@@ -265,6 +265,7 @@ const (
 	AssetRoleSourceSubtitle     AssetRole = "source_subtitle"
 	AssetRoleTranslatedSubtitle AssetRole = "translated_subtitle"
 	AssetRoleDubAudio           AssetRole = "dub_audio"
+	AssetRoleFullDubAudio       AssetRole = "full_dub_audio"
 	AssetRoleTranslatedVideo    AssetRole = "translated_video"
 	AssetRoleFinalVideo         AssetRole = "final_video"
 )
@@ -274,7 +275,7 @@ func (r AssetRole) Valid() bool {
 	switch r {
 	case "", AssetRoleOriginal, AssetRoleVoice, AssetRoleAmbience, AssetRoleCleanVideo,
 		AssetRoleSourceSubtitle, AssetRoleTranslatedSubtitle, AssetRoleDubAudio,
-		AssetRoleTranslatedVideo, AssetRoleFinalVideo:
+		AssetRoleFullDubAudio, AssetRoleTranslatedVideo, AssetRoleFinalVideo:
 		return true
 	default:
 		return false

@@ -56,6 +56,7 @@ export type AssetRole =
   | "source_subtitle"
   | "translated_subtitle"
   | "dub_audio"
+  | "full_dub_audio"
   | "translated_video"
   | "final_video";
 

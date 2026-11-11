@@ -212,6 +212,9 @@ func (s *Service) advancePipeline(ctx context.Context, tx *store.Tx, runID domai
 					return err
 				}
 			}
+			if err := s.ensureCloneAudioAssembly(ctx, tx, snap, language, revision, events); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -789,6 +792,14 @@ func (s *Service) computeCloneStatus(
 		segmentOutcomes, err := s.cloneTaskOutcomes(ctx, tx, snap, language, revision)
 		if err != nil {
 			return domain.NodeStatusPending, err
+		}
+		if cloneAudioAssemblyRequired(*snap.run) &&
+			aggregateNodeStatus(segmentOutcomes, domain.NodeKeyClone) == domain.NodeStatusDone {
+			if task, ok := latestCloneAudioAssemblyTask(snap.tasks, language); ok {
+				outcomes = append(outcomes, taskNodeStatus(task))
+			} else {
+				outcomes = append(outcomes, domain.NodeStatusPending)
+			}
 		}
 		outcomes = append(outcomes, segmentOutcomes...)
 	}

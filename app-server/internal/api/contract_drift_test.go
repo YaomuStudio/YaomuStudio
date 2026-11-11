@@ -602,7 +602,7 @@ var enumGuards = []enumGuard{
 	{"AssetRole", "AssetRole", "", enumStrings(
 		domain.AssetRoleOriginal, domain.AssetRoleVoice, domain.AssetRoleAmbience,
 		domain.AssetRoleCleanVideo, domain.AssetRoleSourceSubtitle,
-		domain.AssetRoleTranslatedSubtitle, domain.AssetRoleDubAudio,
+		domain.AssetRoleTranslatedSubtitle, domain.AssetRoleDubAudio, domain.AssetRoleFullDubAudio,
 		domain.AssetRoleTranslatedVideo, domain.AssetRoleFinalVideo,
 	)},
 	{"AssetStatus", "AssetStatus", "", enumStrings(

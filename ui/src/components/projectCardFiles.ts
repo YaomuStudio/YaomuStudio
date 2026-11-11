@@ -41,6 +41,7 @@ const ROLE_ORDER: AssetRole[] = [
   "source_subtitle",
   "translated_subtitle",
   "dub_audio",
+  "full_dub_audio",
   "translated_video",
   "final_video",
 ];
@@ -140,7 +141,8 @@ function assetExtension(asset: Asset, role: AssetRole | undefined): string {
     asset.type === "audio_track" ||
     role === "voice" ||
     role === "ambience" ||
-    role === "dub_audio"
+    role === "dub_audio" ||
+    role === "full_dub_audio"
   ) {
     return ".wav";
   }
@@ -247,6 +249,21 @@ function metaFor(asset: Asset): DownloadMeta {
         previewLabel: t("workbench.card.dl.dubAudioPlain"),
         prefix: "_",
       };
+    case "full_dub_audio":
+      if (lang) {
+        return {
+          label: t("workbench.card.dl.langFullDub", { language: lang }),
+          stem: t("workbench.card.dl.langFullDub", { language: lang }),
+          previewLabel: t("workbench.card.dl.langFullDub", { language: lang }),
+          prefix: "_",
+        };
+      }
+      return {
+        label: t("workbench.card.dl.fullDub"),
+        stem: t("workbench.card.dl.fullDub"),
+        previewLabel: t("workbench.card.dl.fullDub"),
+        prefix: "_",
+      };
     case "translated_video": {
       const label = lang
         ? t("workbench.card.dl.langVideo", { language: lang })
@@ -273,7 +290,9 @@ function roleVisible(simpleType: CardSimpleType, role: AssetRole): boolean {
     case "translate":
       return ["source_subtitle", "translated_subtitle"].includes(role);
     case "clone":
-      return ["voice", "source_subtitle", "translated_subtitle", "dub_audio"].includes(role);
+      return ["voice", "source_subtitle", "translated_subtitle", "dub_audio", "full_dub_audio"].includes(
+        role,
+      );
     case "extract":
       return ["original", "source_subtitle"].includes(role);
     default:
@@ -282,7 +301,9 @@ function roleVisible(simpleType: CardSimpleType, role: AssetRole): boolean {
 }
 
 function roleGroup(asset: Asset, role: AssetRole | undefined): DownloadGroup {
-  if (role === "voice" || role === "ambience" || role === "dub_audio") return "audio";
+  if (role === "voice" || role === "ambience" || role === "dub_audio" || role === "full_dub_audio") {
+    return "audio";
+  }
   if (role === "source_subtitle" || role === "translated_subtitle") return "subtitle";
   if (asset.type === "audio" || asset.type === "audio_track") return "audio";
   if (asset.type === "subtitle") return "subtitle";
@@ -333,9 +354,21 @@ export function buildProjectDownloadItems(
     fileSafe(options.projectName) || t("workbench.card.dl.projectFallback");
   const simpleType = options.simpleType ?? "";
   const allowedGroups = options.allowedGroups ?? ALL_GROUPS;
+  const fullDubLanguages = new Set(
+    options.assets
+      .filter((asset) => asset.status === "ready" && asset.role === "full_dub_audio")
+      .map((asset) => asset.language ?? ""),
+  );
   const candidates = options.assets
     .filter((asset) => asset.status === "ready" && DOWNLOADABLE_TYPES.has(asset.type))
     .filter((asset) => {
+      if (
+        simpleType === "clone" &&
+        asset.role === "dub_audio" &&
+        fullDubLanguages.has(asset.language ?? "")
+      ) {
+        return false;
+      }
       const role = asset.role;
       // 无/未知 role 保留为文件级条目，不能因其他资产有 role 而整体丢失。
       if (!isKnownRole(role)) return true;

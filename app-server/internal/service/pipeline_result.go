@@ -167,6 +167,9 @@ func (p *preparedNodeResult) AfterCommit() error {
 
 // assetRoleForTask 按任务/节点与媒体职责给出产物角色；未知组合留空。
 func assetRoleForTask(task domain.Task, meta *domain.MediaMeta) domain.AssetRole {
+	if isCloneAudioAssemblyTask(task) {
+		return domain.AssetRoleFullDubAudio
+	}
 	if task.Kind == domain.TaskKindSegment {
 		return domain.AssetRoleDubAudio
 	}

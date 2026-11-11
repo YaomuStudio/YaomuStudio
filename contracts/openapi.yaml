@@ -2854,12 +2854,14 @@ components:
       type: string
       enum:
         [original, voice, ambience, clean_video, source_subtitle, translated_subtitle,
-         dub_audio, translated_video, final_video]
+         dub_audio, full_dub_audio, translated_video, final_video]
       description: >-
         产物角色（可选，旧资产省略则按 AssetType 降级）。original=原片/原音频，
         voice=人声，ambience=环境音，clean_video=纯净版，source_subtitle=原文字幕，
-        translated_subtitle=译文字幕，dub_audio=配音音频，translated_video=分语种视频，
-        final_video=混合成片。产物是否存在以 Asset 记录为准，不额外返回远端 URL。
+        translated_subtitle=译文字幕，dub_audio=句级配音候选，
+        full_dub_audio=音色克隆工具按时间轴合成的完整配音，
+        translated_video=分语种视频，final_video=混合成片。
+        产物是否存在以 Asset 记录为准，不额外返回远端 URL。
 
     AssetImportRequest:
       type: object

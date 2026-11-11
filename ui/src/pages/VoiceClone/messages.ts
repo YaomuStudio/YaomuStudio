@@ -56,13 +56,13 @@ const messages: AreaMessages = {
     "voiceClone.opt.adjustHint":
       "Not supported in this version: dubbing duration is not stretched or shrunk, so this option is disabled.",
 
-    "voiceClone.result.desc": "Clone progress and the recommended audio for each line appear here.",
+    "voiceClone.result.desc": "When cloning finishes, one full dubbing track appears here.",
     "voiceClone.result.idle": "Not started",
     "voiceClone.result.running": "Cloning",
     "voiceClone.result.emptyTitle": "Created tasks appear here",
     "voiceClone.result.emptyDesc":
       "Upload a clean vocal track and subtitles, choose languages, then click Create.",
-    "voiceClone.result.missing": "Clone finished but translated tracks or audio candidates were missing.",
+    "voiceClone.result.missing": "Clone finished, but the full dubbing track was not produced.",
     "voiceClone.result.noCandidate": "No audio candidate for this line.",
     "voiceClone.result.candidate": "Recommended · {model}",
     "voiceClone.result.lineCount": "{count} lines",
@@ -127,12 +127,12 @@ const messages: AreaMessages = {
     "voiceClone.opt.adjust": "时长动态调整",
     "voiceClone.opt.adjustHint": "当前版本暂不支持时长调整：不会伸缩配音时长，因此该选项不可用。",
 
-    "voiceClone.result.desc": "克隆进度与每句推荐音频在此显示。",
+    "voiceClone.result.desc": "克隆完成后，这里显示一条完整配音。",
     "voiceClone.result.idle": "未开始",
     "voiceClone.result.running": "克隆中",
     "voiceClone.result.emptyTitle": "创建后在此显示进度/结果",
     "voiceClone.result.emptyDesc": "上传纯净人声轨与字幕、选择目标语言后，点击「创建」。",
-    "voiceClone.result.missing": "克隆完成，但缺少译文轨或音频候选。",
+    "voiceClone.result.missing": "克隆完成，但没有生成完整配音。",
     "voiceClone.result.noCandidate": "该句没有音频候选。",
     "voiceClone.result.candidate": "推荐 · {model}",
     "voiceClone.result.lineCount": "{count} 句",

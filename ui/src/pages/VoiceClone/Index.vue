@@ -7,7 +7,7 @@ import { messageNotice, renderNotice, type SafeNotice } from "@/i18n/notice";
 import { TARGET_LANGUAGES, targetLanguageLabel } from "@/domain/languages";
 import { detectFileLanguage } from "@/domain/subtitleLanguage";
 import type {
-  AudioCandidate,
+  Asset,
   Capability,
   CapabilitySlotKey,
   Project,
@@ -60,11 +60,9 @@ interface TranslatedFile extends PickedFile {
   language?: string;
 }
 
-interface CandidateRow {
-  segmentId: string;
-  text: string;
+interface FullDubRow {
   language: string;
-  candidate: AudioCandidate | null;
+  asset: Asset;
 }
 
 const desktopApi = typeof window !== "undefined" ? window.yaomu?.api : undefined;
@@ -106,7 +104,7 @@ const adjustDuration = ref(false);
 const showErrors = ref(false);
 const pathError = ref("");
 const resultError = ref("");
-const resultRows = ref<CandidateRow[]>([]);
+const resultRows = ref<FullDubRow[]>([]);
 const saveBusy = ref("");
 const saveMessage = ref<SafeNotice | null>(null);
 const saveError = ref<SafeNotice | null>(null);
@@ -427,50 +425,41 @@ async function create(): Promise<void> {
 }
 
 async function loadResult(project: Project): Promise<void> {
-  const rows: CandidateRow[] = [];
-  let missingTrack = false;
-  for (const language of resultLanguages.value) {
-    const track = project.tracks.find(
-      (item) => item.type === "translation" && item.language === language,
-    );
-    const revision =
-      track?.revisions.find((item) => item.id === track.currentRevisionId) ??
-      track?.revisions.at(-1);
-    if (!revision || revision.segments.length === 0) {
-      missingTrack = true;
-      continue;
-    }
-    for (const segment of revision.segments) {
-      let candidates: AudioCandidate[] = [];
-      try {
-        candidates = await api.listCandidates(segment.id, language);
-      } catch {
-        candidates = [];
-      }
-      rows.push({
-        segmentId: segment.id,
-        text: segment.text,
-        language,
-        candidate: candidates.find((item) => item.isRecommended) ?? candidates[0] ?? null,
-      });
-    }
-  }
-  resultRows.value = rows;
-  if (missingTrack || rows.length === 0) {
+  const runId = currentRun.value?.id;
+  const rows = project.assets.filter(
+    (asset) =>
+      asset.status === "ready" &&
+      asset.role === "full_dub_audio" &&
+      (asset.type === "audio" || asset.type === "audio_track") &&
+      (!runId || !asset.runId || asset.runId === runId),
+  );
+  const languages = resultLanguages.value;
+  const ordered = [...rows].sort((a, b) => {
+    const left = languages.indexOf(a.language ?? "");
+    const right = languages.indexOf(b.language ?? "");
+    const leftRank = left === -1 ? languages.length : left;
+    const rightRank = right === -1 ? languages.length : right;
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  resultRows.value = ordered.map((asset) => ({
+    language: asset.language ?? "",
+    asset,
+  }));
+  const finished = currentRun.value?.status === "SUCCEEDED" || currentRun.value?.status === "PARTIAL";
+  if (finished && resultRows.value.length === 0) {
     resultError.value = t("voiceClone.result.missing");
   }
 }
 
-async function saveCandidate(row: CandidateRow): Promise<void> {
-  const candidate = row.candidate;
-  if (!candidate) return;
-  saveBusy.value = candidate.audioAssetId;
+async function saveFullDub(row: FullDubRow): Promise<void> {
+  saveBusy.value = row.asset.id;
   saveMessage.value = null;
   saveError.value = null;
   try {
     const saved = await api.saveAsset({
-      assetId: candidate.audioAssetId,
-      suggestedName: `clone-${row.language}-${row.segmentId}.wav`,
+      assetId: row.asset.id,
+      suggestedName: row.language ? `clone-${row.language}.wav` : "clone-full.wav",
       title: t("voiceClone.result.save"),
     });
     if (!saved) return;
@@ -484,7 +473,13 @@ async function saveCandidate(row: CandidateRow): Promise<void> {
 
 onMounted(() => {
   if (caps.slots.length === 0) void caps.load().catch(() => undefined);
-  void restoreRun("tool_voice_clone").catch(() => undefined);
+  void (async () => {
+    const restored = await restoreRun("tool_voice_clone");
+    if (!restored?.projectId) return;
+    if (restored.status !== "SUCCEEDED" && restored.status !== "PARTIAL") return;
+    const project = await api.getProject(restored.projectId);
+    await loadResult(project);
+  })().catch(() => undefined);
 });
 </script>
 
@@ -762,24 +757,16 @@ onMounted(() => {
           <template #header>
             <div class="summary-head">
               <span>{{ group.label }}</span>
-              <YmBadge tone="success">
-                {{ t("voiceClone.result.lineCount", { count: group.rows.length }) }}
-              </YmBadge>
             </div>
           </template>
           <ul class="candidate-list">
-            <li v-for="row in group.rows" :key="row.segmentId" class="candidate-row">
-              <span class="candidate-text">{{ row.text }}</span>
-              <span class="candidate-meta">
-                {{ row.candidate
-                  ? t("voiceClone.result.candidate", { model: row.candidate.modelVersion })
-                  : t("voiceClone.result.noCandidate") }}
-              </span>
+            <li v-for="row in group.rows" :key="row.asset.id" class="candidate-row">
+              <span class="candidate-text">{{ row.asset.name }}</span>
+              <span class="candidate-meta">{{ formatBytes(row.asset.sizeBytes) }}</span>
               <YmButton
-                v-if="row.candidate"
                 size="sm"
-                :disabled="saveBusy === row.candidate.audioAssetId"
-                @click="saveCandidate(row)"
+                :disabled="saveBusy === row.asset.id"
+                @click="saveFullDub(row)"
               >
                 {{ t("voiceClone.result.save") }}
               </YmButton>
