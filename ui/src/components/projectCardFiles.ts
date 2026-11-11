@@ -363,7 +363,6 @@ export function buildProjectDownloadItems(
     .filter((asset) => asset.status === "ready" && DOWNLOADABLE_TYPES.has(asset.type))
     .filter((asset) => {
       if (
-        simpleType === "clone" &&
         asset.role === "dub_audio" &&
         fullDubLanguages.has(asset.language ?? "")
       ) {

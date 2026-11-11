@@ -25,10 +25,23 @@ type frozenCloneAudioPlan struct {
 	Params   map[string]any
 }
 
-// cloneAudioAssemblyRequired 限定在音色克隆工具模板：它的产出必须是完整音频，
-// 而不是只有逐句候选。自定义流水线/全流程的 08 仍按各自计划合成视频。
+// cloneAudioAssemblyRequired 报告这次运行的克隆成品必须是一条完整音轨。
+//
+// 音色克隆工具和含克隆的专属链路都是这样。全流程的成品仍是 08 成片，
+// 不另做这条音频合成。
 func cloneAudioAssemblyRequired(run domain.WorkflowRun) bool {
-	return run.Template == templateVoiceClone
+	if run.Template == templateVoiceClone {
+		return true
+	}
+	if run.Template != templateCustomPipeline {
+		return false
+	}
+	for _, node := range run.Nodes {
+		if node.Key == domain.NodeKeyClone {
+			return true
+		}
+	}
+	return false
 }
 
 func isCloneAudioAssemblyParams(params map[string]any) bool {
@@ -278,5 +291,65 @@ func (s *Service) ensureCloneAudioAssemblyFailure(
 	}
 	snap.tasks = append(snap.tasks, task)
 	snap.taskByID[task.ID] = task
+	return nil
+}
+
+// BackfillMissingCloneAudio 为已经成功、但还没有完整音轨的克隆运行补一条合成任务。
+//
+// 只处理 SUCCEEDED。进行中的运行会在句级任务提交后自行创建；失败和取消的运行不重开。
+func (s *Service) BackfillMissingCloneAudio(ctx context.Context) error {
+	if !s.opts.PipelineOrchestration || s.opts.WorkspaceID == "" {
+		return nil
+	}
+	summaries, err := s.store.ListProjectSummaries(ctx, domain.ID(s.opts.WorkspaceID))
+	if err != nil {
+		return err
+	}
+	for _, summary := range summaries {
+		runs, err := s.store.ListProjectRuns(ctx, summary.ID)
+		if err != nil {
+			return err
+		}
+		for _, run := range runs {
+			if run.Status != domain.RunStatusSucceeded || !cloneAudioAssemblyRequired(run) {
+				continue
+			}
+			var events []domain.DomainEvent
+			err := s.store.DoTx(ctx, func(tx *store.Tx) error {
+				snap, err := s.loadPipelineSnapshot(ctx, tx, run.ID)
+				if err != nil {
+					return err
+				}
+				if snap.run.Status != domain.RunStatusSucceeded || !cloneAudioAssemblyRequired(*snap.run) {
+					return nil
+				}
+				tpl, err := pipelineTemplateForRun(*snap.run)
+				if err != nil {
+					return err
+				}
+				for _, language := range snap.run.Languages {
+					revision := translationRevisionForRun(snap, language, tpl)
+					if err := s.ensureCloneAudioAssembly(ctx, tx, snap, language, revision, &events); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+			if len(events) == 0 {
+				continue
+			}
+			s.publish(events...)
+			s.notify()
+			if s.log != nil {
+				s.log.Info("service", "service.clone_audio_backfill", map[string]any{
+					"run_id": string(run.ID),
+					"events": len(events),
+				})
+			}
+		}
+	}
 	return nil
 }

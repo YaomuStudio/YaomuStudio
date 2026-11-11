@@ -120,6 +120,10 @@ func (p *pipelineExecutor) Execute(
 		if !write("candidate.wav", "candidate-audio") {
 			return pipelineFailure("PIPELINE_WRITE_FAILED", "candidate")
 		}
+	case "07_clone":
+		if !write("full.wav", "full-dub") {
+			return pipelineFailure("PIPELINE_WRITE_FAILED", "clone-assembly")
+		}
 	case "08_mix":
 		if !write("preview.mp4", "preview-video") {
 			return pipelineFailure("PIPELINE_WRITE_FAILED", "mix")

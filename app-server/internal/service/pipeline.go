@@ -362,7 +362,14 @@ func (s *Service) ensurePipelineTask(
 	params map[string]any,
 	events *[]domain.DomainEvent,
 ) error {
-	if snap.run.Status.Terminal() {
+	// 句级克隆在旧规则下会把专属链路标成已成功。补齐完整音轨时允许在
+	// SUCCEEDED 上追加这一条任务，不把失败或已取消的运行重新打开。
+	assemblyOnSucceeded := snap.run.Status == domain.RunStatusSucceeded &&
+		kind == domain.TaskKindNode &&
+		node == domain.NodeKeyClone &&
+		segmentID == "" &&
+		isCloneAudioAssemblyParams(params)
+	if snap.run.Status.Terminal() && !assemblyOnSucceeded {
 		return nil
 	}
 	params, modelLock, err := freezeTaskParams(*snap.run, node, params)
@@ -383,7 +390,7 @@ func (s *Service) ensurePipelineTask(
 	}
 	freezeSubtitleOutput(snap, node, language, params)
 	status := domain.TaskStatusQueued
-	if !domain.RunAllowsDispatch(snap.run.Status) {
+	if !domain.RunAllowsDispatch(snap.run.Status) && !assemblyOnSucceeded {
 		status = domain.TaskStatusPaused
 	}
 	now := s.Now()

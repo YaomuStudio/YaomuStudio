@@ -141,8 +141,9 @@ func DecodeTaskCursor(cursor string) (createdAt, id string, err error) {
 // NextDispatchableTask 返回下一条可派发任务（QUEUED 且所属 Run 允许派发）。
 //
 // 没有 run_id 的任务（例如独立导出）不受 Run 闸门约束；导出是交付动作，
-// 即使来源 Run 已暂停/终止也允许执行（不占用模型槽）。PAUSED/终止 Run 的
-// 其他任务不会被选中（docs/local-api-contract.md §8）。
+// 即使来源 Run 已暂停/终止也允许执行（不占用模型槽）。已成功的克隆/专属链路
+// 只额外放行补齐完整音轨的 07 assemble 任务，不重开 Run。其余终止 Run 的
+// 任务不会被选中（docs/local-api-contract.md §8）。
 func (q *querier) NextDispatchableTask(ctx context.Context) (domain.Task, bool, error) {
 	return q.nextDispatchableTask(ctx, true)
 }
@@ -173,17 +174,25 @@ func (q *querier) nextDispatchableTask(ctx context.Context, includeExport bool) 
 
 // dispatchableTaskWhere 是“可派发任务”的唯一 SQL 谓词：QUEUED/WAITING_RESOURCE，
 // 且所属 Run 允许派发（无 Run 的独立任务与导出不受 Run 暂停/终止闸门约束）。
+// 已成功 Run 上补齐完整配音的 07 assemble 任务是唯一的节点例外。
 // 单条派发与批量等待原因扫描共用它，避免两套候选口径漂移。
 func dispatchableTaskWhere(includeExport bool) (string, []any) {
 	args := []any{
 		string(domain.TaskStatusQueued), string(domain.TaskStatusWaitingResource),
 		string(domain.TaskKindExport),
+		string(domain.RunStatusSucceeded),
+		string(domain.TaskKindNode),
+		string(domain.NodeKeyClone),
 	}
 	clause := `tasks.status IN (?, ?)
 		  AND (tasks.run_id IS NULL OR tasks.run_id = '' OR tasks.kind = ?
 		       OR EXISTS (
 			SELECT 1 FROM workflow_runs r
-			WHERE r.id = tasks.run_id AND r.status IN ('QUEUED', 'RUNNING', 'WAITING_REVIEW')))`
+			WHERE r.id = tasks.run_id AND (
+				r.status IN ('QUEUED', 'RUNNING', 'WAITING_REVIEW')
+				OR (r.status = ? AND tasks.kind = ? AND tasks.node_key = ?
+				    AND COALESCE(tasks.segment_id, '') = ''
+				    AND json_extract(tasks.params_json, '$.op') = 'assemble'))))`
 	if !includeExport {
 		clause += ` AND tasks.kind != ?`
 		args = append(args, string(domain.TaskKindExport))

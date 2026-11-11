@@ -537,3 +537,41 @@ func TestTransactionalTaskEventReceipt(t *testing.T) {
 		t.Errorf("rolled back receipt error = %v, want ErrNotFound", err)
 	}
 }
+
+func TestNextDispatchableKeepsSucceededCloneAssembly(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	project := seedProject(t, s, "project-assembly")
+	seedRun(t, s, project.ID, "run-assembly")
+	if _, err := s.DB().Exec(`UPDATE workflow_runs SET status = ? WHERE id = ?`,
+		string(domain.RunStatusSucceeded), "run-assembly"); err != nil {
+		t.Fatalf("mark run succeeded: %v", err)
+	}
+	sentence := domain.Task{
+		ID: "task-sentence", ProjectID: project.ID, RunID: "run-assembly",
+		Kind: domain.TaskKindSegment, NodeKey: domain.NodeKeyClone, SegmentID: "seg-1",
+		Language: "ja", Status: domain.TaskStatusQueued,
+		Params:    map[string]any{"text": "一句"},
+		CreatedAt: testTime, UpdatedAt: testTime,
+	}
+	assembly := domain.Task{
+		ID: "task-assembly", ProjectID: project.ID, RunID: "run-assembly",
+		Kind: domain.TaskKindNode, NodeKey: domain.NodeKeyClone,
+		Language: "ja", Status: domain.TaskStatusQueued,
+		Params:    map[string]any{"op": "assemble", "out": "full.wav"},
+		CreatedAt: testTime.Add(time.Second), UpdatedAt: testTime.Add(time.Second),
+	}
+	if err := s.CreateTask(ctx, sentence); err != nil {
+		t.Fatalf("CreateTask(sentence): %v", err)
+	}
+	if err := s.CreateTask(ctx, assembly); err != nil {
+		t.Fatalf("CreateTask(assembly): %v", err)
+	}
+	got, ok, err := s.NextDispatchableTask(ctx)
+	if err != nil {
+		t.Fatalf("NextDispatchableTask: %v", err)
+	}
+	if !ok || got.ID != assembly.ID {
+		t.Fatalf("dispatchable = %s ok=%v, want assembly", got.ID, ok)
+	}
+}

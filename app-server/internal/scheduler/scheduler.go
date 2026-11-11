@@ -452,7 +452,10 @@ func (s *Scheduler) claim(ctx context.Context, taskID domain.ID) (*claim, bool, 
 				return err
 			}
 			if !domain.RunAllowsDispatch(current.Status) {
-				return errSkip
+				// 已成功的专属链路/克隆工具可以补跑缺失的完整音轨，不重开 Run。
+				if current.Status != domain.RunStatusSucceeded || !taskAssemblesCloneAudio(task) {
+					return errSkip
+				}
 			}
 			run = &current
 			if current.Status == domain.RunStatusQueued {
@@ -905,6 +908,10 @@ func runnerParamsFor(adapterID string, params map[string]any) map[string]any {
 		delete(out, "adjust_duration")
 		delete(out, "validate_timestamps")
 	}
+	if adapterID == ffmpegAdapterID {
+		// language 用来区分任务身份，不是 ffmpeg 混音参数。
+		delete(out, "language")
+	}
 	return out
 }
 
@@ -1038,6 +1045,16 @@ func projectFileInputParam(
 	return out
 }
 
+// taskAssemblesCloneAudio 识别把已完成句级配音铺到时间轴上的完整音轨任务。
+// 它使用 ffmpeg，不再次调用克隆模型。
+func taskAssemblesCloneAudio(task domain.Task) bool {
+	if task.Kind != domain.TaskKindNode || task.NodeKey != domain.NodeKeyClone || task.SegmentID != "" {
+		return false
+	}
+	op, _ := task.Params["op"].(string)
+	return op == "assemble"
+}
+
 // adapterForTask 按任务类型选择执行适配器。
 //
 // 03 分离 → separate；07 克隆 / 句段任务 → voice_clone；06 翻译 → translate
@@ -1046,7 +1063,7 @@ func projectFileInputParam(
 // ModelLock 只作模型引用，不决定 adapter.id。
 func adapterForTask(task domain.Task) (adapter, runtime, model execadapter.ComponentRef) {
 	model = componentRef(task.ModelLock, "model")
-	if task.Kind == domain.TaskKindExport || task.NodeKey == domain.NodeKeyMix {
+	if task.Kind == domain.TaskKindExport || task.NodeKey == domain.NodeKeyMix || taskAssemblesCloneAudio(task) {
 		ref := execadapter.ComponentRef{ID: ffmpegAdapterID, Digest: ffmpegAdapterDigest}
 		return ref, ref, model
 	}

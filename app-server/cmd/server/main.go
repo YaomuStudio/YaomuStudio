@@ -248,6 +248,9 @@ func run() error {
 	if err := sched.Start(rootCtx); err != nil {
 		return fmt.Errorf("scheduler start: %w", err)
 	}
+	if err := svc.BackfillMissingCloneAudio(rootCtx); err != nil {
+		logger.Warn("core", "core.clone_audio_backfill_failed", map[string]any{"error": err.Error()})
+	}
 	go maintainEventRetention(rootCtx, st, logger)
 
 	localManager, err := localapi.NewManager(st, logger, localapi.Options{})

@@ -40,13 +40,20 @@ func TestVoiceCloneRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListRunTasks: %v", err)
 	}
-	if len(tasks) != 2 {
-		t.Fatalf("tasks = %d, want two 07 segment tasks", len(tasks))
-	}
+	segmentTasks := 0
+	assemblyTasks := 0
 	for _, task := range tasks {
-		if task.Kind != domain.TaskKindSegment || task.NodeKey != domain.NodeKeyClone {
-			t.Fatalf("task = %s/%s, want segment/07", task.Kind, task.NodeKey)
+		if task.Kind == domain.TaskKindNode && task.NodeKey == domain.NodeKeyClone && task.Params["op"] == "assemble" {
+			assemblyTasks++
+			if task.Status != domain.TaskStatusSucceeded {
+				t.Fatalf("assembly %s status = %s", task.ID, task.Status)
+			}
+			continue
 		}
+		if task.Kind != domain.TaskKindSegment || task.NodeKey != domain.NodeKeyClone {
+			t.Fatalf("task = %s/%s, want segment/07 or full-audio assembly", task.Kind, task.NodeKey)
+		}
+		segmentTasks++
 		if task.Status != domain.TaskStatusSucceeded {
 			t.Fatalf("task %s status = %s", task.ID, task.Status)
 		}
@@ -69,6 +76,9 @@ func TestVoiceCloneRun(t *testing.T) {
 		if len(candidates) != 1 || !candidates[0].IsRecommended || candidates[0].AudioAssetID == "" {
 			t.Fatalf("candidates for %s = %+v", task.SegmentID, candidates)
 		}
+	}
+	if segmentTasks != 2 || assemblyTasks != 1 {
+		t.Fatalf("segment tasks = %d, assembly tasks = %d, want 2 and 1", segmentTasks, assemblyTasks)
 	}
 
 	gates, err := e.st.ListProjectReviews(context.Background(), project, string(run.ID))

@@ -19,7 +19,6 @@ import { detectFileLanguage } from "@/domain/subtitleLanguage";
 import type {
   Asset,
   SubtitleStyle,
-  AudioCandidate,
   Capability,
   CapabilitySlotKey,
   CustomPipelineFeature,
@@ -88,15 +87,6 @@ interface TrackResult {
   track: SubtitleTrack;
   revision: SubtitleRevision;
   lineCount: number;
-}
-
-interface CandidateRow {
-  key: string;
-  language: string;
-  segmentId: string;
-  text: string;
-  candidate: AudioCandidate;
-  alternatives: number;
 }
 
 interface ExportState {
@@ -213,7 +203,7 @@ const separationAssets = ref<Asset[]>([]);
 const eraseAssets = ref<Asset[]>([]);
 const mixAssets = ref<Asset[]>([]);
 const translatedTracks = ref<TrackResult[]>([]);
-const candidateRows = ref<CandidateRow[]>([]);
+const fullDubAssets = ref<Asset[]>([]);
 const resultError = ref("");
 const saveBusy = ref("");
 const saveMessage = ref<SafeNotice | null>(null);
@@ -723,7 +713,7 @@ async function create(): Promise<void> {
   eraseAssets.value = [];
   mixAssets.value = [];
   translatedTracks.value = [];
-  candidateRows.value = [];
+  fullDubAssets.value = [];
   pendingReviews.value = [];
 
   const result = await startRun({
@@ -801,25 +791,8 @@ async function loadResults(project: Project, run: WorkflowRun): Promise<void> {
   }
   translatedTracks.value = tracks;
 
-  const rows: CandidateRow[] = [];
-  if (cloneSelected.value) {
-    for (const item of tracks) {
-      for (const segment of item.revision.segments) {
-        const candidates = await api.listCandidates(segment.id, item.language);
-        const candidate = candidates.find((option) => option.isRecommended) ?? candidates[0];
-        if (!candidate) continue;
-        rows.push({
-          key: `${item.language}:${segment.id}`,
-          language: item.language,
-          segmentId: segment.id,
-          text: segment.text,
-          candidate,
-          alternatives: Math.max(candidates.length - 1, 0),
-        });
-      }
-    }
-  }
-  candidateRows.value = rows;
+  const fullDub = cloneSelected.value ? await loadFullDubAssets(run.id, project.id) : [];
+  fullDubAssets.value = fullDub;
 
   if (features.includes("separation") && separation.length === 0) {
     resultError.value = t("tools.custom.result.separationMissing");
@@ -829,28 +802,33 @@ async function loadResults(project: Project, run: WorkflowRun): Promise<void> {
     resultError.value = t("tools.custom.result.mixMissing");
   } else if (needsText.value && tracks.length < selectedLanguages.value.length) {
     resultError.value = t("tools.custom.result.translationMissing");
-  } else if (cloneSelected.value && rows.length === 0) {
+  } else if (cloneSelected.value && fullDub.length === 0) {
     resultError.value = t("tools.custom.result.candidatesMissing");
   }
 }
 
-async function saveCandidateAudio(row: CandidateRow): Promise<void> {
-  saveBusy.value = row.candidate.audioAssetId;
-  saveError.value = null;
-  saveMessage.value = null;
-  try {
-    const saved = await api.saveAsset({
-      assetId: row.candidate.audioAssetId,
-      suggestedName: `${row.language}-${row.segmentId}.wav`,
-      title: t("tools.custom.save.candidateTitle"),
-    });
-    if (!saved) return;
-    saveMessage.value = messageNotice("tools.custom.save.saved", { path: saved.path });
-  } catch {
-    saveError.value = messageNotice("tools.custom.save.failed");
-  } finally {
-    saveBusy.value = "";
+async function loadFullDubAssets(runId: string, projectId: string): Promise<Asset[]> {
+  const started = Date.now();
+  const deadline = started + 3 * 60 * 1000;
+  let sawAssembly = false;
+  while (Date.now() < deadline) {
+    const ready = (await loadAllNodeArtifacts(runId, projectId, "07_clone")).filter(
+      (asset) => asset.role === "full_dub_audio" && asset.status === "ready",
+    );
+    if (ready.length > 0) return ready;
+    const tasks = await api.listTasks({ runId, limit: 200 });
+    const assembly = tasks.items.filter(
+      (task) => task.kind === "node" && task.nodeKey === "07_clone" && !task.segmentId,
+    );
+    if (assembly.length > 0) sawAssembly = true;
+    const terminal = new Set(["SUCCEEDED", "FAILED", "CANCELED", "INTERRUPTED"]);
+    if (assembly.length > 0 && assembly.every((task) => terminal.has(task.status))) {
+      return ready;
+    }
+    if (!sawAssembly && Date.now() - started > 15_000) return [];
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
+  return [];
 }
 
 async function saveAsset(asset: Asset): Promise<void> {
@@ -1441,18 +1419,13 @@ onMounted(() => {
           </div>
         </YmCard>
 
-        <YmCard v-if="candidateRows.length">
+        <YmCard v-if="fullDubAssets.length">
           <template #header><span>{{ t("tools.custom.result.clone") }}</span></template>
           <ul class="asset-list">
-            <li v-for="row in candidateRows" :key="row.key" class="asset-row asset-row--stack">
-              <div class="candidate-text">
-                <span class="candidate-lang">{{ languageLabel(row.language) }}</span>
-                <span class="candidate-line">{{ row.text }}</span>
-                <span class="candidate-meta">
-                  {{ t("tools.custom.result.candidateMeta", { count: row.alternatives }) }}
-                </span>
-              </div>
-              <YmButton size="sm" :disabled="saveBusy === row.candidate.audioAssetId" @click="saveCandidateAudio(row)">
+            <li v-for="asset in fullDubAssets" :key="asset.id" class="asset-row">
+              <span class="asset-row__name">{{ languageLabel(asset.language || "") || asset.name }}</span>
+              <span class="asset-row__meta">{{ formatBytes(asset.sizeBytes) }}</span>
+              <YmButton size="sm" :disabled="saveBusy === asset.id" @click="saveAsset(asset)">
                 {{ t("tools.custom.save.action") }}
               </YmButton>
             </li>

@@ -460,13 +460,16 @@ def build_mix_argv(
     bitrate_kbps: int | None = None,
     sample_rate: int | None = None,
     overwrite: bool = False,
+    max_inputs: int = 32,
 ) -> list[str]:
     """多轨混音 argv；音量、编码器、采样率均为白名单参数。"""
 
     if isinstance(inputs, (str, bytes)) or not isinstance(inputs, Sequence):
         raise ValueError("inputs 必须是 AudioMixInput 数组")
-    if not 1 <= len(inputs) <= 32:
-        raise ValueError("inputs 数量必须在 1..32 之间")
+    if max_inputs < 1:
+        raise ValueError("max_inputs 必须为正")
+    if not 1 <= len(inputs) <= max_inputs:
+        raise ValueError("inputs 数量必须在 1..%d 之间" % max_inputs)
     items: list[AudioMixInput] = []
     for item in inputs:
         if not isinstance(item, AudioMixInput):
@@ -857,11 +860,13 @@ class FfmpegAdapter:
         output_dir = request.output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-        if op == "mix":
+        if op == "mix" or op == "assemble":
             _reject_unknown(params, _MIX_PARAM_KEYS)
             inputs = _parse_audio_inputs(_require_param(params, "inputs"))
             out_rel = _require_relative_output(params.get("out"))
             output = _resolve_output_path(output_dir, out_rel)
+            # 成片混音维持 32 路上限。完整配音要铺下整条字幕，句数可以更多。
+            max_inputs = 512 if op == "assemble" else 32
             argv = build_mix_argv(
                 inputs,
                 output,
@@ -870,8 +875,9 @@ class FfmpegAdapter:
                 bitrate_kbps=_optional_int(params, "bitrate_kbps"),
                 sample_rate=_optional_int(params, "sample_rate"),
                 overwrite=_optional_bool(params, "overwrite"),
+                max_inputs=max_inputs,
             )
-            self._run("mix", argv, timeout_s=600.0)
+            self._run(op, argv, timeout_s=600.0)
         elif op == "video_merge":
             _reject_unknown(params, _VIDEO_MERGE_PARAM_KEYS)
             video_src = _require_param(params, "video_src")
