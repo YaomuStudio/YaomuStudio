@@ -229,5 +229,16 @@ def write_bytes(path: str, payload: bytes) -> int:
     return size
 
 
-def artifact_entry(rel_path: str, abs_path: str) -> dict[str, Any]:
-    return {"rel_path": rel_path, "size_bytes": os.path.getsize(abs_path)}
+def artifact_entry(
+    rel_path: str,
+    abs_path: str,
+    *,
+    media: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    entry: dict[str, Any] = {
+        "rel_path": rel_path,
+        "size_bytes": os.path.getsize(abs_path),
+    }
+    if media:
+        entry["media"] = dict(media)
+    return entry

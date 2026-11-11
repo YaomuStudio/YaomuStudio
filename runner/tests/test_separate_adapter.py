@@ -88,11 +88,32 @@ class SeparateAdapterUnitTests(unittest.TestCase):
             [item["rel_path"] for item in result["outputs"]],
             ["vocals.wav", "bgm.wav"],
         )
+        self.assertEqual(
+            [item["media"]["role"] for item in result["outputs"]],
+            ["vocals", "background"],
+        )
         self.assertGreater(result["outputs"][0]["size_bytes"], 0)
         self.assertEqual(
             (self.output_dir / "vocals.wav").read_bytes(), b"MOCK-SEPARATE-VOCALS\n"
         )
         self.assertEqual(self.adapter.last_environ["CUDA_VISIBLE_DEVICES"], "0")
+
+    def test_role_is_declared_for_custom_output_names(self):
+        result = self.adapter.execute(
+            _execution_request(
+                str(self.output_dir),
+                {
+                    "executor": "mock",
+                    "input": str(self.input_path),
+                    "vocals_name": "lead.wav",
+                    "bgm_name": "bed.wav",
+                },
+            )
+        )
+        self.assertEqual(
+            [(item["rel_path"], item["media"]["role"]) for item in result["outputs"]],
+            [("lead.wav", "vocals"), ("bed.wav", "background")],
+        )
 
     def test_path_escape_rejected(self):
         with self.assertRaises(Exception) as ctx:
@@ -148,6 +169,10 @@ class SeparateAdapterUnitTests(unittest.TestCase):
         )
         self.assertEqual(
             (self.output_dir / "background.wav").read_bytes(), b"REAL-BGM"
+        )
+        self.assertEqual(
+            [item["media"]["role"] for item in result["outputs"]],
+            ["vocals", "background"],
         )
         self.assertIn("xym/melband-roformer:1.0.10", self.adapter.last_argv)
 

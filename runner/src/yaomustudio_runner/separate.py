@@ -39,6 +39,14 @@ from .protocol import ExecutionRequest
 
 LOGGER = logging.getLogger("yaomustudio_runner.separate")
 
+
+def _declared_audio(rel_path: str, abs_path: str, role: str) -> dict[str, Any]:
+    """把适配器自己生成的人声/环境音标成 media.role，不靠文件名让 Core 猜测。"""
+
+    if role not in ("vocals", "background"):
+        raise CapabilityInvalidParams("分离产物角色必须是 vocals 或 background")
+    return artifact_entry(rel_path, abs_path, media={"role": role})
+
 _PARAM_KEYS = frozenset(
     {
         "executor",
@@ -186,8 +194,8 @@ class SeparateAdapter:
             log("runner", "mock 分离完成")
         return {
             "outputs": [
-                artifact_entry(vocals_rel, vocals_abs),
-                artifact_entry(bgm_rel, bgm_abs),
+                _declared_audio(vocals_rel, vocals_abs, "vocals"),
+                _declared_audio(bgm_rel, bgm_abs, "background"),
             ],
             "executor": "mock",
             "device": {
@@ -250,8 +258,8 @@ class SeparateAdapter:
 
         return {
             "outputs": [
-                artifact_entry(vocals_rel, vocals_abs),
-                artifact_entry(bgm_rel, bgm_abs),
+                _declared_audio(vocals_rel, vocals_abs, "vocals"),
+                _declared_audio(bgm_rel, bgm_abs, "background"),
             ],
             "executor": "flashcli",
             "model_ref": "xym/melband-roformer:1.0.10",
