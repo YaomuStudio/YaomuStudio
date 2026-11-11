@@ -527,6 +527,35 @@ export const useTasksStore = defineStore("tasks", () => {
     }
   }
 
+  /**
+   * 没有当前项目时，全局任务列表已经是快照；仍要从事件高水位 H 订阅。
+   * 直接从 0 订阅会在历史被裁剪后立刻 409，重启也不能把游标变新。
+   * H 取任意现存项目的快照 eventSeq（Core 的高水位是工作区级）。
+   */
+  async function readEventHighWatermark(): Promise<number | null> {
+    const candidates: ID[] = [];
+    const fromTask = items.value.find((task) => task.projectId)?.projectId;
+    if (fromTask) candidates.push(fromTask);
+    if (candidates.length === 0) {
+      try {
+        const projects = await api.listProjects();
+        const first = projects[0]?.id;
+        if (first) candidates.push(first);
+      } catch {
+        return null;
+      }
+    }
+    for (const id of candidates) {
+      try {
+        const snapshot = await api.getSnapshot(id);
+        if (Number.isFinite(snapshot.eventSeq) && snapshot.eventSeq >= 0) return snapshot.eventSeq;
+      } catch {
+        // 项目可能刚被删除；换下一个候选。
+      }
+    }
+    return null;
+  }
+
   function subscribe(afterSeq?: number): void {
     unsub?.();
     const epoch = listenEpoch;
@@ -604,6 +633,13 @@ export const useTasksStore = defineStore("tasks", () => {
       }
       await load(projectId ?? undefined).catch(() => undefined);
       if (epoch !== listenEpoch || !snapshotReads.current(token) || unsub) return;
+      const watermark = await readEventHighWatermark();
+      if (epoch !== listenEpoch || !snapshotReads.current(token) || unsub) return;
+      if (watermark !== null) {
+        highWatermark.value = watermark;
+        subscribe(watermark);
+        return;
+      }
       subscribe();
     } finally {
       syncing = false;
@@ -657,6 +693,13 @@ export const useTasksStore = defineStore("tasks", () => {
       }
     }
     if (epoch !== listenEpoch || !snapshotReads.current(token) || unsub) return;
+    const watermark = await readEventHighWatermark();
+    if (epoch !== listenEpoch || !snapshotReads.current(token) || unsub) return;
+    if (watermark !== null) {
+      highWatermark.value = watermark;
+      subscribe(watermark);
+      return;
+    }
     subscribe();
   }
 

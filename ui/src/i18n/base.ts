@@ -61,10 +61,10 @@ const base: AreaMessages = {
     "statusbar.coreHintDown": "Local background service offline. Check logs and retry.",
     "statusbar.device": "Device",
     "statusbar.disk": "Disk",
-    "statusbar.syncCursorExpired": "Live updates stopped — restart the app to resync",
+    "statusbar.syncCursorExpired": "Live updates expired. Reopen the current page to resync.",
     "statusbar.syncStopped": "Live updates stopped",
     "statusbar.syncStoppedHint":
-      "Live updates stopped. Restart the app to resync.",
+      "The Core event stream stopped. Reopen the current page so the app can reload a snapshot.",
 
     // 安装计划确认（FR-MODEL-02）
     "install.plan.title": "Confirm download plan",
@@ -223,7 +223,7 @@ const base: AreaMessages = {
     "error.idempotency_conflict":
       "This request was already submitted with different content. Reload and retry.",
     "error.not_found": "The requested item was not found.",
-    "error.event_cursor_expired": "Live updates stopped. Restart the app to resync.",
+    "error.event_cursor_expired": "Live updates expired. The app must reload a snapshot before continuing.",
     "error.preflight_stale": "The preflight result is stale. Run preflight again.",
     "error.model_not_installed":
       "A required model is not installed. Open Model setup to install it.",
@@ -455,9 +455,9 @@ const base: AreaMessages = {
     "statusbar.coreHintDown": "本地后台服务未连接，请查看日志后重试。",
     "statusbar.device": "设备",
     "statusbar.disk": "磁盘",
-    "statusbar.syncCursorExpired": "实时更新已中断，请重启应用以重新同步",
+    "statusbar.syncCursorExpired": "实时更新游标已过期，请重新进入当前页面以同步",
     "statusbar.syncStopped": "实时更新已停止",
-    "statusbar.syncStoppedHint": "实时更新已停止，请重启应用以重新同步。",
+    "statusbar.syncStoppedHint": "Core 事件流已停止。请重新进入当前页面，应用会重新读取快照。",
 
     // 安装计划确认（FR-MODEL-02）
     "install.plan.title": "确认下载计划",
@@ -608,7 +608,7 @@ const base: AreaMessages = {
     "error.state_conflict": "状态已在别处变化，请刷新后重试。",
     "error.idempotency_conflict": "同一请求已以不同内容提交，请刷新后重试。",
     "error.not_found": "未找到请求的资源。",
-    "error.event_cursor_expired": "实时更新已中断，请重启应用以重新同步。",
+    "error.event_cursor_expired": "实时更新游标已过期，需要重新读取快照后再继续。",
     "error.preflight_stale": "预检结果已过期，请重新预检。",
     "error.model_not_installed": "所需模型尚未安装，请到模型设置完成安装。",
     "error.runtime_incompatible": "当前运行环境或设备无法运行该模型，请检查模型设置与计算设备。",
