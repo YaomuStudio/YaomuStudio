@@ -17,6 +17,7 @@ import YmFileRow from "@/components/ui/YmFileRow.vue";
 import YmIcon from "@/components/ui/YmIcon.vue";
 import YmIconButton from "@/components/ui/YmIconButton.vue";
 import { useProjectsStore } from "@/stores/projects";
+import { loadRecentTargetLanguages } from "@/composables/useRecentTargetLanguages";
 
 interface SelectedVideo {
   /** 桌面端通过授权文件对话框选择时没有 File；仅浏览器 demo 有。 */
@@ -30,7 +31,7 @@ const router = useRouter();
 const projects = useProjectsStore();
 
 const name = ref("");
-const targetLanguages = ref<string[]>([]);
+const targetLanguages = ref<string[]>(loadRecentTargetLanguages("pipeline"));
 const eraseMode = ref<EraseMode>("dialog_only");
 const validateTimestamps = ref(false);
 const adjustDuration = ref(false);

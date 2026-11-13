@@ -76,6 +76,7 @@ import CandidatePanel from "./CandidatePanel.vue";
 import DeliveryPanel from "./DeliveryPanel.vue";
 import ExportPanel from "./ExportPanel.vue";
 import { useDefaultOutputDir } from "@/composables/useDefaultOutputDir";
+import { rememberTargetLanguages } from "@/composables/useRecentTargetLanguages";
 import { deliveryReviewView, translationReviewView } from "./reviewBinding";
 import { useTasksStore } from "@/stores/tasks";
 import { useRuntimeStore } from "@/stores/runtime";
@@ -2044,6 +2045,7 @@ async function startProduction(): Promise<void> {
     // warning 不阻断创建：保留在配置列，按 action_ids 引导到存储设置/清理。
     preflightWarnings.value = uniqueIssues.filter((issue) => issue.severity === "warning");
     const created = await api.createWorkflowRun(payload);
+    rememberTargetLanguages("pipeline", created.languages);
     activeRunId.value = created.id;
     exportLanguage.value = created.languages[0] ?? targetLanguages.value[0] ?? "";
     const outcome = await refreshProject({ force: true });

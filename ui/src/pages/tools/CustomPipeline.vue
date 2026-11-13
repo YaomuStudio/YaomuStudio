@@ -68,6 +68,10 @@ import StylePanel from "@/pages/ManualCorrection/StylePanel.vue";
 import { useDefaultOutputDir } from "@/composables/useDefaultOutputDir";
 import { loadAllNodeArtifacts, useToolRun } from "./useToolRun";
 import { useMediaPreview } from "@/composables/useMediaPreview";
+import {
+  loadRecentTargetLanguages,
+  rememberTargetLanguages,
+} from "@/composables/useRecentTargetLanguages";
 
 interface PickedFile {
   name: string;
@@ -185,7 +189,7 @@ const media = ref<PickedFile | null>(null);
 const { kind: mediaKind, url: mediaPreviewUrl } = useMediaPreview(mediaFile);
 const selectedFunctions = ref<CustomPipelineFeature[]>([]);
 const sourceLanguage = ref("");
-const selectedLanguages = ref<string[]>([]);
+const selectedLanguages = ref<string[]>(loadRecentTargetLanguages("custom"));
 const eraseScope = ref<EraseScope>("dialog_only");
 const selectedOCR = ref<OCRCode>("chinese");
 const ocrQuality = ref<"standard" | "fine">("fine");
@@ -766,6 +770,7 @@ async function create(): Promise<void> {
     },
   });
   if (!result) return;
+  rememberTargetLanguages("custom", selectedLanguages.value);
   resultProject.value = result.project;
   await loadResults(result.project, result.run);
 }

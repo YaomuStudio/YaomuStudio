@@ -179,3 +179,18 @@ test("keeps translations visible when export fails", async ({ page }) => {
   await expect(page.getByText("Export failed.")).toBeVisible();
   await expect(page.getByText("Translated zh-CN line one.")).toBeVisible();
 });
+
+test("remembers the last successful target languages for the feature", async ({ page }) => {
+  await openTranslate(page);
+  await createRun(page);
+  await expect(page.getByText("Translated zh-CN line one.")).toBeVisible();
+
+  // 重建页面（不经过 fixture 重置）后应按该功能上次成功创建的语言预填。
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(
+    page
+      .getByTestId("language-picker-trigger")
+      .locator(".language-chip")
+      .filter({ hasText: "简体中文" }),
+  ).toBeVisible();
+});

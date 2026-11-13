@@ -23,6 +23,10 @@ import {
 import { useCapabilitiesStore } from "@/stores/capabilities";
 import { useCreateGuard } from "@/composables/useCreateGuard";
 import { useCreationFlow } from "@/composables/useCreationFlow";
+import {
+  loadRecentTargetLanguages,
+  rememberTargetLanguages,
+} from "@/composables/useRecentTargetLanguages";
 import { evaluateAccess } from "@/domain/capabilityAccess";
 import WorkbenchPage from "@/components/layout/WorkbenchPage.vue";
 import CapabilityAccessNotice from "@/components/layout/CapabilityAccessNotice.vue";
@@ -95,7 +99,7 @@ const sourceAudio = ref<PickedFile | null>(null);
 const originalSubtitle = ref<PickedFile | null>(null);
 const translatedSubtitles = ref<TranslatedFile[]>([]);
 const sourceLanguage = ref("und");
-const targetLanguages = ref<string[]>([]);
+const targetLanguages = ref<string[]>(loadRecentTargetLanguages("voice-clone"));
 const validateTimestamps = ref(false);
 // 时长调整尚未实现：新建表单固定关闭且不可开启，不伪造可用性。
 const adjustDuration = ref(false);
@@ -418,6 +422,7 @@ async function create(): Promise<void> {
     },
   });
   if (!result) return;
+  rememberTargetLanguages("voice-clone", targetLanguages.value);
   await loadResult(result.project);
 }
 

@@ -24,6 +24,10 @@ import {
 import { useCapabilitiesStore } from "@/stores/capabilities";
 import { useCreateGuard } from "@/composables/useCreateGuard";
 import { useCreationFlow } from "@/composables/useCreationFlow";
+import {
+  loadRecentTargetLanguages,
+  rememberTargetLanguages,
+} from "@/composables/useRecentTargetLanguages";
 import { evaluateAccess } from "@/domain/capabilityAccess";
 import WorkbenchPage from "@/components/layout/WorkbenchPage.vue";
 import CapabilityAccessNotice from "@/components/layout/CapabilityAccessNotice.vue";
@@ -96,7 +100,7 @@ const projectName = ref("");
 const sourceFile = ref<File | null>(null);
 const sourceSubtitle = ref<PickedFile | null>(null);
 const sourceLanguage = ref("und");
-const targetLanguages = ref<string[]>([]);
+const targetLanguages = ref<string[]>(loadRecentTargetLanguages("translate"));
 const showErrors = ref(false);
 const mediaPathError = ref("");
 const resultError = ref("");
@@ -339,6 +343,7 @@ async function create(): Promise<void> {
     },
   });
   if (!result) return;
+  rememberTargetLanguages("translate", targetLanguages.value);
   resultProject.value = result.project;
   // 无轨、无 revision 或空句段都视为失败，不展示成功结果。
   // 一个语种都没产出时不能说“翻译完成”，需指向凭据/执行日志。
