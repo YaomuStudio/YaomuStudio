@@ -92,7 +92,7 @@ jobs:
         env:
           BUNDLE_PYTHON: "1"
           BUNDLE_FFMPEG: "1"
-        run: bash scripts/build-core.sh --arch x64 --out build/core-x64
+        run: bash scripts/build-core.sh --arch x64 --out desktop/build/core-x64
 
       - name: Build NSIS installer
         working-directory: desktop
@@ -161,13 +161,13 @@ jobs:
         env:
           BUNDLE_PYTHON: "1"
           BUNDLE_FFMPEG: "1"
-        run: bash scripts/build-core.sh --arch arm64 --out build/core-arm64
+        run: bash scripts/build-core.sh --arch arm64 --out desktop/build/core-arm64
 
       - name: Build Core + bundled runtime (x64)
         env:
           BUNDLE_PYTHON: "1"
           BUNDLE_FFMPEG: "1"
-        run: bash scripts/build-core.sh --arch x64 --out build/core-x64
+        run: bash scripts/build-core.sh --arch x64 --out desktop/build/core-x64
 
       - name: Build DMG + zip (unsigned preview)
         working-directory: desktop
@@ -238,7 +238,7 @@ jobs:
         env:
           BUNDLE_PYTHON: "1"
           BUNDLE_FFMPEG: "1"
-        run: bash scripts/build-core.sh --arch x64 --out build/core-x64
+        run: bash scripts/build-core.sh --arch x64 --out desktop/build/core-x64
 
       - name: Build AppImage
         working-directory: desktop
