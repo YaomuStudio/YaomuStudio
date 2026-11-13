@@ -5,6 +5,7 @@
 // 绝不能回退成发起 slot，否则已解绑的槽位会被旧回执复活。
 import { CAPABILITY_SLOTS } from "./capabilities";
 import type {
+  Capability,
   CapabilitySlotKey,
   Installation,
   InstallationPhase,
@@ -26,6 +27,20 @@ export function isCapabilitySlotKey(value: unknown): value is CapabilitySlotKey 
 
 export function isInstallationActive(installation: Installation): boolean {
   return ACTIVE_PHASES.has(installation.phase);
+}
+
+/**
+ * 槽位当前是否有可下载的准入发布。
+ *
+ * `engines` 是 Core 按发布准入投影的本地引擎目录（契约：客户端不得写死
+ * 引擎列表）。目录为空表示该槽位尚未适配/准入，安装计划只会返回
+ * release_not_configured；UNSUPPORTED/UNVERIFIED 同理不提供下载入口。
+ * 批量下载与单模型下载都以此为准，避免把未支持的模型计入或发起请求。
+ */
+export function hasDownloadableRelease(capability: Capability | undefined): boolean {
+  if (!capability) return false;
+  if (capability.state === "UNSUPPORTED" || capability.state === "UNVERIFIED") return false;
+  return (capability.engines?.length ?? 0) > 0;
 }
 
 /** 仍引用该物理记录的槽位；旧 Core 缺字段时只按发起槽单槽处理。 */

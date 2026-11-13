@@ -19,6 +19,7 @@ import {
 } from "@/domain/capabilities";
 import {
   activeInstallationForSlot,
+  hasDownloadableRelease,
   installationCoveredSlots,
   planCoverage,
 } from "@/domain/installations";
@@ -246,10 +247,25 @@ function activePhaseLabel(slot: CapabilitySlotKey): string {
   return inst ? t(`models.phase.${inst.phase}`) : "";
 }
 
+/** 当前版本可下载的槽位；未适配/未准入的模型只展示禁用下载，不参与批量下载。 */
+function isDownloadable(slot: CapabilitySlotKey): boolean {
+  return hasDownloadableRelease(capOf(slot));
+}
+
+/** 行内提示：未支持的模型说明没有可下载版本，其余保持模型包信息。 */
+function modelHint(slot: CapabilitySlotKey): string {
+  const cap = capOf(slot);
+  if (cap && !hasDownloadableRelease(cap)) {
+    return t("installation.release_not_configured");
+  }
+  return t("onboarding.models.sizeHint");
+}
+
 const missingModelSlots = computed(() =>
   MODEL_METAS.filter((meta) => {
-    const state = capOf(meta.key)?.state;
-    return state !== undefined && state !== "READY" && state !== "UNSUPPORTED" && !activeInstallation(meta.key);
+    const cap = capOf(meta.key);
+    if (!cap || cap.state === "READY" || activeInstallation(meta.key)) return false;
+    return hasDownloadableRelease(cap);
   }),
 );
 const activeModelSlots = computed(() =>
@@ -279,7 +295,8 @@ async function loadCapabilities(): Promise<void> {
 }
 
 async function installModel(slot: CapabilitySlotKey): Promise<void> {
-  if (activeInstallation(slot)) return;
+  // 未支持的模型没有可解析的发布，直接禁用入口，不发无效计划请求。
+  if (activeInstallation(slot) || !isDownloadable(slot)) return;
   busy.value = slot;
   error.value = null;
   notice.value = null;
@@ -686,7 +703,7 @@ onBeforeUnmount(() => {
                       {{ activeSharedLabel(meta.key) }}
                     </span>
                   </div>
-                  <p v-else class="hint">{{ t("onboarding.models.sizeHint") }}</p>
+                  <p v-else class="hint">{{ modelHint(meta.key) }}</p>
                 </div>
                 <div class="model__actions">
                   <YmButton
@@ -711,6 +728,7 @@ onBeforeUnmount(() => {
                     size="sm"
                     variant="secondary"
                     icon="download"
+                    :disabled="!isDownloadable(meta.key)"
                     :loading="busy === meta.key"
                     @click="installModel(meta.key)"
                   >

@@ -165,6 +165,21 @@ test("an unsupported model slot is shown as not configured without install actio
   await expect(card.getByRole("button", { name: "Download model" })).toHaveCount(0);
 });
 
+test("a model without an admitted release keeps a disabled download action", async ({ page }) => {
+  await seedOnboardedSettings(page);
+  // mock 的 OCR 只有能力记录、没有准入引擎：等价于当前版本尚未提供下载。
+  await seedCapabilityStates(page, { ocr: "NEEDS_SETUP" });
+  await page.goto("/#/settings/models");
+
+  const card = modelCard(page, "Subtitle extraction");
+  const download = card.getByRole("button", { name: "Download model" });
+  await expect(download).toBeVisible();
+  await expect(download).toBeDisabled();
+  await expect(
+    card.getByText("No downloadable version is available for this model yet."),
+  ).toBeVisible();
+});
+
 test("a ready entry shows no setup notice and no recovery action", async ({ page }) => {
   await seedOnboardedSettings(page);
   await page.goto("/#/tools/separate");

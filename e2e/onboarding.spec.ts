@@ -247,18 +247,25 @@ test("downloads all missing models in one confirmation and dedupes shared packag
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /Download all missing models \(6\)/ }).click();
+  // OCR 没有可下载的准入发布：不参与批量下载，单模型下载按钮禁用并说明原因。
+  const ocrRow = page.locator(".model").filter({ hasText: "Subtitle extraction" });
+  await expect(ocrRow.getByRole("button", { name: "Download", exact: true })).toBeDisabled();
+  await expect(
+    ocrRow.getByText("No downloadable version is available for this model yet."),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: /Download all missing models \(5\)/ }).click();
   const dialog = page.locator(".ym-dialog").filter({ hasText: "Download all models" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Total download size");
   await expect(dialog).toContainText("Voice clone");
   await dialog.getByRole("button", { name: "Start download" }).click();
 
-  await expect(page.getByText("Started downloading 6 model packages.")).toBeVisible();
+  await expect(page.getByText("Started downloading 5 model packages.")).toBeVisible();
   const counts = await page.evaluate(() => {
     const control = (window as Window & { __yaomuMock?: Record<string, number> }).__yaomuMock;
     return { plans: control?.planRequests ?? 0, installs: control?.installRequests ?? 0 };
   });
-  expect(counts.plans).toBe(6);
-  expect(counts.installs).toBe(6);
+  expect(counts.plans).toBe(5);
+  expect(counts.installs).toBe(5);
 });

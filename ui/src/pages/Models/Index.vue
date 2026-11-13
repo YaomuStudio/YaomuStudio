@@ -14,6 +14,7 @@ import {
 } from "@/domain/capabilities";
 import {
   activeInstallationForSlot,
+  hasDownloadableRelease,
   installationCoveredSlots,
   latestInstallationForSlot,
   planCoverage,
@@ -157,6 +158,22 @@ const rows = computed<SlotRow[]>(() =>
 function isUnconfigured(row: SlotRow): boolean {
   if (!row.cap) return true;
   return row.cap.state === "UNSUPPORTED" || row.cap.state === "UNVERIFIED";
+}
+
+/** 这些状态下会提供下载入口；没有准入发布时按钮改为禁用。 */
+const DOWNLOAD_STATES: ReadonlySet<SlotState> = new Set<SlotState>([
+  "NEEDS_SETUP",
+  "FAILED",
+  "DEGRADED",
+]);
+
+/** 没有准入发布时说明“暂未提供版本”，不沿用“尚未安装”的误导提示。 */
+function slotHint(row: SlotRow): string {
+  if (!row.cap) return "";
+  if (DOWNLOAD_STATES.has(row.cap.state) && !hasDownloadableRelease(row.cap)) {
+    return t("installation.release_not_configured");
+  }
+  return t(STATE_HINTS[row.cap.state]);
 }
 const modelRows = computed(() =>
   DISPLAY_MODEL_SLOTS.map((slot) => rows.value.find((row) => row.cap?.slot === slot)).filter(
@@ -379,7 +396,8 @@ async function refresh(): Promise<void> {
 }
 
 async function startInstall(slot: CapabilitySlotKey): Promise<void> {
-  if (activeInstallation(slot)) return;
+  // 未支持/未准入的槽位没有可解析的发布，禁用入口且不发无效计划请求。
+  if (activeInstallation(slot) || !hasDownloadableRelease(caps.slotState(slot))) return;
   busySlot.value = slot;
   clearSlotFeedback(slot);
   try {
@@ -707,6 +725,7 @@ onMounted(() => {
                 variant="primary"
                 size="sm"
                 icon="download"
+                :disabled="!hasDownloadableRelease(row.cap)"
                 :loading="busySlot === row.cap.slot"
                 @click="startInstall(row.cap.slot)"
               >
@@ -784,7 +803,7 @@ onMounted(() => {
             <bdi>{{ slotFeedbackText[row.cap.slot]?.notice }}</bdi>
           </p>
 
-          <p class="slot__hint">{{ t(STATE_HINTS[row.cap.state]) }}</p>
+          <p class="slot__hint">{{ slotHint(row) }}</p>
         </template>
         <p v-else class="muted">{{ t("models.unconfiguredHint") }}</p>
       </article>
@@ -860,6 +879,7 @@ onMounted(() => {
                 variant="primary"
                 size="sm"
                 icon="download"
+                :disabled="!hasDownloadableRelease(row.cap)"
                 :loading="busySlot === row.cap.slot"
                 @click="startInstall(row.cap.slot)"
               >
@@ -924,7 +944,7 @@ onMounted(() => {
             <YmIcon name="check" :size="16" />
             <bdi>{{ slotFeedbackText[row.cap.slot]?.notice }}</bdi>
           </p>
-          <p class="slot__hint">{{ t(STATE_HINTS[row.cap.state]) }}</p>
+          <p class="slot__hint">{{ slotHint(row) }}</p>
         </template>
         <p v-else class="muted">{{ t("models.managedByApp") }}</p>
       </article>
