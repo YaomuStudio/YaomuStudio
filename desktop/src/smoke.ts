@@ -676,7 +676,7 @@ export async function runSmoke(
       await evaluate(win, `location.hash = ${JSON.stringify(hash)}`);
       const bound = await waitFor(
         win,
-        `!!document.querySelector('.project-select') && document.querySelector('.project-select').value === ${JSON.stringify(createdId)}`,
+        `document.querySelector('.project-select .ym-select__value')?.textContent?.trim() === ${JSON.stringify(SMOKE_PROJECT_NAME)}`,
       );
       const noLoadError = await evaluate<boolean>(
         win,

@@ -881,6 +881,9 @@ void app.whenReady().then(async () => {
   const installController = createUpdateInstallController(controller);
   updateInstall = installController;
   registerIpc(controller, installController);
+  // 窗口控件 IPC 必须在创建/加载窗口前注册：smoke 模式会提前进入断言分支，
+  // 正常模式 renderer 也可能在 createWindow() 后立即调用 window:is-maximized。
+  registerWindowControlsIpc();
   // 冒烟 no-core 刻意不拉起 Core：给出有限失败快照，而不是永久 preparing。
   if (smokeMode === "no-core") {
     controller.markFailed("startup_failed", false);
@@ -951,7 +954,6 @@ void app.whenReady().then(async () => {
   } else {
     registerDevUpdateIpc();
   }
-  registerWindowControlsIpc();
   app.on("activate", () => {
     if (quitting || startup.cancelled) return;
     if (!mainWindow || mainWindow.isDestroyed()) createWindow();
