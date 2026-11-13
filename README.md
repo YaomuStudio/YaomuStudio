@@ -12,7 +12,7 @@
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-1677ff">
   <img alt="Preview" src="https://img.shields.io/badge/preview-macOS%20%2F%20Linux-3ccffa">
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-6b7280">
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-beta.1-6b7280">
   <img alt="Status" src="https://img.shields.io/badge/status-control%20plane-6b7280">
 </p>
 
@@ -47,10 +47,10 @@
 
 | 平台 | 安装包 | 说明 |
 |---|---|---|
-| Windows x64 | `YaoMuStudio-0.1.0-win-x64.exe` | NSIS；SmartScreen 可能提示。模型执行走 WSL2。 |
-| macOS arm64 | `YaoMuStudio-0.1.0-mac-arm64.dmg` | 未签名 preview；需右键打开。模型执行不在本版范围。 |
-| macOS x64 | `YaoMuStudio-0.1.0-mac-x64.dmg` | 同上。 |
-| Linux x64 | `YaoMuStudio-0.1.0-linux-x64.AppImage` | preview；需要 GPU 驱动。模型执行 best-effort。 |
+| Windows x64 | `YaoMuStudio-0.1.0-beta.1-win-x64.exe` | NSIS；SmartScreen 可能提示。模型执行走 WSL2。 |
+| macOS arm64 | `YaoMuStudio-0.1.0-beta.1-mac-arm64.dmg` | 未签名 preview；需右键打开。模型执行不在本版范围。 |
+| macOS x64 | `YaoMuStudio-0.1.0-beta.1-mac-x64.dmg` | 同上。 |
+| Linux x64 | `YaoMuStudio-0.1.0-beta.1-linux-x64.AppImage` | preview；需要 GPU 驱动。模型执行 best-effort。 |
 
 **前置条件**：Windows 的模型执行需要可用的 WSL2 环境；macOS / Linux 当前以媒体链路为主，模型执行能力以对应平台的 Release notes 为准。macOS 未签名包首次打开需右键 → 打开，自动更新不可用。
 
