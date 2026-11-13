@@ -1275,6 +1275,14 @@ export async function runSmoke(
           };
         })()`,
       );
+      const batchSkippedForModel =
+        batchSetup?.ok !== true &&
+        typeof batchSetup?.error === "string" &&
+        batchSetup.error.includes("PREFLIGHT_STALE") &&
+        !coreContext?.requireRunnerModelReady;
+      if (batchSkippedForModel) {
+        console.log(`[smoke] batch export: SKIP (model not ready) ${batchSetup.error}`);
+      } else {
       check(
         "core.batchExportSetup",
         batchSetup?.ok === true && batchSetup?.inputOk === true,
@@ -1439,6 +1447,7 @@ export async function runSmoke(
         check("core.batchExportSubtitle", false, "batch setup failed");
         check("core.batchExportPerItemStatus", false, "batch setup failed");
         check("core.batchExportBlockedKinds", false, "batch setup failed");
+      }
       }
     }
 
