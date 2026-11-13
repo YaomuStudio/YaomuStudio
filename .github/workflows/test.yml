@@ -8,6 +8,11 @@ on:
   # 只在 main 推送、PR 和手动触发时运行；功能分支推送不再自动触发。
   push:
     branches: [main]
+    # 只在 package 版本可能变化时触发；轻量的 secret-scan 仍独立运行。
+    paths:
+      - package.json
+      - ui/package.json
+      - desktop/package.json
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -20,8 +25,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version-changed:
+    name: version changed
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare package version before/after
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" != "push" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          before=$(git show "$BEFORE_SHA:package.json" 2>/dev/null | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).version' 2>/dev/null || true)
+          after=$(node -pe 'require("./package.json").version')
+          if [ -n "$before" ] && [ "$before" = "$after" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   go:
     name: go (vet + race)
+    needs: version-changed
+    if: needs.version-changed.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -64,6 +99,8 @@ jobs:
 
   runner:
     name: runner (pytest)
+    needs: version-changed
+    if: needs.version-changed.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -85,6 +122,8 @@ jobs:
 
   web:
     name: web (typecheck + build + desktop tests)
+    needs: version-changed
+    if: needs.version-changed.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -116,6 +155,8 @@ jobs:
 
   e2e:
     name: e2e (playwright chromium)
+    needs: version-changed
+    if: needs.version-changed.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -167,6 +208,8 @@ jobs:
   # （run 41379385411 / 41379583396 / 41379746566），ready 13/13、no-core 6/6、console errors 0。
   macos-smoke:
     name: macos-smoke (hidden Electron)
+    needs: version-changed
+    if: needs.version-changed.outputs.changed == 'true'
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -196,6 +239,8 @@ jobs:
   # 容器/CI 无 GPU、无真实桌面会话；模型执行、Wayland、托盘/输入法不在本作业范围。
   linux-smoke:
     name: linux-smoke (hidden Electron)
+    needs: version-changed
+    if: needs.version-changed.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
