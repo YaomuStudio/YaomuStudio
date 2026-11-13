@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const files = ["README.md", "README.en.md"];
+const files = ["README.md", "README.zh-CN.md"];
 const failures = [];
 
 const banned = [
@@ -50,11 +50,11 @@ const texts = Object.fromEntries(files.map((f) => [f, read(f)]));
 
 for (const [rel, text] of Object.entries(texts)) {
   if (!text) continue;
-  if (rel === "README.md" && !text.includes("[English](README.en.md)")) {
-    failures.push(`${rel}: missing English language link`);
-  }
-  if (rel === "README.en.md" && !text.includes("[简体中文](README.md)")) {
+  if (rel === "README.md" && !text.includes("[简体中文](README.zh-CN.md)")) {
     failures.push(`${rel}: missing Chinese language link`);
+  }
+  if (rel === "README.zh-CN.md" && !text.includes("[English](README.md)")) {
+    failures.push(`${rel}: missing English language link`);
   }
   for (const word of banned) {
     if (text.includes(word)) failures.push(`${rel}: banned text "${word}"`);

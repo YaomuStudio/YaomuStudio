@@ -1,12 +1,12 @@
-简体中文 | [English](README.en.md)
+English | [简体中文](README.zh-CN.md)
 
 <p align="center">
   <img src="assets/readme/logo.svg" width="72" alt="YaomuStudio logo">
 </p>
 
-<h1 align="center">YaomuStudio（曜幕）</h1>
+<h1 align="center">YaomuStudio</h1>
 
-<p align="center">本地优先的媒体翻译与配音桌面客户端</p>
+<p align="center">A local-first desktop client for media translation and dubbing</p>
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -16,108 +16,108 @@
   <img alt="Status" src="https://img.shields.io/badge/status-control%20plane-6b7280">
 </p>
 
-曜幕把媒体翻译与配音放在一台机器上完成：ASR、翻译、语音合成、声音克隆、字幕擦除、音频分离，外加 OCR 辅助。免登录，项目、字幕与素材留在本地。
+YaomuStudio runs media translation and dubbing on your own machine: ASR, translation, text-to-speech, voice cloning, subtitle erase, and audio separation, with OCR assist. There is no sign-in, and projects, subtitles, and source media stay local.
 
-它适合需要翻译字幕、保留原说话人音色做配音、擦除画面内嵌字幕，或在受限网络环境中继续处理已准备项目的场景。
+It is built for translating subtitles, dubbing in the original speaker's voice, removing burned-in subtitles, and continuing work on prepared projects in restricted-network environments.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/workbench-dark.png">
-  <img src="assets/readme/workbench-light.png" alt="YaomuStudio 工作台">
+  <img src="assets/readme/workbench-light.png" alt="YaomuStudio workbench">
 </picture>
 
-<p align="center"><sub>工作台 · 演示数据</sub></p>
+<p align="center"><sub>Workbench · demo data</sub></p>
 
-## 能力
+## Capabilities
 
-| 能力 | 状态 | 说明 |
+| Capability | Status | Notes |
 |---|---|---|
-| ASR 语音识别 | `READY` | 从音视频提取字幕，保留时间戳与语种。 |
-| 翻译 | `READY` | 按句翻译字幕，原文/译文对照校正。 |
-| 语音合成（TTS） | `PREVIEW` | 已合并到语音克隆入口；按句生成目标语言配音。 |
-| 声音克隆 | `PREVIEW` | 从参考音频建立音色，生成多语种配音。 |
-| 字幕擦除 | `PREVIEW` | 检测并移除画面内嵌字幕。 |
-| 音频分离 | `PREVIEW` | 分离人声与环境声，供混音与配音使用。 |
-| OCR 辅助 | `PREVIEW` | 识别画面文字，辅助字幕与擦除流程。 |
+| ASR | `READY` | Extract subtitles from audio or video, with timestamps and language. |
+| Translation | `READY` | Translate subtitles sentence by sentence; edit source and target side by side. |
+| Text-to-speech | `PREVIEW` | Folded into the voice-clone entry; generate target-language dubbing per sentence. |
+| Voice cloning | `PREVIEW` | Build a voice from reference audio and generate multilingual dubbing. |
+| Subtitle erase | `PREVIEW` | Detect and remove burned-in subtitles. |
+| Audio separation | `PREVIEW` | Split voice and ambience for mixing or dubbing. |
+| OCR assist | `PREVIEW` | Read on-screen text for subtitle and erase workflows. |
 
-> 状态以 Windows + WSL2 基线为准；macOS / Linux 的可用范围见「下载」表。
+> Status is relative to the Windows + WSL2 baseline; see the Download table for macOS/Linux scope.
 
-## 下载
+## Download
 
-安装包由 GitHub Actions 在 `v*` tag 上构建，前往 [Releases](https://github.com/YaomuStudio/YaomuStudio/releases) 下载。当前版本未签名。
+Installers are built by GitHub Actions on `v*` tags. Download them from [Releases](https://github.com/YaomuStudio/YaomuStudio/releases). The current builds are unsigned.
 
-| 平台 | 安装包 | 说明 |
+| Platform | Installer | Notes |
 |---|---|---|
-| Windows x64 | `YaoMuStudio-0.1.0-beta.1-win-x64.exe` | NSIS；SmartScreen 可能提示。模型执行走 WSL2。 |
-| macOS arm64 | `YaoMuStudio-0.1.0-beta.1-mac-arm64.dmg` | 未签名 preview；需右键打开。模型执行不在本版范围。 |
-| macOS x64 | `YaoMuStudio-0.1.0-beta.1-mac-x64.dmg` | 同上。 |
-| Linux x64 | `YaoMuStudio-0.1.0-beta.1-linux-x64.AppImage` | preview；需要 GPU 驱动。模型执行 best-effort。 |
+| Windows x64 | `YaoMuStudio-0.1.0-beta.1-win-x64.exe` | NSIS. SmartScreen may warn. Model execution uses WSL2. |
+| macOS arm64 | `YaoMuStudio-0.1.0-beta.1-mac-arm64.dmg` | Unsigned preview; right-click to open. Model execution is out of scope for this build. |
+| macOS x64 | `YaoMuStudio-0.1.0-beta.1-mac-x64.dmg` | Same as above. |
+| Linux x64 | `YaoMuStudio-0.1.0-beta.1-linux-x64.AppImage` | Preview; requires a GPU driver. Model execution is best-effort. |
 
-**前置条件**：Windows 的模型执行需要可用的 WSL2 环境；macOS / Linux 当前以媒体链路为主，模型执行能力以对应平台的 Release notes 为准。macOS 未签名包首次打开需右键 → 打开，自动更新不可用。
+**Requirements:** model execution on Windows needs a working WSL2 environment. macOS and Linux currently focus on the media path; see the Release notes for the exact model-execution status on each platform. Unsigned macOS builds must be opened with right-click → Open, and auto-update is unavailable.
 
-## 快速开始
+## Quick start
 
 ```text
-1. 下载对应平台的安装包
-2. 首次启动，在引导页下载所需模型
-3. 新建项目，导入视频 / 音频 / 字幕
-4. 运行流水线，逐句校正后导出
+1. Download the installer for your platform
+2. On first launch, download the models you need from the onboarding page
+3. Create a project and import video, audio, or subtitles
+4. Run the pipeline, correct sentences, then export
 ```
 
-## 本地优先
+## Local-first
 
-- **数据留在本机**：项目、字幕、音视频与模型产物写入本地工作区，不默认上传。
-- **免登录**：没有账号体系，不要求云端工作区；安装后即可创建项目。
-- **离线可用**：已就绪的模型与媒体能力在断网时照常运行；更新与模型下载是独立的联网行为。
+- **Data stays on your machine**: projects, subtitles, source media, and model outputs are written to a local workspace and are not uploaded by default.
+- **No sign-in**: there is no account system and no required cloud workspace. You can create a project right after installing.
+- **Works offline**: models and media capabilities that are already prepared keep working without a network. Updates and model downloads are separate network actions.
 
-## 架构
+## Architecture
 
-Electron 主进程持有特权边界；Vue 3 负责界面；Go Core 是唯一业务状态权威；Python Runner 只做受控执行适配；模型通过 FlashCLI 调用，媒体处理走固定版本 FFmpeg。
+The Electron main process owns the privileged boundary; Vue 3 renders the UI; the Go Core is the single authority for business state; the Python Runner only performs controlled execution; models are invoked through FlashCLI and media is processed by a pinned FFmpeg build.
 
 <details>
-<summary>展开进程与数据流</summary>
+<summary>Show process and data flow</summary>
 
 ```text
 Electron Main / preload
   └─ Vue 3 renderer
-       └─ Go Core（唯一业务状态权威）
-            ├─ SQLite（项目 / 任务 / 安装记录）
-            ├─ Python Runner（受控执行适配）
-            │    ├─ FlashCLI（模型）
-            │    └─ FFmpeg / ffprobe（媒体）
-            └─ 本地 HTTP JSON + SSE
+       └─ Go Core (single authority for business state)
+            ├─ SQLite (projects / tasks / installations)
+            ├─ Python Runner (controlled execution adapter)
+            │    ├─ FlashCLI (models)
+            │    └─ FFmpeg / ffprobe (media)
+            └─ local HTTP JSON + SSE
 ```
 
 </details>
 
-Renderer 不直接访问 Core、文件系统或任意 IPC；所有特权操作经 preload 与主进程白名单代理。
+The renderer never talks to the Core, the filesystem, or arbitrary IPC directly. Every privileged operation goes through preload and a main-process allowlist.
 
-## 状态与限制
+## Status and limitations
 
-| 范围 | 状态 | 说明 |
+| Area | Status | Notes |
 |---|---|---|
-| 控制面 | `DONE` | Electron / Vue / Go Core / SQLite / Runner / FFmpeg 链路。 |
-| 真实模型 bundle | `MISSING` | 六槽位真实 bundle、签名清单与严格离线验收。 |
-| macOS / Linux 模型执行 | `MISSING` | 当前基线是 Windows + WSL2；Linux 为 best-effort。 |
-| 签名 / 公证 | `MISSING` | 当前安装包未签名；macOS 自动更新不可用。 |
-| 安装失败回滚 | `MISSING` | 保留旧版本与回滚验证仍在计划中。 |
+| Control plane | `DONE` | Electron / Vue / Go Core / SQLite / Runner / FFmpeg wiring. |
+| Real model bundles | `MISSING` | Real bundles for the six slots, signed manifests, and strict offline acceptance. |
+| macOS / Linux model execution | `MISSING` | The baseline is Windows + WSL2; Linux is best-effort. |
+| Signing / notarization | `MISSING` | Current builds are unsigned; macOS auto-update is unavailable. |
+| Install rollback | `MISSING` | Keeping the previous version and verifying rollback are still planned. |
 
-> README 不把未完成的能力写成已可用；发布说明会按版本更新实际状态。
+> The README does not present unfinished capabilities as available. Release notes will track the actual status per version.
 
-## 开发
+## Development
 
 ```bash
 ./scripts/setup-dev.sh
 npm install
 npm run typecheck
 npm run build
-npm run test:macos   # macOS 本地自动化基线
-npm run test:e2e     # UI E2E（浏览器夹具）
+npm run test:macos   # local macOS automation baseline
+npm run test:e2e     # UI E2E with browser fixtures
 ```
 
-要求 Node 22、Go 1.23+、Python 3.11+。桌面端改动需要在真实 Electron 中验证，不以编译通过代替。
+Requires Node 22, Go 1.23+, and Python 3.11+. Desktop changes need to be verified in a real Electron run; a successful compile is not enough.
 
-提交前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
-## 许可
+## License
 
-Apache-2.0。模型权重与第三方依赖各有独立许可；FFmpeg 以独立可执行文件分发，遵循其 GPL/LGPL 许可；Python 运行时遵循 PSF 许可。
+Apache-2.0. Model weights and third-party dependencies have their own licenses. FFmpeg is distributed as a separate executable under its GPL/LGPL terms; the bundled Python runtime follows the PSF license.
