@@ -1580,7 +1580,7 @@
   "workbench.tool.erase.title": "Xóa phụ đề",
   "workbench.tool.extract.desc": "ASR, OCR hay nhận dạng song kênh để trích xuất phụ đề chính xác.",
   "workbench.tool.extract.title": "Trích xuất phụ đề",
-  "workbench.tool.hot": "HOT",
+  "workbench.tool.hot": "PHỔ BIẾN",
   "workbench.tool.new": "NEW",
   "workbench.tool.open": "Mở",
   "workbench.tool.pipeline.desc": "Trích xuất phụ đề, dịch, xóa phụ đề và thuyết minh bằng nhân bản giọng giàu cảm xúc trong một luồng.",

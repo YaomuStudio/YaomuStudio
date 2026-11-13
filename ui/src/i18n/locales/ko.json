@@ -1592,7 +1592,7 @@
   "workbench.tool.erase.title": "스마트 자막 지우기",
   "workbench.tool.extract.desc": "ASR, OCR, 듀얼 채널 인식으로 정확한 자막을 추출합니다.",
   "workbench.tool.extract.title": "자막 추출",
-  "workbench.tool.hot": "HOT",
+  "workbench.tool.hot": "인기",
   "workbench.tool.new": "NEW",
   "workbench.tool.open": "열기",
   "workbench.tool.pipeline.desc": "자막 추출, 번역, 자막 지우기, 고감정 보이스 클론 더빙을 하나의 흐름으로.",

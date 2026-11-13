@@ -1659,7 +1659,7 @@
   "workbench.tool.erase.title": "智慧字幕擦除",
   "workbench.tool.extract.desc": "ASR、OCR 或雙通道識別，精準提取字幕。",
   "workbench.tool.extract.title": "字幕提取",
-  "workbench.tool.hot": "熱門",
+  "workbench.tool.hot": "HOT",
   "workbench.tool.new": "NEW",
   "workbench.tool.open": "開始使用",
   "workbench.tool.pipeline.desc": "提取字幕、翻譯、擦除字幕並以高情感克隆配音交付成片。",

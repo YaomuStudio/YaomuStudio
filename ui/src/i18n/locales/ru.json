@@ -1581,7 +1581,7 @@
   "workbench.tool.erase.title": "Умное удаление субтитров",
   "workbench.tool.extract.desc": "ASR, OCR или двухканальное распознавание для точных субтитров.",
   "workbench.tool.extract.title": "Извлечение субтитров",
-  "workbench.tool.hot": "HOT",
+  "workbench.tool.hot": "ХИТ",
   "workbench.tool.new": "NEW",
   "workbench.tool.open": "Открыть",
   "workbench.tool.pipeline.desc": "Извлечение субтитров, перевод, удаление и дубляж эмоциональным клонированием в одном потоке.",

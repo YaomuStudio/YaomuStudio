@@ -1581,7 +1581,7 @@
   "workbench.tool.erase.title": "Odstranění titulků",
   "workbench.tool.extract.desc": "ASR, OCR nebo dvoukanálové rozpoznávání pro přesnou extrakci titulků.",
   "workbench.tool.extract.title": "Extrakce titulků",
-  "workbench.tool.hot": "TOP",
+  "workbench.tool.hot": "OBLÍBENÉ",
   "workbench.tool.new": "NOVÉ",
   "workbench.tool.open": "Otevřít",
   "workbench.tool.pipeline.desc": "Extrahujte titulky, přeložte, odstraňte titulky a nadabujte s vysoce emotivním klonováním hlasu v jednom toku.",

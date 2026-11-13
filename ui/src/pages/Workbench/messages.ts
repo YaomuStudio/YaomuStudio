@@ -90,7 +90,7 @@ const messages: AreaMessages = {
     "workbench.tool.translate.desc": "将标准 SRT 字幕翻译为多种语言。",
     "workbench.tool.extract.title": "字幕提取",
     "workbench.tool.extract.desc": "ASR、OCR 或双通道识别，精准提取字幕。",
-    "workbench.tool.hot": "热门",
+    "workbench.tool.hot": "HOT",
     "workbench.tool.new": "NEW",
     "workbench.tool.try": "立即体验",
     "workbench.tool.open": "开始使用",

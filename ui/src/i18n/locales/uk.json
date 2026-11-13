@@ -1580,7 +1580,7 @@
   "workbench.tool.erase.title": "Видалення субтитрів",
   "workbench.tool.extract.desc": "ASR, OCR або двоканальне розпізнавання для точного витягу субтитрів.",
   "workbench.tool.extract.title": "Витяг субтитрів",
-  "workbench.tool.hot": "ТОП",
+  "workbench.tool.hot": "ПОПУЛЯРНЕ",
   "workbench.tool.new": "НОВЕ",
   "workbench.tool.open": "Відкрити",
   "workbench.tool.pipeline.desc": "Витягніть субтитри, перекладіть, видаліть субтитри та здублюйте з високоемоційним клонуванням голосу в одному потоці.",

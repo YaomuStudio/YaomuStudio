@@ -428,3 +428,26 @@ test("composite search fields draw a single focus ring", async ({ page }) => {
   await expect(subSearch).toBeFocused();
   expect(await subSearch.evaluate((element) => getComputedStyle(element).boxShadow)).toBe("none");
 });
+
+test("hot badge follows the interface language", async ({ page }) => {
+  await page.addInitScript(() => {
+    // 只在首次加载写入；reload 时保留测试中切换后的语言。
+    if (sessionStorage.getItem("hot-seeded")) return;
+    sessionStorage.setItem("hot-seeded", "1");
+    localStorage.setItem(
+      "yaomu.settings",
+      JSON.stringify({ onboarded: true, theme: "light", locale: "zh-CN" }),
+    );
+  });
+  await page.goto("/#/");
+  await expect(page.locator(".recommend-badge").filter({ hasText: "HOT" }).first()).toBeVisible();
+  await expect(page.getByText("热门", { exact: true })).toHaveCount(0);
+
+  await page.evaluate(() => {
+    const raw = localStorage.getItem("yaomu.settings");
+    const settings = raw ? JSON.parse(raw) : {};
+    localStorage.setItem("yaomu.settings", JSON.stringify({ ...settings, locale: "ja" }));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator(".recommend-badge").filter({ hasText: "人気" }).first()).toBeVisible();
+});

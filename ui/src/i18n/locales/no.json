@@ -1581,7 +1581,7 @@
   "workbench.tool.erase.title": "Undertekstfjerning",
   "workbench.tool.extract.desc": "ASR-, OCR- eller tokanel gjenkjenning for nøyaktig undertekstuttrekk.",
   "workbench.tool.extract.title": "Undertekstuttrekk",
-  "workbench.tool.hot": "TOPP",
+  "workbench.tool.hot": "POPULÆR",
   "workbench.tool.new": "NY",
   "workbench.tool.open": "Åpne",
   "workbench.tool.pipeline.desc": "Trekk ut undertekster, oversett, fjern undertekster og dubb med emosjonsrik stemmekloning i én flyt.",

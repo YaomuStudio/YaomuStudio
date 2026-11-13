@@ -1583,7 +1583,7 @@
   "workbench.tool.erase.title": "Borrado inteligente",
   "workbench.tool.extract.desc": "ASR, OCR o doble canal.",
   "workbench.tool.extract.title": "Extracción",
-  "workbench.tool.hot": "TOP",
+  "workbench.tool.hot": "POPULAR",
   "workbench.tool.new": "NUEVO",
   "workbench.tool.open": "Abrir",
   "workbench.tool.pipeline.desc": "Extraer, traducir, borrar y doblar en un flujo.",

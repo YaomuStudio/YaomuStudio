@@ -1580,7 +1580,7 @@
   "workbench.tool.erase.title": "सबटाइटल मिटाना",
   "workbench.tool.extract.desc": "सटीक सबटाइटल निष्कर्षण के लिए ASR, OCR या दोहरी-चैनल पहचान।",
   "workbench.tool.extract.title": "सबटाइटल निष्कर्षण",
-  "workbench.tool.hot": "हॉट",
+  "workbench.tool.hot": "लोकप्रिय",
   "workbench.tool.new": "नया",
   "workbench.tool.open": "खोलें",
   "workbench.tool.pipeline.desc": "एक प्रवाह में सबटाइटल निकालें, अनुवाद करें, सबटाइटल मिटाएँ और उच्च-भावना वॉइस क्लोनिंग से डब करें।",

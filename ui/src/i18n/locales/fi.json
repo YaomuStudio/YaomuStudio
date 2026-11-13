@@ -1581,7 +1581,7 @@
   "workbench.tool.erase.title": "Tekstityksen poisto",
   "workbench.tool.extract.desc": "ASR-, OCR- tai kaksikanavainen tunnistus tarkkaan tekstityksen poimintaan.",
   "workbench.tool.extract.title": "Tekstityksen poiminta",
-  "workbench.tool.hot": "HOT",
+  "workbench.tool.hot": "SUOSITTU",
   "workbench.tool.new": "NEW",
   "workbench.tool.open": "Avaa",
   "workbench.tool.pipeline.desc": "Poimi tekstitykset, käännä, poista tekstitys ja dubbaa voimakkaan tunteen äänen kloonaus yhdessä virtauksessa.",

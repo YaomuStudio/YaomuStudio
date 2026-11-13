@@ -1591,7 +1591,7 @@
   "workbench.tool.erase.title": "スマート字幕消去",
   "workbench.tool.extract.desc": "ASR・OCR・デュアルチャネル認識で正確な字幕を抽出。",
   "workbench.tool.extract.title": "字幕抽出",
-  "workbench.tool.hot": "HOT",
+  "workbench.tool.hot": "人気",
   "workbench.tool.new": "NEW",
   "workbench.tool.open": "開く",
   "workbench.tool.pipeline.desc": "字幕抽出・翻訳・字幕消去・高感情ボイスクローン吹き替えを一つの流れで。",
