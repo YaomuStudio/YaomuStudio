@@ -80,7 +80,9 @@ mac:
 linux:
   target:
     - AppImage
-  artifactName: YaoMuStudio-${version}-linux-${arch}.${ext}
+  # electron-builder 在 Linux 上把 ${arch} 解析为 x86_64；发布契约与 README
+  # 使用 linux-x64，因此这里显式固定为 x64（发布矩阵只构建 Linux x64）。
+  artifactName: YaoMuStudio-${version}-linux-x64.${ext}
   # Linux AppImage 从 workspace scoped name 推导会得到非法 executableName；显式固定。
   executableName: yaomustudio
   icon: resources/icon.png
