@@ -602,6 +602,7 @@ async function downloadAsset(asset: Asset, filename?: string): Promise<void> {
         v-if="!isProducing && previewTabs.length"
         type="button"
         class="recent-card__play"
+        :class="{ 'is-always': statusBucket === 'completed' }"
         :aria-label="productPreviewTitle"
         @click.stop="openProductPreview"
       >
@@ -1132,7 +1133,8 @@ async function downloadAsset(asset: Asset, filename?: string): Promise<void> {
   transform: translate(-50%, -50%) scale(0.9);
   transition: opacity var(--motion-duration-base) var(--motion-ease-out), transform var(--motion-duration-base) var(--motion-ease-out);
 }
-.recent-card:hover .recent-card__play {
+.recent-card:hover .recent-card__play,
+.recent-card__play.is-always {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
 }

@@ -19,6 +19,8 @@ test("renders project cards with type, status, preview and download groups", asy
 
   await expect(card.getByText("Smart full-pipeline dubbing")).toBeVisible();
   await expect(card.getByText("Completed", { exact: true })).toBeVisible();
+  // 已完成项目的预览播放键常显，不依赖 hover。
+  await expect(card.getByRole("button", { name: "Preview video" })).toHaveCSS("opacity", "1");
   // 编号使用本地项目序号，而不是内部 ID 片段。
   await expect(card.getByText("ID:1", { exact: true })).toBeVisible();
 
