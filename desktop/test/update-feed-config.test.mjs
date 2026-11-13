@@ -26,6 +26,7 @@ test("publish block contains no embedded credentials", () => {
 test("release asset names stay aligned across platforms", () => {
   assert.equal(config.win?.artifactName, "YaoMuStudio-${version}-win-${arch}.${ext}");
   assert.equal(config.mac?.artifactName, "YaoMuStudio-${version}-mac-${arch}.${ext}");
-  assert.equal(config.linux?.artifactName, "YaoMuStudio-${version}-linux-${arch}.${ext}");
+  // electron-builder resolves ${arch} to x86_64 on Linux; the release contract uses linux-x64.
+  assert.equal(config.linux?.artifactName, "YaoMuStudio-${version}-linux-x64.${ext}");
   assert.equal(config.linux?.executableName, "yaomustudio");
 });
