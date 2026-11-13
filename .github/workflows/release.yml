@@ -1,6 +1,7 @@
 name: release
 
-# 公开仓 tag 发布：v* tag 推送后构建 Windows/macOS/Linux 安装包，
+# 公开仓 tag 发布：v* tag 推送后构建 Windows/Linux 安装包。
+# macOS 发布构建暂时排除：等 macOS 打包修复且模型就绪后再恢复。
 # 全部成功后自动创建并公开 GitHub Release。非 tag 事件不构建安装包。
 # 详细契约见 contracts/release-publication.md。
 
@@ -125,80 +126,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  build-macos:
-    name: build macOS arm64 + x64
-    needs: validate
-    runs-on: macos-15
-    timeout-minutes: 60
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.validate.outputs.commit }}
-          fetch-depth: 1
-          persist-credentials: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: app-server/go.mod
-          cache-dependency-path: app-server/go.sum
-
-      - uses: actions/cache@v4
-        with:
-          path: desktop/build/.cache
-          key: ${{ runner.os }}-${{ runner.arch }}-yaomu-runtime-${{ hashFiles('scripts/fetch-python-runtime.sh', 'scripts/fetch-ffmpeg.sh', 'scripts/fetch-python-standalone.sh', 'scripts/fetch-ffmpeg-static.sh') }}
-
-      - run: npm ci
-      - run: npm run build
-
-      - name: Build Core + bundled runtime (arm64)
-        env:
-          BUNDLE_PYTHON: "1"
-          BUNDLE_FFMPEG: "1"
-        run: bash scripts/build-core.sh --arch arm64 --out desktop/build/core-arm64
-
-      - name: Build Core + bundled runtime (x64)
-        env:
-          BUNDLE_PYTHON: "1"
-          BUNDLE_FFMPEG: "1"
-        run: bash scripts/build-core.sh --arch x64 --out desktop/build/core-x64
-
-      - name: Build DMG + zip (unsigned preview)
-        working-directory: desktop
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npx electron-builder --mac dmg zip --arm64 --x64 --publish never
-
-      - name: Verify app-update.yml (arm64)
-        run: node scripts/check-app-update-yml.mjs "desktop/dist-app/mac-arm64/YaoMu Studio.app/Contents/Resources"
-
-      - name: Verify app-update.yml (x64)
-        run: node scripts/check-app-update-yml.mjs "desktop/dist-app/mac/YaoMu Studio.app/Contents/Resources"
-
-      - name: Verify packaged resources
-        run: node desktop/scripts/check-packaged-artifacts.mjs
-
-      - name: Collect release assets
-        run: >-
-          node scripts/collect-release-assets.mjs
-          --platform mac
-          --version ${{ needs.validate.outputs.version }}
-          --dist desktop/dist-app
-          --out release-assets
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-macos
-          path: release-assets
-          if-no-files-found: error
-          retention-days: 7
-
+  # macOS 发布构建暂时排除：等 macOS 打包修复且模型就绪后再恢复。
+  # 恢复时把 build-macos job、publish.needs 与 verify 步骤一并还原。
   build-linux:
     name: build Linux x64
     needs: validate
@@ -267,7 +196,7 @@ jobs:
 
   publish:
     name: publish GitHub Release
-    needs: [validate, build-windows, build-macos, build-linux]
+    needs: [validate, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -289,11 +218,9 @@ jobs:
           merge-multiple: true
 
       - name: Verify release assets and update manifests
-        run: >-
-          node scripts/verify-release-assets.mjs
-          --dir release-assets
-          --version ${{ needs.validate.outputs.version }}
-          --platform all
+        run: |
+          node scripts/verify-release-assets.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform win
+          node scripts/verify-release-assets.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform linux
 
       - name: Refuse to overwrite an existing release
         env:

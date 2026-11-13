@@ -13,7 +13,7 @@ This is the CI contract for application installers published from `YaomuStudio/Y
 
 - Automatic builds run only on `push` of a `v*` tag.
 - `workflow_dispatch` is a manual rerun/repair path and requires an existing tag; it does not accept branches.
-- A tag push builds all platforms. Only after every build succeeds does the publish job create the GitHub Release. A failed build publishes nothing.
+- A tag push builds the current platform matrix: Windows and Linux. macOS builds are temporarily excluded until macOS packaging is fixed and models are ready. Only after every configured build succeeds does the publish job create the GitHub Release. A failed build publishes nothing.
 - The release is public by default. There is no draft/approval step in this contract.
 - If a release with the same tag already exists, the publish job fails closed. It must not delete, overwrite, or `--clobber` it. Recovering a partially uploaded release is a manual owner action.
 
@@ -22,16 +22,16 @@ This is the CI contract for application installers published from `YaomuStudio/Y
 | Job | Runner | Target |
 |---|---|---|
 | `build-windows` | `windows-latest` | NSIS, x64 |
-| `build-macos` | `macos-15` (arm64) | DMG + zip, arm64 and x64 in one electron-builder invocation |
+| ~~`build-macos`~~ | — | Temporarily excluded; restore DMG + zip (arm64/x64) after macOS packaging is fixed and models are ready. |
 | `build-linux` | `ubuntu-24.04` | AppImage, x64 |
 
 - Build jobs use `--publish never`. Only the publish job uploads assets.
-- macOS builds both architectures in one invocation so `latest-mac.yml` contains both architectures. Building each architecture separately and uploading two manifests is not allowed.
+- When macOS is re-enabled, it builds both architectures in one invocation so `latest-mac.yml` contains both architectures. Building each architecture separately and uploading two manifests is not allowed.
 - `extraResources` selects `desktop/build/core-${arch}` so Core, Python, and FFmpeg match the target architecture.
 
 ## Assets
 
-Exact expected asset set for version `V`:
+Exact expected asset set for version `V`. The macOS block is not required while macOS release builds are temporarily excluded; it is retained for re-enable.
 
 ```text
 YaoMuStudio-V-win-x64.exe
@@ -59,14 +59,14 @@ latest-linux.yml
 
 ## Verification before publication
 
-The publish job downloads all build artifacts into one directory and runs `scripts/verify-release-assets.mjs`:
+The publish job downloads all build artifacts into one directory and runs `scripts/verify-release-assets.mjs`. While macOS is excluded it runs `--platform win` and `--platform linux`; when macOS is re-enabled, add `--platform mac` (or `--platform all`).
 
 1. Reject unknown or non-regular files.
 2. Require every expected asset.
 3. Parse `latest.yml`, `latest-mac.yml`, and `latest-linux.yml` with the trusted YAML parser.
 4. For every `files[]` entry: require a safe basename, positive size, nonempty SHA-512, an existing local file, matching size, and matching base64 SHA-512.
-5. Require the Windows installer in `latest.yml`, both macOS architectures in `latest-mac.yml`, and the Linux AppImage in `latest-linux.yml`.
-6. Require `latest-mac.yml` to contain both `mac-arm64` and `mac-x64` entries.
+5. Require the Windows installer in `latest.yml` and the Linux AppImage in `latest-linux.yml`. When macOS is enabled, also require both macOS architectures in `latest-mac.yml`.
+6. When macOS is enabled, require `latest-mac.yml` to contain both `mac-arm64` and `mac-x64` entries.
 
 The build jobs also verify the generated `app-update.yml` points to `YaomuStudio/YaomuStudio` and that the packaged Core/Runner/Python/FFmpeg files exist.
 
@@ -75,9 +75,9 @@ Artifacts are consumed from the same workflow run's artifact store. This contrac
 ## Signing and platform policy
 
 - Windows builds may be unsigned. Unsigned installers can be distributed, but SmartScreen may warn. The release notes must say so.
-- macOS builds are unsigned previews. Gatekeeper requires right-click → Open; auto-update is unavailable. The release notes must say so.
+- macOS release builds are temporarily excluded until macOS packaging is fixed and models are ready. When re-enabled, they are unsigned previews: Gatekeeper requires right-click → Open and auto-update is unavailable.
 - Linux AppImage builds are unsigned previews. Auto-update is not verified on a real desktop.
-- Model execution is Windows + WSL2 by default. Linux host execution is best-effort. macOS model execution is not part of this release. Release notes must state this.
+- Model execution is Windows + WSL2 by default. Linux host execution is best-effort. macOS builds and model execution are not part of the current release. Release notes must state this.
 - Do not claim a signature, notarization, or auto-update capability that the build did not produce.
 
 ## Release notes
@@ -85,8 +85,9 @@ Artifacts are consumed from the same workflow run's artifact store. This contrac
 Use `gh release create --generate-notes` plus a short prepended note:
 
 ```text
-> 未签名构建：Windows 可能触发 SmartScreen；macOS 需右键打开，自动更新不可用。
-> macOS/Linux 为 preview；模型执行以 Windows + WSL2 为基线，Linux 为 best-effort。
+> 未签名构建：Windows 可能触发 SmartScreen。
+> Linux 为 preview；模型执行以 Windows + WSL2 为基线，Linux 为 best-effort。
+> macOS 发布构建暂时排除，等打包修复且模型就绪后再提供。
 ```
 
 Beta tags must also pass `--prerelease`.

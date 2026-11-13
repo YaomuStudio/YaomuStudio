@@ -11,7 +11,7 @@
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-1677ff">
-  <img alt="Preview" src="https://img.shields.io/badge/preview-macOS%20%2F%20Linux-3ccffa">
+  <img alt="Preview" src="https://img.shields.io/badge/preview-Windows%20%2F%20Linux-3ccffa">
   <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-beta.1-6b7280">
   <img alt="Status" src="https://img.shields.io/badge/status-control%20plane-6b7280">
 </p>
@@ -39,7 +39,7 @@
 | 音频分离 | `PREVIEW` | 分离人声与环境声，供混音与配音使用。 |
 | OCR 辅助 | `PREVIEW` | 识别画面文字，辅助字幕与擦除流程。 |
 
-> 状态以 Windows + WSL2 基线为准；macOS / Linux 的可用范围见「下载」表。
+> 状态以 Windows + WSL2 基线为准；Linux 为 best-effort；macOS 发布构建暂时排除。
 
 ## 下载
 
@@ -48,11 +48,10 @@
 | 平台 | 安装包 | 说明 |
 |---|---|---|
 | Windows x64 | `YaoMuStudio-0.1.0-beta.1-win-x64.exe` | NSIS；SmartScreen 可能提示。模型执行走 WSL2。 |
-| macOS arm64 | `YaoMuStudio-0.1.0-beta.1-mac-arm64.dmg` | 未签名 preview；需右键打开。模型执行不在本版范围。 |
-| macOS x64 | `YaoMuStudio-0.1.0-beta.1-mac-x64.dmg` | 同上。 |
 | Linux x64 | `YaoMuStudio-0.1.0-beta.1-linux-x64.AppImage` | preview；需要 GPU 驱动。模型执行 best-effort。 |
+| macOS | — | 发布构建暂时排除；等 macOS 打包修复且模型就绪后再提供。 |
 
-**前置条件**：Windows 的模型执行需要可用的 WSL2 环境；macOS / Linux 当前以媒体链路为主，模型执行能力以对应平台的 Release notes 为准。macOS 未签名包首次打开需右键 → 打开，自动更新不可用。
+**前置条件**：Windows 的模型执行需要可用的 WSL2 环境；Linux 为 best-effort；macOS 发布构建暂时排除，等修复打包并确认模型就绪后再提供。Windows 安装包未签名，SmartScreen 可能提示。
 
 ## 快速开始
 
@@ -97,8 +96,8 @@ Renderer 不直接访问 Core、文件系统或任意 IPC；所有特权操作�
 |---|---|---|
 | 控制面 | `DONE` | Electron / Vue / Go Core / SQLite / Runner / FFmpeg 链路。 |
 | 真实模型 bundle | `MISSING` | 六槽位真实 bundle、签名清单与严格离线验收。 |
-| macOS / Linux 模型执行 | `MISSING` | 当前基线是 Windows + WSL2；Linux 为 best-effort。 |
-| 签名 / 公证 | `MISSING` | 当前安装包未签名；macOS 自动更新不可用。 |
+| macOS 构建 / 模型执行 | `MISSING` | macOS 发布构建暂时排除；Linux 为 best-effort。 |
+| 签名 / 公证 | `MISSING` | 当前 Windows / Linux 安装包未签名。 |
 | 安装失败回滚 | `MISSING` | 保留旧版本与回滚验证仍在计划中。 |
 
 > README 不把未完成的能力写成已可用；发布说明会按版本更新实际状态。

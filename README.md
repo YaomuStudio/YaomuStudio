@@ -11,7 +11,7 @@ English | [简体中文](README.zh-CN.md)
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-1677ff">
-  <img alt="Preview" src="https://img.shields.io/badge/preview-macOS%20%2F%20Linux-3ccffa">
+  <img alt="Preview" src="https://img.shields.io/badge/preview-Windows%20%2F%20Linux-3ccffa">
   <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-beta.1-6b7280">
   <img alt="Status" src="https://img.shields.io/badge/status-control%20plane-6b7280">
 </p>
@@ -39,7 +39,7 @@ It is built for translating subtitles, dubbing in the original speaker's voice, 
 | Audio separation | `PREVIEW` | Split voice and ambience for mixing or dubbing. |
 | OCR assist | `PREVIEW` | Read on-screen text for subtitle and erase workflows. |
 
-> Status is relative to the Windows + WSL2 baseline; see the Download table for macOS/Linux scope.
+> Status is relative to the Windows + WSL2 baseline; Linux is best-effort. macOS release builds are temporarily unavailable.
 
 ## Download
 
@@ -48,11 +48,10 @@ Installers are built by GitHub Actions on `v*` tags. Download them from [Release
 | Platform | Installer | Notes |
 |---|---|---|
 | Windows x64 | `YaoMuStudio-0.1.0-beta.1-win-x64.exe` | NSIS. SmartScreen may warn. Model execution uses WSL2. |
-| macOS arm64 | `YaoMuStudio-0.1.0-beta.1-mac-arm64.dmg` | Unsigned preview; right-click to open. Model execution is out of scope for this build. |
-| macOS x64 | `YaoMuStudio-0.1.0-beta.1-mac-x64.dmg` | Same as above. |
 | Linux x64 | `YaoMuStudio-0.1.0-beta.1-linux-x64.AppImage` | Preview; requires a GPU driver. Model execution is best-effort. |
+| macOS | — | Release builds are temporarily excluded until macOS packaging is fixed and models are ready. |
 
-**Requirements:** model execution on Windows needs a working WSL2 environment. macOS and Linux currently focus on the media path; see the Release notes for the exact model-execution status on each platform. Unsigned macOS builds must be opened with right-click → Open, and auto-update is unavailable.
+**Requirements:** model execution on Windows needs a working WSL2 environment. Linux is best-effort. macOS release builds are temporarily unavailable. Windows builds are unsigned; SmartScreen may warn.
 
 ## Quick start
 
@@ -97,8 +96,8 @@ The renderer never talks to the Core, the filesystem, or arbitrary IPC directly.
 |---|---|---|
 | Control plane | `DONE` | Electron / Vue / Go Core / SQLite / Runner / FFmpeg wiring. |
 | Real model bundles | `MISSING` | Real bundles for the six slots, signed manifests, and strict offline acceptance. |
-| macOS / Linux model execution | `MISSING` | The baseline is Windows + WSL2; Linux is best-effort. |
-| Signing / notarization | `MISSING` | Current builds are unsigned; macOS auto-update is unavailable. |
+| macOS build / model execution | `MISSING` | macOS release builds are temporarily excluded; Linux is best-effort. |
+| Signing / notarization | `MISSING` | Current Windows and Linux builds are unsigned. |
 | Install rollback | `MISSING` | Keeping the previous version and verifying rollback are still planned. |
 
 > The README does not present unfinished capabilities as available. Release notes will track the actual status per version.

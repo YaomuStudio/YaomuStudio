@@ -82,10 +82,9 @@ for (const [rel, text] of Object.entries(texts)) {
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const version = pkg.version;
+// macOS 发布构建暂时排除；恢复 macOS 时把 mac-arm64/mac-x64 资产加回。
 const assets = [
   `YaoMuStudio-${version}-win-x64.exe`,
-  `YaoMuStudio-${version}-mac-arm64.dmg`,
-  `YaoMuStudio-${version}-mac-x64.dmg`,
   `YaoMuStudio-${version}-linux-x64.AppImage`,
 ];
 for (const [rel, text] of Object.entries(texts)) {
