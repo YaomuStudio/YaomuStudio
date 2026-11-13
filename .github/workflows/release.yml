@@ -1,0 +1,329 @@
+name: release
+
+# 公开仓 tag 发布：v* tag 推送后构建 Windows/macOS/Linux 安装包，
+# 全部成功后自动创建并公开 GitHub Release。非 tag 事件不构建安装包。
+# 详细契约见 contracts/release-publication.md。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "已存在的 tag（vX.Y.Z 或 vX.Y.Z-beta.N）"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+concurrency:
+  group: release-${{ github.repository }}-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate tag and versions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      commit: ${{ steps.tag.outputs.commit }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate existing tag and package versions
+        id: tag
+        env:
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+          RELEASE_INPUT_TAG: ${{ inputs.tag }}
+        run: node scripts/check-release-tag.mjs
+
+  build-windows:
+    name: build windows x64
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app-server/go.mod
+          cache-dependency-path: app-server/go.sum
+
+      - uses: actions/cache@v4
+        with:
+          path: desktop/build/.cache
+          key: ${{ runner.os }}-${{ runner.arch }}-yaomu-runtime-${{ hashFiles('scripts/fetch-python-runtime.sh', 'scripts/fetch-ffmpeg.sh', 'scripts/fetch-python-standalone.sh', 'scripts/fetch-ffmpeg-static.sh') }}
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Build Core + bundled runtime
+        shell: bash
+        env:
+          BUNDLE_PYTHON: "1"
+          BUNDLE_FFMPEG: "1"
+        run: bash scripts/build-core.sh --arch x64 --out build/core-x64
+
+      - name: Build NSIS installer
+        working-directory: desktop
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: Verify app-update.yml
+        shell: bash
+        run: node scripts/check-app-update-yml.mjs desktop/dist-app/win-unpacked/resources
+
+      - name: Verify packaged resources
+        shell: bash
+        run: node desktop/scripts/check-packaged-artifacts.mjs
+
+      - name: Collect release assets
+        shell: bash
+        run: >-
+          node scripts/collect-release-assets.mjs
+          --platform win
+          --version ${{ needs.validate.outputs.version }}
+          --dist desktop/dist-app
+          --out release-assets
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: release-assets
+          if-no-files-found: error
+          retention-days: 7
+
+  build-macos:
+    name: build macOS arm64 + x64
+    needs: validate
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app-server/go.mod
+          cache-dependency-path: app-server/go.sum
+
+      - uses: actions/cache@v4
+        with:
+          path: desktop/build/.cache
+          key: ${{ runner.os }}-${{ runner.arch }}-yaomu-runtime-${{ hashFiles('scripts/fetch-python-runtime.sh', 'scripts/fetch-ffmpeg.sh', 'scripts/fetch-python-standalone.sh', 'scripts/fetch-ffmpeg-static.sh') }}
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Build Core + bundled runtime (arm64)
+        env:
+          BUNDLE_PYTHON: "1"
+          BUNDLE_FFMPEG: "1"
+        run: bash scripts/build-core.sh --arch arm64 --out build/core-arm64
+
+      - name: Build Core + bundled runtime (x64)
+        env:
+          BUNDLE_PYTHON: "1"
+          BUNDLE_FFMPEG: "1"
+        run: bash scripts/build-core.sh --arch x64 --out build/core-x64
+
+      - name: Build DMG + zip (unsigned preview)
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --mac dmg zip --arm64 --x64 --publish never
+
+      - name: Verify app-update.yml (arm64)
+        run: node scripts/check-app-update-yml.mjs "desktop/dist-app/mac-arm64/YaoMu Studio.app/Contents/Resources"
+
+      - name: Verify app-update.yml (x64)
+        run: node scripts/check-app-update-yml.mjs "desktop/dist-app/mac/YaoMu Studio.app/Contents/Resources"
+
+      - name: Verify packaged resources
+        run: node desktop/scripts/check-packaged-artifacts.mjs
+
+      - name: Collect release assets
+        run: >-
+          node scripts/collect-release-assets.mjs
+          --platform mac
+          --version ${{ needs.validate.outputs.version }}
+          --dist desktop/dist-app
+          --out release-assets
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: release-assets
+          if-no-files-found: error
+          retention-days: 7
+
+  build-linux:
+    name: build Linux x64
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app-server/go.mod
+          cache-dependency-path: app-server/go.sum
+
+      - uses: actions/cache@v4
+        with:
+          path: desktop/build/.cache
+          key: ${{ runner.os }}-${{ runner.arch }}-yaomu-runtime-${{ hashFiles('scripts/fetch-python-runtime.sh', 'scripts/fetch-ffmpeg.sh', 'scripts/fetch-python-standalone.sh', 'scripts/fetch-ffmpeg-static.sh') }}
+
+      - name: Install Linux Electron runtime deps
+        run: bash scripts/install-linux-electron-deps.sh
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Build Core + bundled runtime
+        env:
+          BUNDLE_PYTHON: "1"
+          BUNDLE_FFMPEG: "1"
+        run: bash scripts/build-core.sh --arch x64 --out build/core-x64
+
+      - name: Build AppImage
+        working-directory: desktop
+        run: npx electron-builder --linux AppImage --x64 --publish never
+
+      - name: Verify app-update.yml
+        run: node scripts/check-app-update-yml.mjs desktop/dist-app/linux-unpacked/resources
+
+      - name: Verify packaged resources
+        run: node desktop/scripts/check-packaged-artifacts.mjs
+
+      - name: Collect release assets
+        run: >-
+          node scripts/collect-release-assets.mjs
+          --platform linux
+          --version ${{ needs.validate.outputs.version }}
+          --dist desktop/dist-app
+          --out release-assets
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: release-assets
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish GitHub Release
+    needs: [validate, build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify release assets and update manifests
+        run: >-
+          node scripts/verify-release-assets.mjs
+          --dir release-assets
+          --version ${{ needs.validate.outputs.version }}
+          --platform all
+
+      - name: Refuse to overwrite an existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release already exists: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - name: Create public release with generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+        run: |
+          notes=$(printf '%s\n%s' \
+            '> 未签名构建：Windows 可能触发 SmartScreen；macOS 需右键打开，自动更新不可用。' \
+            '> macOS/Linux 为 preview；模型执行以 Windows + WSL2 为基线，Linux 为 best-effort。')
+          if [ "$RELEASE_PRERELEASE" = "true" ]; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "$RELEASE_TAG" --generate-notes --notes "$notes" --prerelease
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "$RELEASE_TAG" --generate-notes --notes "$notes"
+          fi
+
+      - name: Upload installers and update manifests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+        run: gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY"

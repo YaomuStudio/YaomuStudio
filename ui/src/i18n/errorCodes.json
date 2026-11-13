@@ -1,0 +1,19 @@
+{
+  "INVALID_REQUEST": "error.invalid_request",
+  "LOCAL_AUTH_REQUIRED": "error.local_auth_required",
+  "LOCAL_ACCESS_DENIED": "error.local_access_denied",
+  "REVISION_CONFLICT": "error.revision_conflict",
+  "PREFLIGHT_STALE": "error.preflight_stale",
+  "IDEMPOTENCY_CONFLICT": "error.idempotency_conflict",
+  "MODEL_NOT_INSTALLED": "error.model_not_installed",
+  "RUNTIME_INCOMPATIBLE": "error.runtime_incompatible",
+  "CAPABILITY_UNVERIFIED": "error.capability_unverified",
+  "INSUFFICIENT_DISK": "error.insufficient_disk",
+  "CORE_NOT_READY": "error.core_not_ready",
+  "PERSISTENCE_UNAVAILABLE": "error.persistence_unavailable",
+  "WORKER_EXITED": "error.worker_exited",
+  "RESOURCE_EXHAUSTED": "error.resource_exhausted",
+  "EVENT_CURSOR_EXPIRED": "error.event_cursor_expired",
+  "NOT_FOUND": "error.not_found",
+  "REVIEW_REQUIRED": "error.review_required"
+}

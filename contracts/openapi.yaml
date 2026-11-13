@@ -1,0 +1,4156 @@
+openapi: 3.0.3
+info:
+  title: 曜幕内部本地 API
+  version: 0.2.1
+  description: |
+    曜幕（YaoMu Studio）本地 App Server 的结构契约。语义权威是 docs/local-api-contract.md，
+    领域模型以 docs/data-and-storage.md 为准，状态机以 docs/initialization-and-task-lifecycle.md
+    与 docs/workflow-and-review.md 为准。本文件只把已有语义落成结构，不新增文档之外的端点或字段。
+
+    约定：
+    - 业务路径统一以 /api/v1 为前缀；只有 /health/live 返回不含机器信息的最小存活响应。
+    - Core 完成业务准备（迁移、任务/文件恢复）后才监听业务 API；Runner hello 异步进行。
+      /health/live 只表示进程存活，core_ready=true 表示 Core 业务准备完成，均不代表模型或执行器就绪。
+    - 线上字段使用 snake_case；UI/TypeScript 侧使用驼峰并在桥接层转换，不做双写。
+    - ID 为不透明字符串；时间使用 UTC ISO 8601；媒体时间用整数毫秒；大小用字节。
+    - 内部 API 须携带 Shell 私有通道注入的实例令牌，并校验 Host/Origin；随机端口和 CORS 不能代替授权。
+    - 状态变更请求携带 Idempotency-Key 与 request_id；只读评估型 POST（preflight/plan）只需 request_id。
+      幂等范围为工作区 + 操作 + key：同一摘要返回原回执，不同摘要返回 409 IDEMPOTENCY_CONFLICT。
+    - 错误响应统一为 {request_id, error:{code, message_key, retryable, action_ids}}，原始输出只进
+      有上限、脱敏的本地诊断，不通过网络返回。
+    - 第三方本机 API 是独立回环端口，默认关闭；开启后单独监听 127.0.0.1 并要求可吊销的 Bearer 令牌。
+    - Core/Runner 执行器协议只在本文件的 x-execution-protocol 中保留帧类型摘要，不定义 FlashCLI 参数，
+      也不定义六槽位 bundle 内容契约。
+    - 与文档的差异以 docs/local-api-contract.md 的注记为准，不静默维护第二套语义。
+    - lint 说明：/health/live 按设计不返回 4XX（无鉴权、无业务错误码），Redocly 的
+      operation-4xx-response 告警为预期，不以虚构的 4XX 响应消除。
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: http://127.0.0.1:{core_port}
+    description: 内部 Shell/Core API（随机端口或私有 IPC；业务路径以 /api/v1 为前缀）
+    variables:
+      core_port:
+        default: "0"
+        description: 运行时由 Runtime Supervisor 分配，不在本文件中固定
+  - url: http://127.0.0.1:{local_api_port}
+    description: 第三方本机 API（独立回环端口，默认关闭；开启后才监听，Bearer 令牌可吊销）
+    variables:
+      local_api_port:
+        default: "0"
+        description: 开启第三方本机 API 时单独监听的回环端口
+security:
+  - instanceToken: []
+tags:
+  - name: health
+    description: 最小存活检查
+  - name: system
+    description: 实例握手与启动阶段
+  - name: capabilities
+    description: 能力目录（六类模型槽位 + OCR/FFmpeg 辅助能力）
+  - name: installations
+    description: 模型/运行时安装计划、执行与已安装包管理
+  - name: devices
+    description: 计算设备清单（FR-SET-40）
+  - name: environment
+    description: 本机执行环境快照（平台、WSL2、CUDA、FFmpeg）
+  - name: projects
+    description: 本地项目与项目视图
+  - name: assets
+    description: 媒体导入与受控内容读取
+  - name: workflow-runs
+    description: 业务计划（八节点/专属模板）
+  - name: tasks
+    description: 预检、任务提交与任务快照
+  - name: reviews
+    description: 人工审核（ReviewGate）读取与放行
+  - name: segments
+    description: 句级候选与选用
+  - name: subtitle-tracks
+    description: 字幕轨 revision 保存
+  - name: custom-pipeline
+    description: 专属链路本机模板（配置持久化，不含文件）
+  - name: engines
+    description: 六槽位受控配置
+  - name: exports
+    description: 字幕/成品导出任务
+  - name: storage
+    description: 分区用量与逐类清理（FR-SET-42）
+  - name: sync
+    description: 快照与增量事件（SSE）
+  - name: local-api
+    description: 第三方本机 API 的总开关、令牌、并发上限与本地统计（内部 API，设置页读取）
+  - name: third-party-local-api
+    description: 第三方本机 OpenAI 兼容端点（独立回环端口，默认关闭）
+x-execution-protocol:
+  description: >-
+    Core 与 Runner 之间的执行器协议摘要。只列帧类型与绑定要求，不展开字段，不猜测
+    FlashCLI 的离线/JSON 等参数，也不定义六槽位 bundle 内容契约。
+  transport: 版本化 JSON，建议 stdio 或私有管道；不为每个 Worker 开放 HTTP 端口
+  frames:
+    - hello
+    - probe
+    - execute
+    - cancel
+    - shutdown
+  events:
+    - heartbeat
+    - progress
+    - log
+    - result
+    - error
+  log_event: >-
+    Runner -> Core 的可丢弃执行过程行。payload 绑定 server_epoch/task_id/step_id/attempt，
+    含 stream（stderr|stdout|runner）、应用构造且不超过 512 字符的受控摘要 line 与可选单调 seq；
+    只允许完整匹配固定阶段消息或严格整数模板，模型/子进程 stdout/stderr 原文不得转发；
+    不进入持久事件游标，也不作为任务成功条件。
+  binding: >-
+    执行请求必须绑定协议版本、workspace、server epoch、task/step ID、单调 attempt 编号、
+    模型/适配器/运行时摘要、参数、输入资产 ID 和专属输出目录。
+  constraints:
+    - Task.Params._core 仅 Core 持久化，包含冻结执行与输出基线，不发送给 Runner。
+    - 08/导出向 FFmpeg 传冻结 plan 白名单；所有成果先准备、再随任务终态事务登记和发布成功。
+    - 所有任务共享执行器声明的并发容量；未确认旧执行退出时隔离且不派新任务。
+    - 内部文件路径由 Main 按应用顶层 IPC 来源和窗口授权校验后转发；Renderer 不能构造授权。
+    - Core 先持久化运行状态再派发；只接受当前 epoch/attempt 的结果。
+    - stdout 只写有大小限制的协议帧，日志走 stderr。
+    - 取消超时后只终止本应用拥有的进程树；未确认退出前不把资源槽交给第二个任务。
+    - 心跳丢失不能直接证明进程已死，必须核对拥有者、进程身份与执行侧状态。
+paths:
+  /health/live:
+    get:
+      operationId: getHealthLive
+      tags: [health]
+      summary: 最小存活检查
+      description: 返回不含机器信息的最小存活响应，不要求实例令牌；只说明进程存活，不代表 Core 业务就绪，更不代表 Runner/模型可执行。慢 Runner 握手不阻塞本端点。
+      security: []
+      responses:
+        "200":
+          description: 进程存活
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /api/v1/system:
+    get:
+      operationId: getSystem
+      tags: [system]
+      summary: 实例握手与启动阶段
+      description: 返回应用标识、协议版本、instance/workspace ID、server epoch 与 Core 是否就绪。
+      responses:
+        "200":
+          description: 实例信息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/system/update-preparation:
+    post:
+      operationId: prepareApplicationUpdate
+      tags: [system]
+      summary: 应用更新前同实例原子准备
+      description: >-
+        仅Main经私有认证连接调用，不暴露给Renderer通用代理或第三方端口。
+        有活动业务/执行或在飞普通请求时返回blocked，不暂停/取消/改队列。
+        空闲时原子封住普通请求与业务写，确认调度器及Runner清理后才prepared；
+        开始不可逆清理后失败保持封闸，需重启，不用TTL自动解封。详app-update-installation.md。
+        使用实例内operation_id，不保存跨重启幂等回执；prepared不等于安装已执行。
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePreparationRequest"
+      responses:
+        "200":
+          description: 当前同实例准备结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatePreparationResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/capabilities:
+    get:
+      operationId: listCapabilities
+      tags: [capabilities]
+      summary: 能力目录
+      description: >-
+        逐槽位返回支持范围、安装/运行状态、原因码、修复动作与受控参数 Schema。发布准入决定可见性，
+        本机状态决定可运行性；OCR 为辅助依赖，FFmpeg 为媒体工具能力。
+      responses:
+        "200":
+          description: 能力目录
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Capability"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/installations/plan:
+    post:
+      operationId: planInstallation
+      tags: [installations]
+      summary: 解析安装计划
+      description: >-
+        解析到一组精确发布版本与摘要，返回下载/缓存复用/安装量、峰值暂存、所需权限、许可与计划哈希；
+        计划绑定用户同意的范围，执行时不能扩大。
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallationPlanRequest"
+      responses:
+        "200":
+          description: 安装计划
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationPlan"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/installations:
+    get:
+      operationId: listInstallations
+      tags: [installations]
+      summary: 安装记录列表
+      description: >-
+        返回当前工作区的安装/已安装包记录（含阶段与进度），供模型页、引导页与更新页读取；
+        不含本机绝对路径。已完成的记录用于按槽位删除或回滚上一保留版本（FR-MODEL-02）。
+      responses:
+        "200":
+          description: 安装记录
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Installation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    post:
+      operationId: createInstallation
+      tags: [installations]
+      summary: 执行用户同意的安装计划
+      description: >-
+        绑定计划哈希、covered_slots与幂等键；旧未冻结覆盖的计划须重新plan。
+        同一精确发布并发请求加入同一安装ID；已验证实体可复用，不生成伪Done记录或重复下载。
+        计划过期/复用目标失效/范围变化返回409 PREFLIGHT_STALE；不能扩大已同意范围，详shared-installations.md。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInstallationRequest"
+      responses:
+        "202":
+          description: 安装已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Installation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/installations/{id}:
+    get:
+      operationId: getInstallation
+      tags: [installations]
+      summary: 安装/恢复状态
+      description: 返回阶段、真实进度、已验证文件、错误与可重试标志；重启后以实际状态为准，不只信完成标记。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 安装状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Installation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/installations/{id}/cancel:
+    post:
+      operationId: cancelInstallation
+      tags: [installations]
+      summary: 取消安装
+      description: 请求停止该物理安装，对其全部覆盖槽位生效；先确认写入停止再清理临时文件，保留旧当前版本。202只代表受理，worker尾部仍占有文件。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "202":
+          description: 取消已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Installation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/capabilities/{slot}/installation:
+    delete:
+      operationId: deleteInstalledPackage
+      tags: [installations]
+      summary: 删除已安装包
+      description: >-
+        解除该槽位的当前/保留安装引用（FR-MODEL-02）；不解除其他槽位。
+        仅最后有效引用移除后回收物理文件，保留项目/原件及其他槽位/保留版本的共享文件。
+        活动Task、仍可推进Run的精确冻结引用或安装worker尾部存在时返回409；删除需确认。
+        幂等重放不重复文件删除，详shared-installations.md。
+      parameters:
+        - name: slot
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CapabilitySlotKey"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "204":
+          description: 已删除
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/capabilities/{slot}/rollback:
+    post:
+      operationId: rollbackInstalledPackage
+      tags: [installations]
+      summary: 回滚到上一保留版本
+      description: >-
+        仅该槽位切到上一不同精确发布的保留引用（FR-MODEL-02），核文件后返回202与该已有安装实体；
+        不复制Done记录，不改变其他槽位或冻结任务的锁。相关活动工作未排空时不切换，
+        无可验证的保留版本返回409。旧客户端仍收到Installation形状，写后须重读当前引用。
+      parameters:
+        - name: slot
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/CapabilitySlotKey"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "202":
+          description: 回滚已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Installation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/devices:
+    get:
+      operationId: listDevices
+      tags: [devices]
+      summary: 计算设备清单
+      description: >-
+        返回可用计算设备与推荐项（FR-SET-40）；包含设备类型、内存/显存总量与当前占用、
+        是否被本应用模型占用。设备选择仍通过 PUT /engines/{slot}/config 的 device_id 提交，
+        切换需客户端确认并遵守活跃任务固定旧版本的规则。
+      responses:
+        "200":
+          description: 设备清单
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeviceInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/environment:
+    get:
+      operationId: getEnvironment
+      tags: [environment]
+      summary: 本机执行环境快照
+      description: >-
+        返回宿主平台、WSL2 状态、计算设备与只读环境检查（FR-SET-23/40）。探测失败以
+        检查项表达，不伪造设备；端点不安装系统组件、不修改设置、不执行 FlashCLI。
+      parameters:
+        - name: refresh
+          in: query
+          required: false
+          description: 为 true 时跳过探测缓存并立即重新检测
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: 环境快照
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: 项目列表
+      description: 返回轻量项目摘要；详细资产、字幕轨与运行状态通过项目视图读取。
+      responses:
+        "200":
+          description: 项目摘要列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: 创建本地项目
+      description: 项目属于当前工作区，不需要云账号；创建后由 Core 分配项目 ID 与编辑版本。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: 项目已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: 项目视图
+      description: >-
+        返回项目元数据、资产、字幕轨（含 revision）与运行状态。大媒体内容仍通过资产内容端点
+        以流式/Range 读取，不内联到 JSON。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 项目视图
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: 修改项目元数据
+      description: >-
+        目前只允许修改项目名称；名称去首尾空格后 1–30 个字符。
+        edit_version 用于乐观并发检查，成功后编辑版本递增并发布 project.updated 事件。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: 更新后的项目视图
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: 删除项目
+      description: 删除需要用户确认；Core 校验未解决引用与活跃任务，存在冲突时拒绝删除。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "204":
+          description: 已删除
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/assets/imports:
+    post:
+      operationId: importAssets
+      tags: [assets]
+      summary: 导入媒体
+      description: >-
+        使用 Shell 文件选择器签发的 file grant，指定项目与引用/复制策略；不接受宿主任意路径。
+        长导入返回任务 ID，进度通过任务快照或事件查询；短导入直接返回资产 ID。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetImportRequest"
+      responses:
+        "202":
+          description: 导入已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/assets/{id}/relocate:
+    post:
+      operationId: relocateAsset
+      tags: [assets]
+      summary: 重新定位缺失的外部引用
+      description: >-
+        仅用于 source=external_reference 且 status=missing 的资产。新 file grant 的内容
+        SHA-256 必须等于导入时记录的摘要，否则 400 且状态不变；成功后保留资产 ID、项目与
+        既有轨道/任务引用，只更新位置、大小与（探测可用时）媒体元数据，并恢复 ready。
+        copy/generated 资产、目录或相对路径、探测失败均返回可读错误，要求重新导入。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetRelocateRequest"
+      responses:
+        "200":
+          description: 已重新定位
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/assets/{id}/content:
+    get:
+      operationId: getAssetContent
+      tags: [assets]
+      summary: 预览/流式读取资产内容
+      description: >-
+        按资产授权读取，不接受任意路径或远端 URL；支持字节 Range，用于预览与导出流式处理。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Range
+          in: header
+          required: false
+          description: HTTP 字节范围（bytes=start-end）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 完整内容
+          headers:
+            Accept-Ranges:
+              description: 支持字节范围读取
+              schema:
+                type: string
+                enum: [bytes]
+            Content-Type:
+              description: 由资产类型决定的媒体 MIME
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "206":
+          description: 部分内容
+          headers:
+            Accept-Ranges:
+              description: 支持字节范围读取
+              schema:
+                type: string
+                enum: [bytes]
+            Content-Range:
+              description: 实际返回的字节范围
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/tasks/preflight:
+    post:
+      operationId: preflight
+      tags: [tasks]
+      summary: 评估任务/运行计划
+      description: >-
+        绑定输入资产/字幕 revision、参数摘要、模型/运行时摘要与兼容规则版本，返回 pass/warning/blocker、
+        原因码、修复动作与计划 ID/哈希。警告确认不是全局忽略风险；暂时资源忙可排队，永久不满足为阻断。
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRunInput"
+      responses:
+        "200":
+          description: 预检结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreflightResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/workflow-runs:
+    post:
+      operationId: createWorkflowRun
+      tags: [workflow-runs]
+      summary: 创建业务计划
+      description: >-
+        创建八节点或专属模板的业务计划容器，绑定输入 revision、源/目标语言、提取方式与素材复用语义。
+        写操作先持久化计划、幂等回执与关键事件，再允许派发；预检条件变化返回 409 PREFLIGHT_STALE。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRunInput"
+      responses:
+        "201":
+          description: 运行计划已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowRun"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/workflow-runs/{id}:
+    get:
+      operationId: getWorkflowRun
+      tags: [workflow-runs]
+      summary: 运行计划快照
+      description: 返回运行状态、八节点状态与语言列表；每语种的审核状态通过审核列表读取。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 运行计划
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/workflow-runs/{id}/pause:
+    post:
+      operationId: pauseWorkflowRun
+      tags: [workflow-runs]
+      summary: 暂停运行
+      description: >-
+        在安全单元边界生效：当前不可中断单元完成后显示 PAUSE_REQUESTED，资源释放后为 PAUSED。
+        PAUSED 时仍可保存编辑、候选选择与审核记录，但只登记待执行工作，不派发新模型任务。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "202":
+          description: 暂停已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/workflow-runs/{id}/resume:
+    post:
+      operationId: resumeWorkflowRun
+      tags: [workflow-runs]
+      summary: 恢复运行
+      description: 恢复前重新预检；终止 Run 拒绝恢复，需要生产时创建新的 Run/派生版本。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "202":
+          description: 恢复已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: 任务列表
+      description: 分页返回任务状态、产物与错误摘要，不嵌入完整日志或进度历史。
+      parameters:
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: run_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TaskStatus"
+        - name: cursor
+          in: query
+          required: false
+          description: 上一页返回的 next_cursor
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: 任务分页
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: 提交执行单元
+      description: >-
+        任务、步骤计划、输入锁、幂等回执与关键事件同事务提交成功后才返回 202 并派发。
+        提交时重新检查预检条件，变化返回 409 PREFLIGHT_STALE；数据库失败返回错误，不派发执行器。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "202":
+          description: 任务已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/tasks/{id}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: 任务快照
+      description: 返回状态、步骤、产物与错误；进度是可丢弃反馈，不作为恢复依据。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 任务快照
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/tasks/{id}/cancel:
+    post:
+      operationId: cancelTask
+      tags: [tasks]
+      summary: 请求取消任务
+      description: >-
+        幂等。响应只代表取消受理，实际终态见任务快照；成功提交与取消由 Core 事务比较版本决定，
+        已 SUCCEEDED 的任务不能被迟到取消改为 CANCELED。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "202":
+          description: 取消已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/tasks/{id}/retry:
+    post:
+      operationId: retryTask
+      tags: [tasks]
+      summary: 重试冻结输入的任务
+      description: >-
+        未完成步骤增加单调 attempt 编号；成功终态或输入改变返回冲突。重试固定原模型版本与输入，
+        原版本不可用时要求安装或新建任务，不静默换模型、降 CPU 或转云。
+        07 已记录的冻结时间窗越界或媒体时长未知属于原地重试无法修复的输入冲突，
+        返回 409 REVISION_CONFLICT 及对应安全时间轴消息键；保留原失败、attempt 与事件不变，
+        修正字幕或重新导入媒体后创建新运行，不把新输入替换进旧任务。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "202":
+          description: 重试已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/tasks/{id}/execution-log:
+    get:
+      operationId: getTaskExecutionLog
+      tags: [tasks]
+      summary: 读取任务执行过程日志尾部
+      description: >-
+        只返回应用构造的受控过程摘要（固定阶段或严格整数模板），来自本地 cache 目录；
+        写入与回放使用同一正向允许策略，未知自由文本不返回；不删除或改写既有 cache 文件。
+        不写入业务库，也不作为任务成功条件。文件缺失或已被缓存清理时返回空列表。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: attempt
+          in: query
+          required: false
+          description: attempt 编号；缺省读取该任务最近一次 attempt
+          schema:
+            type: integer
+            minimum: 1
+        - name: tail
+          in: query
+          required: false
+          description: 返回最近的行数
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 200
+      responses:
+        "200":
+          description: 执行过程日志尾部（可能为空）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/projects/{id}/reviews:
+    get:
+      operationId: listReviews
+      tags: [reviews]
+      summary: 项目审核列表
+      description: 返回项目内ReviewGate与只读current_bindings；历史记录保留，可按运行过滤。当前绑定在同一读事务派生，不凭列表顺序推断。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: run_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 审核列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewGate"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/reviews/{id}:
+    get:
+      operationId: getReview
+      tags: [reviews]
+      summary: 审核详情
+      description: 返回单个 ReviewGate；旧审核不能自动放行新内容。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 审核详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewGate"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/reviews/{id}/approve:
+    post:
+      operationId: approveReview
+      tags: [reviews]
+      summary: 人工放行
+      description: >-
+        绑定被请求gate的精确revision_digest与类型；不一致返回409 REVISION_CONFLICT。
+        可选current_binding由新客户端提交，Core在同一事务确认它仍为该gate当前绑定，否则409且不批准。
+        缺省保留旧客户端记录历史gate的语义，历史批准不代表放行新内容。
+        暂停时允许登记审核结果但不派发新任务；终止Run拒绝放行。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveReviewRequest"
+      responses:
+        "200":
+          description: 审核结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewGate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/segments/{id}/candidates:
+    get:
+      operationId: listCandidates
+      tags: [segments]
+      summary: 句级候选列表
+      description: >-
+        返回该句段与语言已有的不可变候选（推荐候选以 is_recommended 标记），用于逐句试听比对
+        与故障恢复（FR-PIPE-04）。生成受理（202）后客户端通过本端点读回新候选，或等待任务事件；
+        只返回该句段该语言的候选，不返回其他句或其他语言。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: language
+          in: query
+          required: true
+          description: 候选所属语言
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 候选列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AudioCandidate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    post:
+      operationId: generateCandidates
+      tags: [segments]
+      summary: 句级重抽
+      description: >-
+        为指定句段与语言新建候选与新的 attempt，不覆盖旧候选或其他句。候选生成属于模型执行，
+        返回 202 与新 attempt 的任务 ID/编号；完成后候选追加到该句段，通过
+        GET /segments/{id}/candidates?language= 读回（或订阅任务事件）。候选文件不可变。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCandidatesRequest"
+      responses:
+        "202":
+          description: 重抽已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SegmentCandidateJob"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/segments/{id}/selection:
+    get:
+      operationId: getCandidateSelection
+      tags: [segments]
+      summary: 读取已选用配音
+      description: 返回该句段与语言的 CandidateSelection；尚无选择时返回 404 NOT_FOUND。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: language
+          in: query
+          required: true
+          description: 选择所属语言
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 已选用候选
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateSelection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    put:
+      operationId: selectCandidate
+      tags: [segments]
+      summary: 选用配音
+      description: >-
+        校验候选属于当前句段 revision 与语言；不满足返回 409 REVISION_CONFLICT。选用关系带 revision，
+        旧候选文件保留且不被覆盖。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelectCandidateRequest"
+      responses:
+        "200":
+          description: 已登记选择
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateSelection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/engines/{slot}/config:
+    get:
+      operationId: getEngineConfig
+      tags: [engines]
+      summary: 读取槽位配置
+      description: 返回受控参数值、设备选择与更新时间；参数键与范围由能力目录的 ParamField 定义。
+      parameters:
+        - name: slot
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ModelSlotKey"
+      responses:
+        "200":
+          description: 槽位配置
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineConfig"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    put:
+      operationId: updateEngineConfig
+      tags: [engines]
+      summary: 更新槽位配置
+      description: >-
+        只接受受控 Schema 内的键与范围；设备/版本变化不得破坏活跃任务，运行中任务固定旧版本。
+        设备切换需客户端确认（可能中断运行中任务，FR-SET-40），Core 只对后续任务生效，
+        不以新设备或新版本静默接管活跃任务。
+      parameters:
+        - name: slot
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ModelSlotKey"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EngineConfigUpdate"
+      responses:
+        "200":
+          description: 更新后的槽位配置
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineConfig"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/subtitle-tracks/imports:
+    post:
+      operationId: importSubtitleTrack
+      tags: [subtitle-tracks]
+      summary: 从 SRT Asset 创建字幕轨
+      description: >-
+        从已导入、属于同一项目的 SRT Asset 解析并创建新的 transcription/translation 轨，
+        供字幕翻译/声音克隆/专属链路使用。不读取任意宿主机路径，不接受非 subtitle Asset；
+        返回 201 SubtitleTrack，支持 Idempotency-Key。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportSubtitleTrackRequest"
+      responses:
+        "201":
+          description: 创建的原文轨
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubtitleTrack"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/custom-pipeline/templates:
+    get:
+      operationId: listCustomPipelineTemplates
+      tags: [custom-pipeline]
+      summary: 读取专属链路本地模板
+      description: >-
+        返回本机保存的专属链路配置模板（最多 20 条，按 updated_at 倒序）。
+        模板只保存配置，不保存媒体/字幕文件；不云同步。
+      responses:
+        "200":
+          description: 模板列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomPipelineTemplateList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    put:
+      operationId: saveCustomPipelineTemplates
+      tags: [custom-pipeline]
+      summary: 保存专属链路本地模板
+      description: >-
+        整表替换本机模板。名称 1–30 字且不区分大小写唯一；总数 ≤ 20。
+        损坏或未知 schema 的旧数据读取为空列表，不阻塞启动。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomPipelineTemplateList"
+      responses:
+        "200":
+          description: 保存后的模板列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomPipelineTemplateList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/subtitle-tracks/{id}/revisions:
+    put:
+      operationId: saveSubtitleRevision
+      tags: [subtitle-tracks]
+      summary: 保存人工修改
+      description: >-
+        基于 base_revision_id 做乐观并发，保存稳定片段 ID 与内容；冲突返回 409 REVISION_CONFLICT，
+        不覆盖新版本。content_revision 与 content_digest 由 Core 计算，客户端不提交。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveSubtitleRevisionRequest"
+      responses:
+        "201":
+          description: 新 revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubtitleRevision"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/exports:
+    get:
+      operationId: listExports
+      tags: [exports]
+      summary: 导出记录列表
+      description: 返回导出任务记录（状态、格式与输出路径）；可按项目过滤。
+      parameters:
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 导出记录
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExportRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    post:
+      operationId: createExport
+      tags: [exports]
+      summary: 导出字幕/成品
+      description: >-
+        绑定输入 revision、授权输出目录与命名策略，创建独立导出任务。format 决定实际编码/容器，
+        kind 保留产品类型（video/audio/subtitle），Core 校验 kind 与 format 一致。
+        Run 派生导出（带 run_id）要求该 Run 存在已放行（approved）的 delivery 审核门槛，
+        且门槛的 revision_digest 等于 Core 从持久化状态重算的当前产物修订摘要（按导出语种；
+        不信任客户端传入的摘要）；绑定当前修订的门槛仍为 pending（编辑或重新混音后尚未放行）
+        时同样返回 409 REVIEW_REQUIRED；无 run_id 的工具导出不设此门禁。
+        交付对象按 kind 分流：视频/音频导出只接受冻结在当前 revision 的成功 08 摘要；
+        字幕导出接受被导出 revision 的交付绑定，不要求先合成 08；字幕级放行不能替代
+        视频/音频交付审核。
+        各语种放行按摘要独立成立：放行其他语种不会顶掉本语种的有效放行。
+        已完成审核的导出是交付动作，来源 Run 已终止（SUCCEEDED/PARTIAL/CANCELED 等）时仍可导出
+        （workflow-and-review §5 部分成功语义）。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportRequest"
+      responses:
+        "202":
+          description: 导出已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/storage/usage:
+    get:
+      operationId: getStorageUsage
+      tags: [storage]
+      summary: 分区用量
+      description: >-
+        返回模型包、媒体库、缓存、导出四类占用字节数（FR-SET-42）；只报告应用数据所在分区，
+        不把宿主其他分区或系统占用算入。
+      responses:
+        "200":
+          description: 分区用量
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageUsage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/storage/cleanup:
+    post:
+      operationId: cleanupStorage
+      tags: [storage]
+      summary: 按类清理存储
+      description: >-
+        清理指定类别中应用拥有、无引用、无活跃 writer 的文件（FR-SET-42）。不删除用户原件、
+        唯一有效模型或其他槽位共享文件；清理前需要用户确认，返回实际释放字节数。
+        资源仍被活跃任务引用时返回 409。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StorageCleanupRequest"
+      responses:
+        "200":
+          description: 清理结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageCleanupResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/snapshot:
+    get:
+      operationId: getSnapshot
+      tags: [sync]
+      summary: 恢复项目视图
+      description: >-
+        在同一读事务中返回项目摘要、运行/任务元数据与事件高水位 H；客户端随后从 H 订阅事件。
+        大内容（媒体、字幕 revision）仍按键另行读取。
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 项目快照
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Snapshot"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      tags: [sync]
+      summary: 增量事件（SSE）
+      description: >-
+        按工作区级持久递增 seq 推送事件；状态与事件同事务提交，提交后才发布。高频进度是可丢弃消息，
+        不推进持久游标。游标落入已裁剪历史时返回 409 EVENT_CURSOR_EXPIRED，客户端需重新获取快照。
+        服务端可能因分批补读在交付部分事件后结束本次流；客户端按最后处理到的 seq 重新订阅续传，
+        属于正常握手，不视为 Core 未就绪。
+        安装进度使用 installation.progress（可丢弃），恢复以 GET /installations/{id} 为准；
+        安装完成/失败分别以 installation.completed / installation.failed 表示，半成品永不产生
+        installation.completed。
+      parameters:
+        - name: after_seq
+          in: query
+          required: true
+          description: 已确认处理到的最后事件 seq（快照高水位或最后一条事件）
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+      responses:
+        "200":
+          description: 事件流
+          content:
+            text/event-stream:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/DomainEvent"
+                description: 每个 SSE data 帧是一个 DomainEvent JSON；按 seq 去重。
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: 游标已过期（EVENT_CURSOR_EXPIRED），需重新获取快照
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/events/cursor:
+    get:
+      operationId: getEventCursor
+      tags: [sync]
+      summary: 事件游标范围
+      description: >-
+        返回历史保留策略下仍可回放的最早事件 seq（docs/local-api-contract.md §5）。
+        客户端在重连前比较 after_seq：低于 earliest_seq 时无法补齐，必须重新获取快照，
+        不静默宣称追赶完成。
+      responses:
+        "200":
+          description: 游标范围
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventCursor"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/local-api/settings:
+    get:
+      operationId: getLocalApiSettings
+      tags: [local-api]
+      summary: 第三方本机 API 设置
+      description: >-
+        返回第三方本机 API 的总开关、并发上限与令牌状态（不返回明文令牌）。该端点是内部 API，
+        第三方端口关闭时仍可读取（FR-SET-30/31/33）。
+      responses:
+        "200":
+          description: 本机 API 设置
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalApiSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    put:
+      operationId: updateLocalApiSettings
+      tags: [local-api]
+      summary: 更新第三方本机 API 设置
+      description: >-
+        设置总开关与并发上限（FR-SET-30/33）。关闭总开关立即停止第三方回环端口监听，不影响
+        内部 Shell/Core API；启用后仍须签发 Bearer 令牌，未签发时第三方请求被拒绝。
+        并发上限只约束新受理的第三方请求，不抢占或中断界面任务，二者共用同一资源队列。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocalApiSettingsUpdate"
+      responses:
+        "200":
+          description: 更新后的设置
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalApiSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/local-api/token:
+    post:
+      operationId: issueLocalApiToken
+      tags: [local-api]
+      summary: 签发/重置第三方本机 API 令牌
+      description: >-
+        签发新的 Bearer 令牌并立即吊销旧令牌（FR-SET-31）。明文令牌只在本次响应返回一次，
+        客户端按敏感信息处理，不写入日志、URL 或持久化存储；仅绑定 127.0.0.1。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "201":
+          description: 新令牌（仅此一次返回明文）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalApiToken"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    delete:
+      operationId: revokeLocalApiToken
+      tags: [local-api]
+      summary: 吊销第三方本机 API 令牌
+      description: >-
+        立即吊销当前 Bearer 令牌（FR-SET-31）；第三方端口仍按总开关监听时，后续请求因缺少
+        有效令牌返回 401，直到重新签发。内部 API 不受影响。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "204":
+          description: 已吊销
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/local-api/stats:
+    get:
+      operationId: getLocalApiStats
+      tags: [local-api]
+      summary: 第三方本机 API 统计
+      description: >-
+        返回第三方本机 API 的总开关状态、近期调用次数与按端点统计（最近错误为安全错误码）；
+        不包含素材/字幕内容。该端点属于内部 API，第三方端口关闭时仍可读取；总开关、令牌与
+        并发上限通过 /local-api/settings 与 /local-api/token 管理（FR-SET-30/31/32/33）。
+      responses:
+        "200":
+          description: 本机 API 统计
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalApiStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /v1/audio/transcriptions:
+    post:
+      operationId: createAudioTranscription
+      tags: [third-party-local-api]
+      summary: OpenAI 兼容语音转写（兼容子集）
+      description: >-
+        位于独立回环端口，默认关闭；仅当能力清单逐项声明兼容子集时提供，不得把任意语言翻译宣称符合
+        OpenAI 语义。请求复用同一 Core 预检、模型许可与资源队列，不允许绕过模型准备；
+        文件仅接受上传流，不接受宿主任意路径。任务型能力（擦除、分离、组合）继续复用内部版本化任务
+        端点 /api/v1/tasks*（同一路径、独立端口 + Bearer），本文件不复制第二套任务 schema。
+      security:
+        - localApiBearer: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: true
+              description: OpenAI 兼容子集字段（如 file 上传流、model、language、response_format），具体支持项以能力清单声明为准。
+      responses:
+        "200":
+          description: 转写结果（兼容子集）
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                description: 兼容子集响应；字段以能力清单声明的子集为准。
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /v1/audio/speech:
+    post:
+      operationId: createAudioSpeech
+      tags: [third-party-local-api]
+      summary: OpenAI 兼容语音合成（兼容子集）
+      description: >-
+        位于独立回环端口，默认关闭；仅当能力清单声明语音合成兼容子集时提供。模型许可
+        仍由 Core 校验，不能通过第三方端口绕过；输出流式返回，不写宿主任意路径。
+      security:
+        - localApiBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: OpenAI 兼容子集字段（如 input、voice、response_format），具体支持项以能力清单声明为准。
+      responses:
+        "200":
+          description: 合成音频流
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+components:
+  securitySchemes:
+    instanceToken:
+      type: apiKey
+      in: header
+      name: X-YaoMu-Token
+      description: >-
+        Shell 私有通道注入的实例能力令牌；值不放入 URL、日志或 Renderer 持久化存储。
+        所有业务访问同时校验工作区/资产授权与 Host/Origin。
+    localApiBearer:
+      type: http
+      scheme: bearer
+      description: 第三方本机 API 专用 Bearer 令牌；仅绑定 127.0.0.1，可吊销/重置，关闭总开关即停止监听。
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >-
+        工作区级幂等键。幂等范围为工作区 + 操作 + key；相同请求摘要返回原回执，不同摘要返回
+        409 IDEMPOTENCY_CONFLICT。key 与回执至少持久保存到任务/回执保留期，不能只用进程内 map。
+      schema:
+        type: string
+    RequestId:
+      name: request_id
+      in: header
+      required: false
+      description: 调用方请求 ID；写入请求应携带，错误体回显同名 request_id。
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: 参数或格式不合法（INVALID_REQUEST）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: 缺少实例/第三方令牌或身份不符（LOCAL_AUTH_REQUIRED）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: 令牌有效但工作区/资产授权或 Host/Origin 不符（LOCAL_ACCESS_DENIED）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: 资源不存在（NOT_FOUND），例如未知项目/任务/审核 ID 或尚无候选选择
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: >-
+        状态或请求冲突：REVISION_CONFLICT / PREFLIGHT_STALE / IDEMPOTENCY_CONFLICT /
+        MODEL_NOT_INSTALLED / RUNTIME_INCOMPATIBLE / CAPABILITY_UNVERIFIED / EVENT_CURSOR_EXPIRED /
+        REVIEW_REQUIRED；
+        删除/回滚/清理等管理操作在资源仍被活跃任务引用时也返回 409。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InsufficientStorage:
+      description: 所需文件系统空间不足（INSUFFICIENT_DISK）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: >-
+        Core 不可服务或持久化不可用（CORE_NOT_READY / PERSISTENCE_UNAVAILABLE）；
+        不得转为无持久化执行。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    SystemInfo:
+      type: object
+      required: [app_id, protocol_version, instance_id, workspace_id, server_epoch, core_ready]
+      properties:
+        app_id:
+          type: string
+          description: 应用标识（曜幕）
+        app_version:
+          type: string
+        protocol_version:
+          type: string
+          description: 内部 API 协议版本，与 info.version 的主版本对应
+        instance_id:
+          type: string
+          description: 本次 Core 实例 ID（不透明，重启变化）
+        workspace_id:
+          type: string
+        server_epoch:
+          type: integer
+          format: int64
+          description: Core 启动 epoch，单调递增；旧 epoch 的结果不得完成新尝试
+        core_ready:
+          type: boolean
+          description: >-
+            Core 业务是否就绪（迁移、身份与恢复准备完成）；false 时只有存活/引导可用。
+            该字段不代表模型或执行器就绪，异步 Runner 初始化由任务 WAITING_RESOURCE 原因表达。
+
+    UpdatePreparationRequest:
+      type: object
+      additionalProperties: false
+      required: [mode, operation_id, workspace_id, instance_id, server_epoch]
+      properties:
+        mode:
+          type: string
+          enum: [check, prepare]
+          description: check只读且不返回prepared；prepare重新原子复核，不信任先前idle。
+        operation_id:
+          type: string
+          minLength: 1
+          maxLength: 200
+        workspace_id:
+          type: string
+          minLength: 1
+          maxLength: 200
+        instance_id:
+          type: string
+          minLength: 1
+          maxLength: 200
+        server_epoch:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+
+    UpdatePreparationResult:
+      type: object
+      additionalProperties: false
+      required: [schema_version, operation_id, workspace_id, instance_id, server_epoch, state, reason]
+      properties:
+        schema_version:
+          type: integer
+          enum: [1]
+        operation_id:
+          type: string
+          minLength: 1
+          maxLength: 200
+        workspace_id:
+          type: string
+          minLength: 1
+          maxLength: 200
+        instance_id:
+          type: string
+          minLength: 1
+          maxLength: 200
+        server_epoch:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        state:
+          type: string
+          enum: [idle, blocked, prepared]
+        reason:
+          type: string
+          nullable: true
+          enum: [null, active_work, request_in_flight, executor_starting, executor_unconfirmed, preparing, restart_required]
+      oneOf:
+        - properties:
+            state:
+              enum: [idle, prepared]
+            reason:
+              enum: [null]
+        - properties:
+            state:
+              enum: [blocked]
+            reason:
+              enum: [active_work, request_in_flight, executor_starting, executor_unconfirmed, preparing, restart_required]
+      description: >-
+        idle仅check可返回，是瞬时观察而非许可；idle/prepared的reason为null。
+        blocked必须有有限reason。prepared只在同实例原子封闸且全部执行资源清理确认后返回，
+        Main还须确认该Core停止后才能调用安装器；不暴露路径、凭据或业务正文。
+
+    CapabilitySlotKey:
+      type: string
+      enum: [asr, translate, tts, voice-clone, subtitle-erase, separation, ocr, ffmpeg]
+      description: 六类模型槽位 + OCR 辅助依赖 + FFmpeg 媒体工具能力
+
+    ModelSlotKey:
+      type: string
+      enum: [asr, translate, tts, voice-clone, subtitle-erase, separation]
+      description: 六类模型槽位；OCR 为辅助依赖、FFmpeg 为媒体工具，不在此配置
+
+    SlotState:
+      type: string
+      enum:
+        [UNKNOWN, UNSUPPORTED, UNVERIFIED, NEEDS_SETUP, INSTALLING, VERIFYING, READY,
+         NEEDS_ACTION, RESTART_REQUIRED, FAILED, DEGRADED]
+      description: 能力状态机（对齐 docs/initialization-and-task-lifecycle.md）
+
+    ParamOption:
+      type: object
+      required: [value, label_key]
+      properties:
+        value:
+          type: string
+        label_key:
+          type: string
+
+    ParamField:
+      type: object
+      required: [key, label_key, type]
+      properties:
+        key:
+          type: string
+        label_key:
+          type: string
+        type:
+          type: string
+          enum: [string, number, boolean, enum]
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParamOption"
+        min:
+          type: number
+        max:
+          type: number
+        default:
+          description: 默认值，类型由 type 决定
+
+    Capability:
+      type: object
+      required: [slot, state, update_available]
+      properties:
+        slot:
+          $ref: "#/components/schemas/CapabilitySlotKey"
+        state:
+          $ref: "#/components/schemas/SlotState"
+        engine_name:
+          type: string
+        version:
+          type: string
+        languages:
+          type: array
+          description: 支持的语言 code（稳定 code，展示名由客户端本地化）
+          items:
+            type: string
+        params:
+          type: array
+          description: 受控参数 Schema（键、范围、枚举与 UI 语义）
+          items:
+            $ref: "#/components/schemas/ParamField"
+        engines:
+          type: array
+          description: 槽位支持的本地引擎目录及本机安装/选中状态；客户端不得写死引擎列表。
+          items:
+            $ref: "#/components/schemas/EngineOption"
+        reason_code:
+          type: string
+          description: 安全原因码（例如 MODEL_NOT_INSTALLED）
+        action_ids:
+          type: array
+          description: 客户端定义的修复动作 ID，不是远端命令字符串
+          items:
+            type: string
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 安装进度（0-100）
+        runtime_state:
+          type: string
+          enum: [idle, running]
+          description: 槽位执行占用状态；running 表示有任务正在执行（模型已载入或正在载入），不表示权重常驻
+        running_tasks:
+          type: integer
+          minimum: 0
+          description: 该槽位当前运行中的任务数；空闲时为 0
+        update_available:
+          type: boolean
+          description: 是否有可用更新（FR-MODEL-04）；更新需用户确认，不打断运行中任务
+        update_version:
+          type: string
+          description: 可用更新的版本（update_available=true 时提供）
+        update_notes:
+          type: string
+          description: 变更说明（update_available=true 时提供）
+
+    EngineOption:
+      type: object
+      required: [id, name, state, installed, selected]
+      description: 槽位支持的本地引擎；目录来自 Core 发布准入，安装/选中状态来自本机。
+      properties:
+        id:
+          type: string
+          description: 引擎标识（当前对应发布 ReleaseRef.release_id）
+        name:
+          type: string
+          description: 引擎展示名
+        version:
+          type: string
+        state:
+          $ref: "#/components/schemas/SlotState"
+        installed:
+          type: boolean
+        selected:
+          type: boolean
+        device:
+          type: string
+          description: 引擎当前运行设备；未知时省略
+        source:
+          type: string
+          description: 引擎来源（例如发布 channel）
+        size_bytes:
+          type: integer
+          format: int64
+          description: 安装体积（字节）；未知时省略
+
+    DeviceKind:
+      type: string
+      enum: [cpu, cuda, mps]
+      description: 计算设备类型（FR-SET-40）
+
+    DeviceInfo:
+      type: object
+      required: [id, name, kind, recommended, selected, in_use]
+      description: 可用计算设备（FR-SET-40）；选择通过 PUT /engines/{slot}/config 提交
+      properties:
+        id:
+          type: string
+          description: 本机设备标识（不透明）
+        name:
+          type: string
+          description: 展示名（CPU / 显卡型号 / Apple 芯片）
+        kind:
+          $ref: "#/components/schemas/DeviceKind"
+        recommended:
+          type: boolean
+          description: 是否为推荐设备
+        selected:
+          type: boolean
+          description: 是否为当前生效设备（auto 模式下由 Core 的探测结果决定）
+        memory_total_bytes:
+          type: integer
+          format: int64
+          description: 显存或系统内存总量（字节）；CPU/MPS 为系统或统一内存，CUDA 为显存；不适用时省略
+        memory_used_bytes:
+          type: integer
+          format: int64
+          description: 当前显存/内存占用（字节）；CPU/MPS 为设备级系统或统一内存估算，CUDA 为显存；不适用时省略
+        in_use:
+          type: boolean
+          description: 本应用模型当前是否占用/载入该设备
+        driver_version:
+          type: string
+          description: GPU 驱动版本；当前仅 CUDA 提供，CPU/MPS 或未知时省略
+
+    EnvironmentInfo:
+      type: object
+      required: [platform, devices, checks]
+      description: 本机执行环境快照（FR-SET-23/40）；探测失败以 checks 表达，不伪造设备
+      properties:
+        platform:
+          type: string
+          enum: [windows, darwin, linux]
+        wsl:
+          $ref: "#/components/schemas/WSLStatus"
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeviceInfo"
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentCheck"
+
+    WSLStatus:
+      type: object
+      required: [available]
+      description: Windows 宿主上的 WSL 探测结果；非 Windows 平台省略
+      properties:
+        available:
+          type: boolean
+        version:
+          type: integer
+          enum: [1, 2]
+          description: 探测到的 WSL 主版本；未知时省略
+        cuda_available:
+          type: boolean
+          description: WSL 内 nvidia-smi 是否成功；未知时省略
+
+    EnvironmentCheck:
+      type: object
+      required: [code, severity, message_key, action_ids]
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+          enum: [pass, warning, blocker]
+        message_key:
+          type: string
+        action_ids:
+          type: array
+          items:
+            type: string
+
+    ReleaseRef:
+      type: object
+      required: [release_id, version, digest]
+      properties:
+        release_id:
+          type: string
+          description: 不可变发布 ID
+        version:
+          type: string
+        digest:
+          type: string
+          description: 发布摘要（SHA-256 等不可变 revision/digest）
+        channel:
+          type: string
+
+    LicenseSummary:
+      type: object
+      required: [license_id, license_name]
+      properties:
+        license_id:
+          type: string
+        license_name:
+          type: string
+        notice_keys:
+          type: array
+          description: 需要展示的 notice 键
+          items:
+            type: string
+
+    InstallationPlanRequest:
+      type: object
+      required: [slot]
+      properties:
+        slot:
+          $ref: "#/components/schemas/CapabilitySlotKey"
+
+    InstallationPlan:
+      type: object
+      required:
+        [plan_id, plan_hash, slot, release, download_bytes, cache_reuse_bytes, install_bytes,
+         permissions, license]
+      properties:
+        plan_id:
+          type: string
+        plan_hash:
+          type: string
+          description: 绑定输入、发布摘要与同意范围的计划哈希
+        slot:
+          $ref: "#/components/schemas/CapabilitySlotKey"
+        covered_slots:
+          type: array
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          readOnly: true
+          items:
+            $ref: "#/components/schemas/CapabilitySlotKey"
+          description: 新计划必返的已准入覆盖范围，排序且含请求slot；冻结进plan_hash，UI须在确认前完整展示。
+        reuse_installation_id:
+          type: string
+          minLength: 1
+          readOnly: true
+          description: 同一物理安装的复用/加入目标；不启动第二下载，目标失效须重新plan。
+        release:
+          $ref: "#/components/schemas/ReleaseRef"
+        download_bytes:
+          type: integer
+          format: int64
+          description: 实际需要下载的字节数
+        cache_reuse_bytes:
+          type: integer
+          format: int64
+          description: 可复用的缓存字节数
+        install_bytes:
+          type: integer
+          format: int64
+          description: 安装后占用字节数
+        peak_staging_bytes:
+          type: integer
+          format: int64
+          description: 含解压与跨系统暂存的峰值字节数
+        permissions:
+          type: array
+          description: 所需权限标识（客户端定义，不是命令字符串）
+          items:
+            type: string
+        license:
+          $ref: "#/components/schemas/LicenseSummary"
+        requires_restart:
+          type: boolean
+
+    CreateInstallationRequest:
+      type: object
+      required: [plan_id, plan_hash]
+      properties:
+        plan_id:
+          type: string
+        plan_hash:
+          type: string
+          description: 必须与用户同意的计划哈希一致；不能扩大下载/权限范围
+
+    InstallationPhase:
+      type: string
+      enum: [planning, downloading, verifying, installing, done, failed, canceled]
+
+    Installation:
+      type: object
+      required: [id, slot, phase, progress]
+      description: >-
+        一次实际物理安装操作/验证记录，不按覆盖槽位复制Done。slot保留发起槽位，
+        实体字段与bound_slots/current_slots来自同一读快照，不能混合安装中与完成后的当前引用。
+        新列表/详情必返数组（含空），旧Core缺省才回退单slot。
+        写响应/幂等回执是原快照，写后须重读，不据旧响应重复激活。
+      properties:
+        id:
+          type: string
+        slot:
+          $ref: "#/components/schemas/CapabilitySlotKey"
+        covered_slots:
+          type: array
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          readOnly: true
+          items:
+            $ref: "#/components/schemas/CapabilitySlotKey"
+          description: 原始冻结同意范围；旧记录只含原slot，后续解绑不改此历史事实。
+        bound_slots:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          readOnly: true
+          items:
+            $ref: "#/components/schemas/CapabilitySlotKey"
+          description: 仍引用该记录的槽位（含保留历史）；空数组不回退发起slot。
+        current_slots:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          readOnly: true
+          items:
+            $ref: "#/components/schemas/CapabilitySlotKey"
+          description: 当前选中此Done实体的槽位；未完成记录为空，不靠记录顺序猜当前。
+        phase:
+          $ref: "#/components/schemas/InstallationPhase"
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 真实进度（0-100）；无法准确预测时不显示虚假 ETA
+        verified_files:
+          type: integer
+          description: 已通过摘要校验的文件数
+        error:
+          $ref: "#/components/schemas/Error"
+        retryable:
+          type: boolean
+          description: 是否可重试
+        plan_hash:
+          type: string
+          description: 本次执行绑定的计划哈希
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 30
+          description: 项目名称（≤30 字，FR-PIPE-02）
+
+    ProjectUpdate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 30
+          description: 去首尾空格后 1–30 个字符；不允许控制字符
+        edit_version:
+          type: integer
+          format: int64
+          minimum: 0
+          description: >-
+            乐观并发检查；大于 0 时必须与当前 edit_version 一致，否则返回 409。
+            省略或 0 表示不检查（旧客户端兼容）。
+
+    ProjectSummary:
+      type: object
+      required: [seq, id, name, edit_version, created_at, updated_at, asset_count, run_count]
+      properties:
+        seq:
+          type: integer
+          format: int64
+          description: 本地项目序号（按创建顺序单调递增，不复用）；卡片编号使用该值
+        id:
+          type: string
+        name:
+          type: string
+        edit_version:
+          type: integer
+          format: int64
+          description: 编辑版本（乐观并发检查）；与项目视图的 edit_version 一致
+        episode_id:
+          type: string
+          description: 集 ID（可选）；Core 新建项目时生成，旧项目省略时客户端回退项目 ID
+        mode_type:
+          type: string
+          description: 最近一次 Run 的能力组合类型（可选）；缺省时客户端按 Run 节点推导
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_opened_at:
+          type: string
+          format: date-time
+        asset_count:
+          type: integer
+        run_count:
+          type: integer
+        latest_run_status:
+          $ref: "#/components/schemas/RunStatus"
+        total_duration_ms:
+          type: integer
+          format: int64
+          description: 项目媒体总时长（毫秒）
+        waiting_resource:
+          type: boolean
+          description: >-
+            最近一次 Run 的当前节点任务是否在等待执行器/资源（可选）。
+            缺省视为 false；客户端据此把“运行中”显示为“等待资源”。
+
+    Project:
+      type: object
+      required:
+        [id, workspace_id, name, directory, schema_version, edit_version, created_at, updated_at,
+         assets, tracks, runs]
+      properties:
+        id:
+          type: string
+        workspace_id:
+          type: string
+        episode_id:
+          type: string
+          description: 集 ID（可选）；用于卡片短 ID，旧项目省略
+        name:
+          type: string
+        directory:
+          type: string
+          description: >-
+            应用管理的项目目录绝对路径（派生字段，不写入数据库、不新增迁移）。
+            创建项目时创建，读取旧项目时补齐；引用模式素材不会复制进去，目录可能为空。
+            仅用于展示与“打开项目目录”，资产内容读取仍必须走 GET /assets/{id}/content。
+        schema_version:
+          type: integer
+          description: 项目数据 schema 版本（迁移与降级检查）
+        edit_version:
+          type: integer
+          description: 编辑版本（乐观并发检查）
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_opened_at:
+          type: string
+          format: date-time
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Asset"
+        tracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubtitleTrack"
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowRun"
+
+    AssetType:
+      type: string
+      enum: [video, audio, subtitle, audio_track, image, archive, other]
+
+    AssetStatus:
+      type: string
+      enum: [importing, ready, missing, corrupt]
+
+    MediaMeta:
+      type: object
+      required: [container, duration_ms, audio_tracks]
+      properties:
+        role:
+          type: string
+          enum: [vocals, background]
+          description: 节点适配器声明的音频职责；未知或无标注时省略，Core 不按文件名/输出顺序推断
+        container:
+          type: string
+        codec:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        duration_ms:
+          type: integer
+          format: int64
+        audio_tracks:
+          type: integer
+        sample_rate:
+          type: integer
+
+    Asset:
+      type: object
+      required: [id, project_id, type, name, size_bytes, status, imported_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        type:
+          $ref: "#/components/schemas/AssetType"
+        role:
+          $ref: "#/components/schemas/AssetRole"
+        language:
+          type: string
+          description: 产物语言 code；非语言相关产物省略
+        run_id:
+          type: string
+          description: 生成该产物的 WorkflowRun ID；用户导入的原件省略
+        name:
+          type: string
+        path:
+          type: string
+          description: 本地显示路径；不用于构造文件访问，读取必须走 /assets/{id}/content
+        size_bytes:
+          type: integer
+          format: int64
+        sha256:
+          type: string
+        meta:
+          $ref: "#/components/schemas/MediaMeta"
+        status:
+          $ref: "#/components/schemas/AssetStatus"
+        imported_at:
+          type: string
+          format: date-time
+
+    AssetRole:
+      type: string
+      enum:
+        [original, voice, ambience, clean_video, source_subtitle, translated_subtitle,
+         dub_audio, translated_video, final_video]
+      description: >-
+        产物角色（可选，旧资产省略则按 AssetType 降级）。original=原片/原音频，
+        voice=人声，ambience=环境音，clean_video=纯净版，source_subtitle=原文字幕，
+        translated_subtitle=译文字幕，dub_audio=配音音频，translated_video=分语种视频，
+        final_video=混合成片。产物是否存在以 Asset 记录为准，不额外返回远端 URL。
+
+    AssetImportRequest:
+      type: object
+      required: [project_id, file_grants, copy_mode]
+      properties:
+        project_id:
+          type: string
+        file_grants:
+          type: array
+          description: Main 已按窗口登记授权的绝对路径引用；Renderer 不能构造授权，Core 仍校验文件存在与身份
+          items:
+            type: string
+        copy_mode:
+          type: boolean
+          description: false=引用原件（默认）；true=复制入库
+
+    AssetImportResult:
+      type: object
+      required: [asset_ids]
+      properties:
+        asset_ids:
+          type: array
+          items:
+            type: string
+        task_id:
+          type: string
+          description: 长导入的任务 ID；进度经任务快照或事件查询
+
+    AssetRelocateRequest:
+      type: object
+      required: [file_grant]
+      properties:
+        file_grant:
+          type: string
+          description: >-
+            系统文件选择器签发的绝对路径；文件必须是普通可读文件，且 SHA-256 等于导入时记录的摘要。
+
+    RunStatus:
+      type: string
+      enum:
+        [DRAFT, QUEUED, RUNNING, PAUSE_REQUESTED, PAUSED, WAITING_REVIEW, PARTIAL,
+         SUCCEEDED, FAILED, CANCELED]
+      description: 业务 Run 状态（对齐 docs/initialization-and-task-lifecycle.md）
+
+    PipelineNodeKey:
+      type: string
+      enum:
+        [01_import, 02_analyze, 03_separate, 04_extract, 05_erase, 06_translate, 07_clone, 08_mix]
+      description: 八节点流程（01 导入 … 08 混合成片）
+
+    NodeStatus:
+      type: string
+      enum: [pending, running, waiting_review, done, skipped, reused, failed]
+
+    PipelineNodeState:
+      type: object
+      required: [key, status, progress]
+      properties:
+        key:
+          $ref: "#/components/schemas/PipelineNodeKey"
+        status:
+          $ref: "#/components/schemas/NodeStatus"
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        detail:
+          type: string
+
+    WorkflowRun:
+      type: object
+      required:
+        [id, project_id, name, template, status, source_language, languages, nodes,
+         created_at, updated_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        name:
+          type: string
+        template:
+          type: string
+          description: >-
+            full_pipeline（八节点）、tool_extract（01/02/04 提取）、
+            tool_separate（01/03 分离；source_language 可使用 und）、
+            tool_erase（01/04/05 OCR 定位后擦除；source_language 使用 OCR code）、
+            tool_translate（01/06 字幕翻译；工具级跳过 06 人工审核）、
+            tool_voice_clone（01/07 仅克隆音频候选）、
+            custom_pipeline（按 features 生成固定节点子集；06/08 保留人工审核）
+            或后续工具/专属模板 ID；nodes 只包含该模板启用的节点
+        mode_type:
+          type: string
+          description: >-
+            能力组合类型（可选）。full_pipeline* 为全链路，custom_workflow 为专属链路，
+            单点工具使用 subtitle_erase_dialog[_and_art]/audio_separate/
+            high_sentiment_tts_clone/subtitle_translate/subtitle_extract_*；缺省时客户端按节点推导。
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        source_language:
+          type: string
+        languages:
+          type: array
+          description: 目标语言；每语种独立进度与审核
+          items:
+            type: string
+        input_asset_ids:
+          type: array
+          description: >-
+            创建时冻结的输入资产 ID，派生自 input_revision_ids（不单独持久化、无迁移），
+            顺序与创建请求一致。06 试听与 08 “原声”按此定位源媒体；
+            tool_translate 等模板下可能是字幕资产，客户端需按 Asset.type 判断能否播放。
+          items:
+            type: string
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PipelineNodeState"
+        params:
+          $ref: "#/components/schemas/RunParams"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    RunParams:
+      type: object
+      description: Run 创建参数只读回显（可选）；旧 Run 省略时卡片不展示对应详情行
+      properties:
+        erase_mode:
+          type: string
+          enum: [dialog_only, dialog_and_art]
+        validate_timestamps:
+          type: boolean
+        adjust_duration:
+          type: boolean
+        bilingual:
+          type: boolean
+        extract_mode:
+          type: string
+          enum: [asr, ocr, asr_ocr]
+        ocr_language:
+          type: string
+          enum: [chinese, chinese_traditional, english, japanese]
+        asr_language:
+          type: string
+          description: 字幕提取源语言 code；方言按 Core 的 zh 口径回显
+        subtitle_style:
+          description: Run 冻结的字幕样式基线（只读回显）；revision.style 存在时优先
+          allOf:
+            - $ref: "#/components/schemas/SubtitleStyle"
+
+    ExtractOptions:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [asr, ocr, asr_ocr]
+          description: 提取方式三选一（FR-TOOL-04）
+        ocr_language:
+          type: string
+          enum: [chinese, chinese_traditional, english, japanese]
+          description: OCR 语言仅此四种；ASR 源语言由 source_language 指定
+        ocr_quality:
+          type: string
+          enum: [standard, fine]
+          description: OCR 提取精度；standard 速度优先，fine 效果优先但耗时更久
+
+    SubtitleOutlineStyle:
+      type: object
+      description: 字幕描边（business-parity.md §5.1；仅 outline.color / outline.width）
+      properties:
+        color:
+          type: string
+          description: 描边颜色；支持 rgba() / rgb() / #RRGGBB / #RRGGBBAA
+        width:
+          type: number
+          description: 描边宽；[0,1) 相对字号，≥1 绝对像素（1080p 基准，由 Core 按输出分辨率缩放）
+
+    SubtitleShadowStyle:
+      type: object
+      description: 字幕阴影（business-parity.md §5.1；颜色与模糊/偏移）
+      properties:
+        color:
+          type: string
+          description: 阴影颜色；支持 rgba() / rgb() / #RRGGBB / #RRGGBBAA
+        blur:
+          type: number
+          description: 模糊；[0,1) 相对字号，≥1 绝对像素
+        x:
+          type: number
+          description: 水平偏移；[0,1) 相对字号，≥1 绝对像素
+        y:
+          type: number
+          description: 垂直偏移；[0,1) 相对字号，≥1 绝对像素
+
+    SubtitleStyle:
+      type: object
+      description: >-
+        节点 08 烧录的字幕样式（FR-PIPE-02），作为受控参数 Schema 的一部分。
+        字段取自 docs/business-parity.md §5.1；其中 max_translation_lines 在 mls 参考中与样式
+        对象平级，曜幕 0.2.0 暂并入本对象，最终键名与位置仍见 docs/open-questions.md §6 会签。
+        字体名枚举与默认位置同样见 §6，本契约只固定字段结构。
+        仅 outline.color / shadow.color / background 三个颜色字段；UI 的「填充（字体主色）」
+        无后端字段，仅前端预览用，禁止写入 outline.color。
+      properties:
+        x:
+          type: number
+          description: 水平位置；0~1 相对画面宽，>1 绝对像素；1080p 基准由 Core 等比例缩放
+        y:
+          type: number
+          description: >-
+            垂直位置；0~1 相对画面高，>1 绝对像素；原点左上，上半屏顶对齐、下半屏底对齐
+        font:
+          type: string
+          description: 字体名；字体枚举随 open-questions §6 会签，本契约不冻结取值
+        font_size:
+          type: number
+          description: 字号；0~1 相对短边，>1 绝对像素
+        line_spacing:
+          type: number
+          description: 行间距；[0,1) 相对字号，≥1 绝对像素
+        bold:
+          type: boolean
+          description: 加粗
+        align:
+          type: string
+          enum: [left, center, right]
+        outline:
+          $ref: "#/components/schemas/SubtitleOutlineStyle"
+        shadow:
+          $ref: "#/components/schemas/SubtitleShadowStyle"
+        background:
+          type: string
+          description: >-
+            字幕框底色；透明度 0=无底框，(0,1)=半透明，1=不透明。
+            支持 rgba() / rgb() / #RRGGBB / #RRGGBBAA
+        max_translation_lines:
+          type: integer
+          minimum: 1
+          maximum: 4
+          default: 3
+          description: 最大译文行数（1~4，默认 3）；键名按 business-parity.md §5.1 对齐参考
+
+    CreateWorkflowRunInput:
+      type: object
+      required: [project_id, name, target_languages]
+      properties:
+        project_id:
+          type: string
+        name:
+          type: string
+          maxLength: 30
+          description: 项目/运行名称（≤30 字，FR-PIPE-02）
+        template:
+          type: string
+          default: full_pipeline
+          description: >-
+            full_pipeline（八节点）或工具模板 ID；tool_extract 启用 01/02/04，
+            tool_separate 启用 01/03，tool_erase 启用 01/04/05，
+            tool_translate 启用 01/06，tool_voice_clone 启用 01/07；
+            custom_pipeline 按 features 自动补齐上游节点（01/03/04/05/06/07/08 子集），
+            06/08 保留人工审核。未知模板由 Core 拒绝，不回退到完整流水线。
+        source_language:
+          type: string
+          description: >-
+            源语言（可省略）；省略表示自动识别，Core 归一为 und。
+            语言无关工具（如 tool_separate）使用 und；tool_erase 与仅擦除的
+            custom_pipeline 使用所选 OCR code（与 extract.ocr_language 一致）；
+            含翻译/克隆/成片的 custom_pipeline 可由客户端按字幕内容识别后提交，
+            无法识别时省略并交由 Core 处理。
+        target_languages:
+          type: array
+          minItems: 0
+          description: >-
+            目标语言；full_pipeline 与含翻译/克隆/成片的模板至少一个，
+            tool_extract/tool_separate/tool_erase 等无目标语言模板可为空；
+            custom_pipeline 仅选择 separation/erase 时允许为空
+            （Core 按 template + features 校验）
+          items:
+            type: string
+        features:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          description: >-
+            仅 custom_pipeline 必填：separation/erase/translate/clone/mix。
+            Core 自动补齐上游节点；其他模板携带 features 返回 400。
+          items:
+            $ref: "#/components/schemas/CustomPipelineFeature"
+        input_revision_ids:
+          type: array
+          description: 冻结的输入资产/字幕 revision ID（预检与计划绑定）
+          items:
+            type: string
+        extract:
+          $ref: "#/components/schemas/ExtractOptions"
+        reuse_audio_track_id:
+          type: string
+          description: 复用的分离音轨；值域为 Asset.id 且 Asset.type=audio_track（不是 SubtitleTrack.id）
+        reuse_subtitle_track_id:
+          type: string
+          description: >-
+            复用的字幕轨；值域为 SubtitleTrack.id（不是 Asset.id）。
+            custom_pipeline 可用它绑定上传的原文 transcription 轨：无擦除时 04 复用，
+            含擦除时 04 仍跑 OCR 但 06 优先使用该轨。
+        erase_mode:
+          type: string
+          enum: [dialog_only, dialog_and_art]
+          description: >-
+            字幕擦除方式二选一：仅对话字幕 / 对话字幕+艺术字（FR-PIPE-02，节点 05）。
+            tool_erase 与含 erase 的 custom_pipeline 必填；不启用擦除节点时省略
+        validate_timestamps:
+          type: boolean
+          description: >-
+            字幕时间戳校验开关（FR-PIPE-02、FR-PIPE-03）。结构约束（负时间、end<=start、重叠）
+            始终生效；开启后 Core 在 tool_voice_clone 预检/创建、07 句级任务冻结前与派发准备时，
+            按所选声源媒体的 meta.duration_ms 校验目标译文与映射参考原文时间窗：end==duration
+            允许，越界或缺失/非正时长可读拒绝；不向 FlashCLI 新增参数。
+        adjust_duration:
+          type: boolean
+          description: >-
+            视频时长动态调整开关，目标作用于节点 06 译文对齐（FR-PIPE-02、FR-VOX-03）。
+            伸缩算法与真实模型参数尚未确认，当前只冻结选项、不产生执行效果，也不向适配器下发；
+            不得据此宣称已调整时长。
+        bilingual:
+          type: boolean
+          description: 双语字幕开关，作用于节点 08 烧录（FR-PIPE-02）
+        subtitle_style:
+          $ref: "#/components/schemas/SubtitleStyle"
+
+    PreflightSeverity:
+      type: string
+      enum: [pass, warning, blocker]
+
+    PreflightIssue:
+      type: object
+      required: [severity, code, message_key, action_ids]
+      properties:
+        severity:
+          $ref: "#/components/schemas/PreflightSeverity"
+        code:
+          type: string
+          description: 安全原因码
+        message_key:
+          type: string
+        action_ids:
+          type: array
+          description: 允许的修复动作 ID（客户端定义）
+          items:
+            type: string
+
+    PreflightResult:
+      type: object
+      required: [issues]
+      properties:
+        plan_id:
+          type: string
+        plan_hash:
+          type: string
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/PreflightIssue"
+
+    TaskStatus:
+      type: string
+      enum:
+        [QUEUED, WAITING_RESOURCE, RUNNING, PAUSE_REQUESTED, PAUSED, SUCCEEDED, FAILED,
+         CANCEL_REQUESTED, CANCELED, INTERRUPTED]
+      description: >-
+        Task 状态机：基础状态对齐 docs/initialization-and-task-lifecycle.md §4；暂停态来自
+        FR-TASK-01 与 docs/workflow-and-review.md §6——PAUSE_REQUESTED 受理后于安全单元边界生效，
+        当前不可中断单元完成后转为 PAUSED；PAUSED 不占资源、不派发，只登记待执行工作
+        （docs/local-api-contract.md §8）。
+
+    TaskKind:
+      type: string
+      enum: [node, segment, export]
+
+    StepStatus:
+      type: string
+      enum: [PENDING, RUNNING, COMMITTING, SUCCEEDED, FAILED, CANCELED, INTERRUPTED]
+
+    TaskStep:
+      type: object
+      required: [step_id, status]
+      properties:
+        step_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/StepStatus"
+        attempt_no:
+          type: integer
+          description: 单调递增的尝试编号
+        epoch:
+          type: integer
+          format: int64
+          description: 执行时的 Core server epoch
+
+    Task:
+      type: object
+      required:
+        [id, project_id, kind, status, progress, artifact_ids, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        run_id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/TaskKind"
+        node_key:
+          $ref: "#/components/schemas/PipelineNodeKey"
+        segment_id:
+          type: string
+          description: 句段任务的稳定 Segment ID
+        language:
+          type: string
+          description: >-
+            节点/句段任务的目标语言；04 为源语言，06/07/08 为目标语言，02/03/05 为空。
+            08 预览按 run_id + language + node_key=08_mix 定位，不依赖任务列表分页顺序。
+        label:
+          type: string
+          description: 可读标签（可选；客户端也可由 node_key/segment_id 本地化）
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 可丢弃的进度反馈，不作为恢复依据
+        steps:
+          type: array
+          description: 任务详包含步骤；列表响应不嵌入完整步骤历史
+          items:
+            $ref: "#/components/schemas/TaskStep"
+        artifact_ids:
+          type: array
+          items:
+            type: string
+        error:
+          $ref: "#/components/schemas/Error"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TaskList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        next_cursor:
+          type: string
+
+    ExecutionLogLine:
+      type: object
+      required: [seq, stream, line]
+      properties:
+        seq:
+          type: integer
+          minimum: 0
+          description: attempt 内单调序号；用于实时事件与回放去重
+        stream:
+          type: string
+          enum: [stderr, stdout, runner]
+        line:
+          type: string
+          maxLength: 512
+          description: 应用构造的受控阶段摘要；只含固定阶段或严格整数模板，未知自由文本不回放
+        at:
+          type: string
+          format: date-time
+          description: Core 接收该行的时间
+
+    ExecutionLog:
+      type: object
+      required: [task_id, attempt, lines]
+      properties:
+        task_id:
+          type: string
+        attempt:
+          type: integer
+          minimum: 0
+          description: 实际读取的 attempt；0 表示没有可读日志
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExecutionLogLine"
+
+    CreateTaskRequest:
+      type: object
+      required: [project_id, kind]
+      properties:
+        project_id:
+          type: string
+        run_id:
+          type: string
+        kind:
+          type: string
+          enum: [node, segment]
+          description: 通用任务端点只创建节点或句段工作；导出必须通过 /api/v1/exports
+        node_key:
+          $ref: "#/components/schemas/PipelineNodeKey"
+        segment_id:
+          type: string
+        language:
+          type: string
+        input_revision_ids:
+          type: array
+          description: 冻结的输入资产/字幕 revision ID
+          items:
+            type: string
+        params:
+          type: object
+          additionalProperties: true
+          description: 受控参数；键名与范围来自能力 Schema，禁止任意执行参数。`_core` 为保留键，客户端提交会被拒绝
+        model_lock:
+          $ref: "#/components/schemas/ReleaseRef"
+
+    ReviewType:
+      type: string
+      enum: [translation, delivery]
+
+    ReviewStatus:
+      type: string
+      enum: [pending, approved]
+
+    ReviewGate:
+      type: object
+      required: [id, run_id, type, revision_digest, status]
+      properties:
+        id:
+          type: string
+        run_id:
+          type: string
+        type:
+          $ref: "#/components/schemas/ReviewType"
+        language:
+          type: string
+        revision_digest:
+          type: string
+          description: 绑定的精确 revision 摘要；旧审核不能自动放行新内容
+        status:
+          $ref: "#/components/schemas/ReviewStatus"
+        confirmed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+          description: 审核门槛创建时间；旧记录可能省略，客户端按存在时取最新
+        current_bindings:
+          type: array
+          readOnly: true
+          items:
+            $ref: "#/components/schemas/ReviewCurrentBinding"
+          description: >-
+            列表/详情由Core在同一只读快照派生；空数组表示无当前绑定，缺省表示旧服务未提供信息。
+            不持久化、不覆盖language/status/历史digest；可能因旧空language记录匹配多个语种。
+            批准响应/幂等回执不保证携带最新投影，客户端须重新读取列表，不能盲用响应恢复放行。
+
+    ReviewCurrentBinding:
+      type: object
+      additionalProperties: false
+      required: [language, source_kind, source_id]
+      properties:
+        language:
+          type: string
+          minLength: 1
+        source_kind:
+          type: string
+          enum: [translation_revision, delivery_revision, delivery_mix]
+        source_id:
+          type: string
+          minLength: 1
+      description: >-
+        Core按既有精确摘要规则派生的当前绑定。revision类source_id为字幕revision ID，
+        delivery_mix为该语种最新成功08 Task ID；不由UI计算摘要，不是独立放行授权。
+
+    ApproveReviewRequest:
+      type: object
+      required: [revision_digest, type]
+      properties:
+        revision_digest:
+          type: string
+          description: 必须等于被请求gate的精确摘要；不一致返回409。旧请求仍可记录历史gate批准，但不放行新内容。
+        type:
+          $ref: "#/components/schemas/ReviewType"
+        current_binding:
+          $ref: "#/components/schemas/ReviewCurrentBinding"
+      description: >-
+        新客户端发送current_binding时，Core在批准事务内重算该gate的current_bindings，
+        所选绑定不再存在即409 REVISION_CONFLICT且无状态/事件副作用。旧客户端缺省保留原记录语义。
+
+    TrackType:
+      type: string
+      enum: [transcription, translation, correction]
+
+    Segment:
+      type: object
+      required: [id, start_ms, end_ms, text, content_revision, content_digest]
+      properties:
+        id:
+          type: string
+          description: 稳定片段 ID（不使用数组下标）
+        start_ms:
+          type: integer
+          format: int64
+        end_ms:
+          type: integer
+          format: int64
+        text:
+          type: string
+        speaker:
+          type: string
+        content_revision:
+          type: integer
+          description: 句级内容版本（句级缓存失效键的一部分）
+        content_digest:
+          type: string
+          description: 句级内容摘要（由 Core 计算）
+        lineage:
+          type: array
+          description: 拆分/合并来源片段 ID
+          items:
+            type: string
+
+    SegmentInput:
+      type: object
+      required: [start_ms, end_ms, text]
+      properties:
+        id:
+          type: string
+          description: 已有稳定片段 ID；省略时由 Core 分配新 ID（拆分/合并保留 lineage）
+        start_ms:
+          type: integer
+          format: int64
+        end_ms:
+          type: integer
+          format: int64
+        text:
+          type: string
+        speaker:
+          type: string
+        lineage:
+          type: array
+          items:
+            type: string
+
+    EraseBlock:
+      type: object
+      description: >-
+        擦除校正块（契约占位，provisional）。等待 05 真实擦除与 04 OCR 位置数据
+        落地后可能增补字段；只描述不可变 revision 中的几何与来源，不包含运行期状态。
+      required: [start_ms, end_ms, bbox]
+      properties:
+        id:
+          type: string
+          description: 块 ID；省略时由 Core 分配，同一 revision 内唯一
+        segment_id:
+          type: string
+          description: 可选关联同一 revision 内的句段 ID
+        start_ms:
+          type: integer
+          format: int64
+        end_ms:
+          type: integer
+          format: int64
+        bbox:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: integer
+          description: 源视频像素坐标 [x1, y1, x2, y2]，要求 x1<x2、y1<y2 且非负
+        source:
+          type: string
+          enum: [clean, source]
+          default: clean
+          description: clean=已擦除源，source=原始源画面
+
+    SubtitleRevision:
+      type: object
+      required: [id, track_id, author_type, segments, created_at]
+      properties:
+        id:
+          type: string
+        track_id:
+          type: string
+        parent_revision_id:
+          type: string
+        author_type:
+          type: string
+          enum: [system, user]
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Segment"
+        input_revision_id:
+          type: string
+          description: >-
+            生成或保存该 revision 时使用的源输入 revision。translation revision 记录
+            当前源 transcription revision（系统生成与人工保存均由 Core 设置）；
+            transcription revision 可为空。缺失表示旧数据或无法确定，客户端不得推断为最新，
+            可用当前源 transcription revision 与该字段比较检测译文过期。
+        style:
+          description: 本 revision 覆盖的字幕样式；省略时回退 RunConfig.SubtitleStyle
+          allOf:
+            - $ref: "#/components/schemas/SubtitleStyle"
+        erase_blocks:
+          type: array
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/EraseBlock"
+          description: 本 revision 的擦除块占位；能力未就绪，当前 Core 只存取、不派发擦除任务
+        revision_digest:
+          type: string
+          description: Core 计算的审核绑定摘要（只读）；样式/擦除块变化会改变该值
+        created_at:
+          type: string
+          format: date-time
+
+    SubtitleTrack:
+      type: object
+      required: [id, project_id, language, type, current_revision_id, revisions]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        language:
+          type: string
+        type:
+          $ref: "#/components/schemas/TrackType"
+        current_revision_id:
+          type: string
+        revisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubtitleRevision"
+
+    CustomPipelineFeature:
+      type: string
+      enum: [separation, erase, translate, clone, mix]
+      description: 专属链路功能；Core 按固定映射补齐上游节点
+
+    CustomPipelineTemplate:
+      type: object
+      required:
+        [id, name, features, languages, source_language, validate_timestamps,
+         adjust_duration, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          description: 模板 ID；仅允许字母、数字、-、_
+        name:
+          type: string
+          maxLength: 30
+          description: 模板名称；1–30 字且不区分大小写唯一
+        features:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/CustomPipelineFeature"
+        languages:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        source_language:
+          type: string
+          description: 保存时的源语言选择；仅分离可为 und，仅擦除为 OCR code
+        erase_mode:
+          type: string
+          enum: [dialog_only, dialog_and_art]
+          description: 含 erase 时必填
+        ocr_language:
+          type: string
+          description: 含 erase 时必填；与 tool_erase 的 OCR code 一致
+        validate_timestamps:
+          type: boolean
+        adjust_duration:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CustomPipelineTemplateList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/CustomPipelineTemplate"
+
+    ImportSubtitleTrackRequest:
+      type: object
+      required: [project_id, asset_id, language]
+      properties:
+        project_id:
+          type: string
+        asset_id:
+          type: string
+          description: 已导入的 SRT Asset.id（Asset.type=subtitle）
+        language:
+          type: string
+          description: 轨道语言；transcription 为原文语言，translation 为目标语言
+        type:
+          type: string
+          enum: [transcription, translation]
+          default: transcription
+          description: 创建的轨道类型；默认 transcription
+
+    SaveSubtitleRevisionRequest:
+      type: object
+      required: [base_revision_id, segments]
+      properties:
+        base_revision_id:
+          type: string
+          description: 乐观并发基准；与当前 revision 不一致返回 409 REVISION_CONFLICT
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/SegmentInput"
+        style:
+          description: >-
+            整轨替换本 revision 的样式；省略表示不覆盖运行样式。样式参与
+            revision 绑定摘要，变更会使既有审核失效。
+          allOf:
+            - $ref: "#/components/schemas/SubtitleStyle"
+        erase_blocks:
+          type: array
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/EraseBlock"
+          description: >-
+            整轨替换本 revision 的擦除块；省略表示清空。客户端保存时必须回传
+            已读取的块，避免丢块。
+
+    AudioCandidate:
+      type: object
+      description: >-
+        句级配音候选（不可变文件，不覆盖旧候选）。通过 GET /segments/{id}/candidates?language=
+        读取已有候选列表；生成受理（202）只负责追加新候选与新 attempt。
+      required:
+        [id, segment_id, language, revision, model_version, audio_asset_id, is_recommended,
+         created_at]
+      properties:
+        id:
+          type: string
+        segment_id:
+          type: string
+        language:
+          type: string
+        revision:
+          type: integer
+          description: 生成候选所依据的句段 content_revision
+        model_version:
+          type: string
+        audio_asset_id:
+          type: string
+          description: 候选音频资产（不可变，不覆盖旧文件）
+        is_recommended:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    CandidateSelection:
+      type: object
+      required: [segment_id, language, candidate_id, revision, selected_at]
+      properties:
+        segment_id:
+          type: string
+        language:
+          type: string
+        candidate_id:
+          type: string
+        revision:
+          type: integer
+          description: 选择所绑定的句段 content_revision
+        selected_at:
+          type: string
+          format: date-time
+
+    CreateCandidatesRequest:
+      type: object
+      required: [language]
+      properties:
+        language:
+          type: string
+
+    SelectCandidateRequest:
+      type: object
+      required: [language, candidate_id]
+      properties:
+        language:
+          type: string
+        candidate_id:
+          type: string
+          description: 必须属于当前句段 revision 与语言
+
+    SegmentCandidateJob:
+      type: object
+      required: [task_id, segment_id, language, attempt_no]
+      properties:
+        task_id:
+          type: string
+        segment_id:
+          type: string
+        language:
+          type: string
+        attempt_no:
+          type: integer
+          description: 新候选生成对应的单调 attempt 编号
+
+    EngineConfig:
+      type: object
+      required: [slot]
+      properties:
+        slot:
+          $ref: "#/components/schemas/ModelSlotKey"
+        device_id:
+          type: string
+          description: >-
+            `auto`（默认，自动探测 MPS/CUDA/CPU）或 DeviceInfo.id；缺省为 auto。
+            运行中任务固定原设备，切换需客户端确认（FR-SET-40）
+        values:
+          type: object
+          additionalProperties: true
+          description: 受控参数值；键与范围来自能力目录的 ParamField
+        updated_at:
+          type: string
+          format: date-time
+
+    EngineConfigUpdate:
+      type: object
+      properties:
+        device_id:
+          type: string
+        values:
+          type: object
+          additionalProperties: true
+          description: 只接受受控 Schema 内的键与范围
+
+    ExportFormat:
+      type: string
+      enum: [mp4_h264, srt, ass, wav, mp3]
+      description: 实际编码/容器格式（FR-EXP-02）
+
+    ExportKind:
+      type: string
+      enum: [video, audio, subtitle]
+      description: 产品导出类型；与 format 的一致性由 Core 校验
+
+    ExportRequest:
+      type: object
+      required: [project_id, kind, format, output_dir_grant, naming_template]
+      properties:
+        project_id:
+          type: string
+        run_id:
+          type: string
+        language:
+          type: string
+          description: >-
+            导出目标语种；省略时使用 Run 的第一个目标语种。指定语种必须是 Run 的目标语种，
+            且该语种当前交付摘要存在已放行的 delivery 门槛（摘要由 Core 重算，不接受客户端传入；
+            视频/音频为冻结在当前 revision 的成功 08 摘要，字幕为被导出 revision 的交付绑定）；
+            不存在或绑定当前摘要的门槛仍为 pending 时返回 409 REVIEW_REQUIRED。
+        kind:
+          $ref: "#/components/schemas/ExportKind"
+        format:
+          $ref: "#/components/schemas/ExportFormat"
+        input_revision_id:
+          type: string
+          description: 字幕导出绑定的 SubtitleRevision；成品导出由 Run 的审核冻结版本决定
+        bilingual:
+          type: boolean
+          description: >-
+            仅字幕 SRT 导出有效；true 时每个 cue 输出原文+译文双行，缺省 false。
+            原文 revision 优先取译文 revision 的 input_revision_id，缺失时按 Run 源语言
+            查找唯一 transcription 轨；无法唯一确定返回 400。
+        output_dir_grant:
+          type: string
+          description: Main 已按窗口登记授权的输出目录绝对路径；Core 仍校验路径范围与可写性
+        naming_template:
+          type: string
+          description: 命名策略
+
+    ExportRecord:
+      type: object
+      required: [id, project_id, kind, format, status, created_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        run_id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/ExportKind"
+        format:
+          $ref: "#/components/schemas/ExportFormat"
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        output_path:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    StorageCategory:
+      type: string
+      enum: [models, media, cache, exports]
+      description: 存储类别：模型包 / 媒体库 / 缓存 / 导出（FR-SET-42）
+
+    StorageUsage:
+      type: object
+      required: [models_bytes, media_bytes, cache_bytes, exports_bytes]
+      description: 应用数据所在分区的四类占用（FR-SET-42）
+      properties:
+        models_bytes:
+          type: integer
+          format: int64
+        media_bytes:
+          type: integer
+          format: int64
+        cache_bytes:
+          type: integer
+          format: int64
+        exports_bytes:
+          type: integer
+          format: int64
+
+    StorageCleanupRequest:
+      type: object
+      required: [category]
+      properties:
+        category:
+          $ref: "#/components/schemas/StorageCategory"
+
+    StorageCleanupResult:
+      type: object
+      required: [category, freed_bytes]
+      properties:
+        category:
+          $ref: "#/components/schemas/StorageCategory"
+        freed_bytes:
+          type: integer
+          format: int64
+          description: 实际释放字节数；未被引用的可清理文件才计入
+
+    Snapshot:
+      type: object
+      required: [project_id, project, runs, tasks, event_seq]
+      properties:
+        project_id:
+          type: string
+        project:
+          $ref: "#/components/schemas/ProjectSummary"
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowRun"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        event_seq:
+          type: integer
+          format: int64
+          description: 事件高水位 H；客户端从 /events?after_seq=H 订阅，大内容按 revision 另取
+
+    EventCursor:
+      type: object
+      required: [earliest_seq]
+      description: 事件历史保留范围（docs/local-api-contract.md §5）
+      properties:
+        earliest_seq:
+          type: integer
+          format: int64
+          minimum: 0
+          description: >-
+            仍可回放的最早事件 seq；after_seq 低于该值时无法补齐，必须重新获取快照，
+            不静默宣称追赶完成
+
+    TaskProgressData:
+      type: object
+      additionalProperties: false
+      required: [step_id, attempt, server_epoch, progress]
+      properties:
+        step_id:
+          type: string
+          minLength: 1
+        attempt:
+          type: integer
+          minimum: 1
+        server_epoch:
+          type: string
+          pattern: '^[1-9][0-9]*$'
+          description: 当前执行尝试的 Core epoch，十进制字符串；不是事件游标。
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 真实计数推导的百分比；100不代表成功，终态由task.succeeded等关键事件决定。
+
+    TaskProgressEvent:
+      allOf:
+        - $ref: "#/components/schemas/DomainEvent"
+        - type: object
+          required: [project_id, task_id, state_version]
+          properties:
+            seq:
+              type: integer
+              enum: [0]
+            type:
+              type: string
+              enum: [task.progress]
+            state_version:
+              type: integer
+              minimum: 1
+            data:
+              $ref: "#/components/schemas/TaskProgressData"
+      description: >-
+        可丢弃实时进度，按当前RUNNING Task/Attempt/epoch条件写快照成功后才发布；
+        不递增状态版本、不追加持久事件，不补发历史。客户端忽略与当前状态/版本/attempt
+        不兼容的迟到帧；重连以Task快照为准，不将seq=0推进持久游标。
+
+    DomainEvent:
+      type: object
+      required: [schema_version, seq, type, data]
+      properties:
+        schema_version:
+          type: integer
+          enum: [1]
+        seq:
+          type: integer
+          format: int64
+          description: >-
+            工作区级持久递增序号，重启不归零；0 表示可丢弃实时事件（如 task.execution_log），
+            不推进持久游标，也不作为恢复依据。
+        type:
+          type: string
+          description: >-
+            事件类型名。成功统一使用 task.succeeded 对应 SUCCEEDED；进度类事件是可丢弃消息，
+            不推进持久游标。安装事件为 installation.created / installation.phase_changed /
+            installation.progress / installation.downloaded / installation.completed /
+            installation.failed / installation.reused / installation.deleted / installation.rollback。
+            物理操作事件以 data.installation_id 标识；data.slot 保留发起槽，新增 data.slots 表示完整冻结覆盖。
+            reused 含 installation_id/slots/release_id，不另造 completed；deleted 仅含请求 slot；
+            rollback 含 installation_id/slot/release_id，按槽切换（contracts/shared-installations.md）。
+            task.progress 是绑定step/attempt/server_epoch的整数百分比（见TaskProgressEvent），
+            可丢弃且seq=0；task.execution_log 是执行过程行（可丢弃，seq=0），不进入持久事件游标；
+            回放以 GET /api/v1/tasks/{id}/execution-log 读取 cache 尾部为准。
+        project_id:
+          type: string
+        task_id:
+          type: string
+        state_version:
+          type: integer
+        data:
+          type: object
+          additionalProperties: true
+
+    LocalApiSettings:
+      type: object
+      required: [enabled, concurrency_limit, token_present]
+      description: 第三方本机 API 设置（FR-SET-30/31/33）；不包含明文令牌
+      properties:
+        enabled:
+          type: boolean
+          description: 总开关；关闭即停止第三方回环端口监听，不影响内部 API
+        concurrency_limit:
+          type: integer
+          minimum: 0
+          description: >-
+            API 并发上限；0 表示不额外限制。只约束新受理的第三方请求，与界面任务共用同一队列，
+            不抢占或中断界面任务（FR-SET-33）
+        token_present:
+          type: boolean
+          description: 当前是否已签发有效 Bearer 令牌
+        token_masked:
+          type: string
+          description: 令牌掩码（仅用于展示，例如末四位）；不返回明文
+
+    LocalApiSettingsUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        enabled:
+          type: boolean
+        concurrency_limit:
+          type: integer
+          minimum: 0
+
+    LocalApiToken:
+      type: object
+      required: [token, issued_at]
+      description: 新签发的第三方本机 API 令牌；明文只在此响应出现一次
+      properties:
+        token:
+          type: string
+          description: 明文 Bearer 令牌；客户端不得写入日志、URL 或持久化存储
+        issued_at:
+          type: string
+          format: date-time
+
+    LocalApiEndpointStats:
+      type: object
+      required: [endpoint, calls]
+      properties:
+        endpoint:
+          type: string
+        calls:
+          type: integer
+        last_error:
+          type: string
+          description: 最近错误的安全错误码（不含素材内容）
+
+    LocalApiStats:
+      type: object
+      required: [enabled, total_calls, by_endpoint]
+      properties:
+        enabled:
+          type: boolean
+          description: 第三方本机 API 总开关（默认关闭）
+        total_calls:
+          type: integer
+        by_endpoint:
+          type: array
+          items:
+            $ref: "#/components/schemas/LocalApiEndpointStats"
+
+    ErrorCode:
+      type: string
+      enum:
+        [INVALID_REQUEST, LOCAL_AUTH_REQUIRED, LOCAL_ACCESS_DENIED, REVISION_CONFLICT,
+         PREFLIGHT_STALE, IDEMPOTENCY_CONFLICT, MODEL_NOT_INSTALLED, RUNTIME_INCOMPATIBLE,
+         CAPABILITY_UNVERIFIED, INSUFFICIENT_DISK, CORE_NOT_READY, PERSISTENCE_UNAVAILABLE,
+         WORKER_EXITED, RESOURCE_EXHAUSTED, EVENT_CURSOR_EXPIRED, NOT_FOUND, REVIEW_REQUIRED]
+      description: >-
+        安全错误码全量。NOT_FOUND 为 v0.2.0 为 404 场景补充；REVIEW_REQUIRED（2026-10-30）
+        表示 Run 派生导出缺少已放行且绑定当前产物修订的 delivery 审核门槛。
+
+    Error:
+      type: object
+      required: [code, message_key, retryable, action_ids]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message_key:
+          type: string
+          description: >-
+            本地化消息键；原始输出只进有上限、脱敏的本地诊断。任务处于 WAITING_RESOURCE 时，
+            该字段可为执行器阻断的安全原因（如 task.runner_starting / task.runner_unavailable /
+            task.runner_isolated，对应 CAPABILITY_UNVERIFIED / WORKER_EXITED）；恢复派发、暂停/恢复重排、
+            取消或重试后清除。task.runner_starting 只表示本实例执行器仍在异步初始化，就绪后自动恢复派发。
+        retryable:
+          type: boolean
+        action_ids:
+          type: array
+          description: 客户端定义的修复动作 ID，不是远端命令字符串
+          items:
+            type: string
+
+    ErrorResponse:
+      type: object
+      required: [request_id, error]
+      properties:
+        request_id:
+          type: string
+        error:
+          $ref: "#/components/schemas/Error"

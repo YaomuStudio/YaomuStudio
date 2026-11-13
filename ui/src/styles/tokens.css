@@ -1,0 +1,246 @@
+/*
+ * YaomuStudio 设计 tokens（唯一配色/间距/圆角/字体来源）。
+ * 浅色默认，深色由 <html data-theme="dark"> 覆盖；跟随系统由 settings store 应用。
+ * 组件与页面只消费 var(--...)，不写死颜色/字号。
+ *
+ * 视觉基线：中性画布 + 白卡片、弱分隔、统一圆角；品牌蓝只用于主操作/当前状态/关键强调，
+ * 不铺满 chrome。参考优秀工具的设计原则，不照搬其布局或配色。
+ */
+
+:root {
+  /* 色板 —— 浅色 */
+  --color-bg: #f5f7fa;
+  --color-bg-preview: #eef2f7;
+  --color-sidebar: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-2: #f2f3f5;
+  --color-surface-3: #ebeef5;
+  --color-border: #ebeef5;
+  --color-border-strong: #dcdfe6;
+  --color-text: #303133;
+  --color-text-muted: #606266;
+  --color-text-faint: #6b7280;
+  --color-primary: #1677ff;
+  --color-primary-hover: #4096ff;
+  --color-primary-active: #0958d9;
+  /* 小字号主色文字：与浅色底达到 WCAG AA。 */
+  --color-primary-ink: #0958d9;
+  /* 实心主按钮底色：采用 #1677ff 的 AA 对齐值，白字仍保持品牌蓝观感。 */
+  --color-primary-action: #0d6efd;
+  --color-primary-action-hover: #0b6dff;
+  --color-on-primary-action: #ffffff;
+  --color-primary-soft: rgba(22, 119, 255, 0.10);
+  --color-on-primary: #ffffff;
+
+  /* 品牌渐变：主操作与关键状态；深色主题单独覆盖，保证文字对比度。 */
+  --gradient-primary: #1677ff;
+  --feature-gradient: linear-gradient(135deg, #1677ff 0%, #4096ff 55%, #22d3ee 100%);
+  --gradient-brand: linear-gradient(135deg, #1677ff 0%, #4096ff 55%, #22d3ee 100%);
+  --gradient-brand-soft: linear-gradient(
+    135deg,
+    rgba(22, 119, 255, 0.08) 0%,
+    rgba(64, 150, 255, 0.05) 50%,
+    rgba(34, 211, 238, 0.06) 100%
+  );
+  --shadow-primary: 0 1px 2px rgba(22, 119, 255, 0.18), 0 4px 12px rgba(22, 119, 255, 0.12);
+  --color-accent: #3ccffa;
+  --color-accent-soft: rgba(60, 207, 250, 0.14);
+  --color-accent-strong: #0e7490;
+  --color-success: #22c55e;
+  /* 品牌淡色底上的成功文字：浅色底仍用深一档，保证小字号对比度。 */
+  --color-success-strong: #166534;
+  --color-success-soft: rgba(34, 197, 94, 0.14);
+  --color-warning: #fbbf24;
+  /* 品牌淡色底上的警告文字：浅色底仍用深一档，保证小字号对比度。 */
+  --color-warning-strong: #92400e;
+  --color-warning-soft: rgba(251, 191, 36, 0.16);
+  --color-error: #ef4444;
+  --color-error-strong: #b91c1c;
+  --color-error-soft: rgba(239, 68, 68, 0.13);
+  --color-on-danger: #ffffff;
+  --color-info: #94a3b8;
+  --color-info-strong: #475569;
+  --color-info-soft: rgba(148, 163, 184, 0.14);
+  --color-media: #0b0c0f; /* 媒体预览区底 */
+  --color-media-text: #e6e8ee;
+  /* 状态标签：纯色底 + 白字，颜色取中高饱和但不过亮，保证小字号也清晰。 */
+  --badge-neutral-bg: #4b5563;
+  --badge-neutral-text: #ffffff;
+  --badge-success-bg: #15803d;
+  --badge-success-text: #ffffff;
+  --badge-warning-bg: #b45309;
+  --badge-warning-text: #ffffff;
+  --badge-error-bg: #b91c1c;
+  --badge-error-text: #ffffff;
+  --badge-info-bg: #0958d9;
+  --badge-info-text: #ffffff;
+  --badge-accent-bg: #0f766e;
+  --badge-accent-text: #ffffff;
+
+  /* 间距（4px 基数） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+
+  --page-gutter: 32px;
+  --page-bottom: 40px;
+
+  /* 圆角：控件 8 / 卡片 14 / 大容器 18 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-card: 12px;
+  --radius-md: 8px;
+  --radius-control: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+
+  /* 阴影：卡片接近无阴影，浮层才使用 */
+  /* 阴影：键影 + 环境影双层；卡片默认近无阴影，浮层才抬升 */
+  --shadow-sm: 0 1px 2px rgba(16, 20, 30, 0.05), 0 2px 8px rgba(16, 20, 30, 0.04);
+  --shadow-md: 0 2px 4px rgba(16, 20, 30, 0.06), 0 8px 24px rgba(16, 20, 30, 0.09);
+  --shadow-lg: 0 4px 8px rgba(16, 20, 30, 0.07), 0 16px 40px rgba(16, 20, 30, 0.13);
+  --shadow-popover: 0 8px 24px rgba(16, 20, 30, 0.14), 0 2px 6px rgba(16, 20, 30, 0.08);
+
+  /* 环境态：品牌蓝低频呼吸光，仅用于运行中/产出中 */
+  --ambient-glow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent),
+    0 0 24px -8px color-mix(in srgb, var(--color-primary) 34%, transparent);
+
+  /* 动效：时长按交互重量分档，缓动按语义分角色 */
+  --motion-duration-fast: 60ms;
+  --motion-duration-snap: 120ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-sheet: 300ms;
+  --motion-duration-slow: 450ms;
+  --motion-duration-spin: 800ms;
+  --motion-duration-pulse: 1000ms;
+  --motion-duration-indeterminate: 1400ms;
+  --motion-duration-ambient: 1800ms;
+  --motion-ease-out: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --motion-ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
+  --motion-ease-overshoot: cubic-bezier(0.34, 1.3, 0.64, 1);
+  --motion-ease-swift: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 字号 / 行高 */
+  --font-size-2xs: 10px;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-page-title: 18px;
+  --font-size-display: 56px;
+  --line-height-tight: 1.3;
+  --line-height-normal: 1.55;
+
+  /* 布局 */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --topbar-height: 52px;
+  --statusbar-height: 30px;
+
+  /* 焦点 */
+  --focus-ring: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+}
+
+[data-theme="dark"] {
+  --color-bg: #171717;
+  --color-bg-preview: #141414;
+  --color-sidebar: #1c1c1c;
+  --color-surface: #212121;
+  --color-surface-2: #2a2a2a;
+  --color-surface-3: #333333;
+  --color-border: #2f2f2f;
+  --color-border-strong: #424242;
+  --color-text: #ececec;
+  --color-text-muted: #a6a6a6;
+  --color-text-faint: #9ca3af;
+  --color-primary: #1677ff;
+  --color-primary-hover: #4096ff;
+  --color-primary-active: #0958d9;
+  /* 深色底上的小字号主色文字需提亮才达 WCAG AA；实心按钮底色仍用深色 + 白字。 */
+  --color-primary-ink: #66aaff;
+  --color-primary-action: #0d6efd;
+  --color-primary-action-hover: #0b6dff;
+  --color-on-primary-action: #ffffff;
+  --color-primary-soft: rgba(22, 119, 255, 0.16);
+  --color-on-primary: #ffffff;
+  --gradient-primary: #1677ff;
+  --feature-gradient: linear-gradient(135deg, #0d2b57 0%, #144a8a 55%, #0f6a7a 100%);
+  --gradient-brand: linear-gradient(135deg, #1677ff 0%, #4096ff 55%, #22d3ee 100%);
+  --gradient-brand-soft: linear-gradient(
+    135deg,
+    rgba(22, 119, 255, 0.14) 0%,
+    rgba(64, 150, 255, 0.08) 50%,
+    rgba(34, 211, 238, 0.08) 100%
+  );
+  --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.32), 0 4px 12px rgba(22, 119, 255, 0.22);
+  --color-accent: #3dd6d0;
+  --color-accent-soft: rgba(61, 214, 208, 0.14);
+  --color-accent-strong: #3dd6d0;
+  --color-success: #3ecf7a;
+  /* 深色主题的淡色底已经足够暗，沿用默认成功色即可保持对比度。 */
+  --color-success-strong: #3ecf7a;
+  --color-success-soft: rgba(62, 207, 122, 0.14);
+  --color-warning: #e0a83a;
+  /* 深色主题的淡色底已经足够暗，沿用默认警告色即可保持对比度。 */
+  --color-warning-strong: #e0a83a;
+  --color-warning-soft: rgba(224, 168, 58, 0.16);
+  --color-error: #ef6a70;
+  --color-error-strong: #ef6a70;
+  --color-error-soft: rgba(239, 106, 112, 0.14);
+  --color-on-danger: #111111;
+  --color-info: #9ca3af;
+  --color-info-strong: #9ca3af;
+  --color-info-soft: rgba(76, 150, 232, 0.14);
+  --color-media: #0a0b0d;
+  --color-media-text: #e6e8ee;
+  /* 状态标签：深色下保持纯色底 + 白字，略压暗以免刺眼。 */
+  --badge-neutral-bg: #4b5563;
+  --badge-neutral-text: #ffffff;
+  --badge-success-bg: #15803d;
+  --badge-success-text: #ffffff;
+  --badge-warning-bg: #b45309;
+  --badge-warning-text: #ffffff;
+  --badge-error-bg: #b91c1c;
+  --badge-error-text: #ffffff;
+  --badge-info-bg: #0958d9;
+  --badge-info-text: #ffffff;
+  --badge-accent-bg: #0f766e;
+  --badge-accent-text: #ffffff;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --ambient-glow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent),
+    0 0 28px -8px color-mix(in srgb, var(--color-primary) 45%, transparent);
+
+  --focus-ring: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+}
+
+/* 语义别名：供 YmBadge / 状态点统一引用 */
+:root {
+  --status-ready-bg: var(--color-accent-soft);
+  --status-ready-fg: var(--color-accent-strong);
+  --status-installing-bg: var(--color-info-soft);
+  --status-installing-fg: var(--color-info-strong);
+  --status-error-bg: var(--color-error-soft);
+  --status-error-fg: var(--color-error);
+  --status-idle-bg: var(--color-surface-3);
+  --status-idle-fg: var(--color-text-muted);
+}
+
+@media (max-width: 1000px) {
+  :root {
+    --page-gutter: 20px;
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "yaomustudio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "曜幕（YaoMu Studio）—— 本地优先的媒体翻译/配音桌面客户端",
+  "license": "Apache-2.0",
+  "workspaces": [
+    "desktop",
+    "ui"
+  ],
+  "scripts": {
+    "dev:ui": "npm run dev -w ui",
+    "build:ui": "npm run build -w ui",
+    "relaunch": "node scripts/relaunch.mjs",
+    "typecheck": "npm run typecheck -w ui && npm run typecheck -w desktop",
+    "test:macos": "bash scripts/test-macos.sh",
+    "test:media": "bash scripts/test-media.sh",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "check:i18n": "node scripts/check-i18n-keys.mjs",
+    "test:i18n-guard": "node --test scripts/check-i18n-keys.test.mjs",
+    "test:runner-manifest": "node --test scripts/generate-runner-manifest.test.mjs",
+    "test:release-workflow": "node --test scripts/check-release-tag.test.mjs scripts/collect-release-assets.test.mjs scripts/verify-release-assets.test.mjs scripts/release-workflow.test.mjs",
+    "test:readme": "node scripts/check-readme.mjs",
+    "build": "npm run build:ui && npm run build -w desktop",
+    "pack:dir": "node scripts/pack-dir.mjs",
+    "smoke:packaged": "npm run smoke:packaged -w desktop"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1"
+  }
+}

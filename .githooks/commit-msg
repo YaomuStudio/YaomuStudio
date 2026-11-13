@@ -1,0 +1,24 @@
+#!/bin/sh
+# 校验提交信息格式：type(scope): subject
+# 允许合并/回滚/自动生成的提交直接通过。
+
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+
+first_line=$(head -n 1 "$msg_file")
+
+case "$first_line" in
+  "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"Initial commit"*|"chore: initial import"*)
+    exit 0
+    ;;
+esac
+
+if ! printf '%s\n' "$first_line" | grep -qE '^(feat|fix|docs|refactor|test|chore|build|ci|contract|perf)(\([a-z0-9._/-]+\))?: .+'; then
+  echo "❌ 提交信息格式不符，应为：type(scope): subject" >&2
+  echo "   type: feat|fix|docs|refactor|test|chore|build|ci|contract|perf" >&2
+  echo "   示例: feat(runner): 增加 execute 帧的 attempt 校验" >&2
+  echo "   当前: $first_line" >&2
+  exit 1
+fi
+
+exit 0

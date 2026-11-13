@@ -1,0 +1,27 @@
+{
+  "name": "外部仿真全流程",
+  "source_language": "zh",
+  "target_languages": ["en"],
+  "extract_mode": "asr",
+  "erase_mode": "dialog_only",
+  "source_srt": "source.zh.srt",
+  "translated_srt": "translated.en.srt",
+  "media": {
+    "duration_ms": 2000,
+    "width": 320,
+    "height": 180,
+    "sample_rate": 48000,
+    "video_frequency_hz": 440,
+    "voice_frequency_hz": 660
+  },
+  "nodes": [
+    "01_import",
+    "02_analyze",
+    "03_separate",
+    "04_extract",
+    "05_erase",
+    "06_translate",
+    "07_clone",
+    "08_mix"
+  ]
+}

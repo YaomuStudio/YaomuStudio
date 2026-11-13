@@ -1,0 +1,70 @@
+name: windows-package
+
+# Windows clean-checkout 装配验证：不发布、不签名，只构建并校验 Core/Runner/桌面资源；WSL not-run。
+# 用于覆盖 release.yml 的 Windows 构建步骤，避免把“YAML 看起来正确”当成 CI 通过。
+on:
+  # Windows 打包验证成本高，改为手动触发；发布流水线仍由 release.yml 处理 tag。
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: windows package (clean checkout)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app-server/go.mod
+          cache-dependency-path: app-server/go.sum
+
+      - run: npm ci
+
+      # 干净 checkout 必须显式构建 UI + desktop TypeScript；electron-builder 不会代跑 tsc。
+      - run: npm run build
+
+      # 生成 yaomu-core.exe、runner_src、yaomu-runner.cmd、随包 Python 与固定 FFmpeg。
+      - name: Build Core + Runner resources
+        shell: bash
+        env:
+          BUNDLE_PYTHON: "1"
+          BUNDLE_FFMPEG: "1"
+        run: bash scripts/build-core.sh --arch x64 --out build/core-x64
+
+      - name: Package (dir, unsigned)
+        shell: bash
+        run: npm run pack -w desktop
+
+      # hosted windows-latest 没有准备好的 yaomu 镜像，不能执行严格 WSL smoke。
+      # 本步骤只验证真实打包装配（Core 文件 + manifest/tree），并明确 WSL not-run；
+      # 严格 packaged smoke 保留给准备好镜像的实机终验，不在此 job 声明通过。
+      - name: Packaged artifact assembly (no WSL)
+        shell: cmd
+        run: node desktop\scripts\check-packaged-artifacts.mjs
+
+      - name: Upload runtime notices
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-runtime-notices
+          path: |
+            desktop/dist-app/win-unpacked/resources/core/FFMPEG-NOTICE.txt
+            desktop/dist-app/win-unpacked/resources/core/FFMPEG-LICENSE.txt
+            desktop/dist-app/win-unpacked/resources/core/python/RUNTIME-SOURCE.txt
+            desktop/dist-app/win-unpacked/resources/core/python/LICENSE.txt
+          if-no-files-found: warn
+          retention-days: 7

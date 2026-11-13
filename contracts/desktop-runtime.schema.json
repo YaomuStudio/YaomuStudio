@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:yaomustudio:desktop-runtime:v1",
+  "title": "Desktop runtime readiness snapshot v1",
+  "description": "Main-owned host state, separate from Core business HTTP/SSE. No transport secrets or raw errors.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "generation", "phase", "reason", "canRetry"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "generation": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "phase": { "enum": ["preparing", "starting", "ready", "restarting", "failed", "stopping", "stopped"] },
+    "reason": { "enum": [null, "startup_failed", "core_exited", "cleanup_unconfirmed", "handshake_failed", "protocol_mismatch", "workspace_mismatch"] },
+    "canRetry": { "type": "boolean" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "phase": { "const": "failed" } } },
+      "then": { "properties": { "reason": { "type": "string" } } },
+      "else": { "properties": { "reason": { "const": null }, "canRetry": { "const": false } } }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "ready" } } },
+      "then": { "properties": { "generation": { "type": "integer", "minimum": 1 } } }
+    },
+    {
+      "if": { "properties": { "reason": { "enum": ["cleanup_unconfirmed", "protocol_mismatch", "workspace_mismatch"] } } },
+      "then": { "properties": { "canRetry": { "const": false } } }
+    }
+  ]
+}

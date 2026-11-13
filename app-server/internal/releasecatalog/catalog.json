@@ -1,0 +1,441 @@
+{
+  "schema_version": 1,
+  "kind": "yaomu_product_release_catalog",
+  "admitted_at": "2026-11-10T08:44:45Z",
+  "distribution_prefixes": [
+    "https://flashhub-cdn.aodianyun.com/"
+  ],
+  "note": "Unsigned product interim catalog. SHA-256 locked locally from FlashHub CDN. Does not replace signed ReleaseManifest.",
+  "releases": [
+    {
+      "slots": [
+        "tts",
+        "voice-clone"
+      ],
+      "release": {
+        "release_id": "fh-tts-omnivoice_flashrt-1.0.3",
+        "version": "1.0.3",
+        "digest": "sha256:1805c191642b15d5efdd8ce51b915b364f735eda5f418eea057cefbba620a96a",
+        "channel": "product-admitted-interim"
+      },
+      "download_bytes": 7177583,
+      "cache_reuse_bytes": 0,
+      "install_bytes": 7177583,
+      "peak_staging_bytes": 7177583,
+      "permissions": [
+        "filesystem_write"
+      ],
+      "license": {
+        "license_id": "flashhub-candidate-unverified",
+        "license_name": "FlashHub candidate (license unverified; product interim lock)",
+        "notice_keys": [
+          "installation.license_unverified"
+        ]
+      },
+      "requires_restart": false,
+      "source": {
+        "flashhub_repo": "tts/omnivoice_flashrt",
+        "flashhub_repo_id": 8,
+        "flashhub_version_id": 68,
+        "release_status": "pre-release",
+        "note": "Product-admitted interim SHA-256 lock computed from CDN bytes. NOT a signed ReleaseManifest."
+      },
+      "files": [
+        {
+          "rel_path": "run.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/8/versions/68/run.py",
+          "sha256": "3ba9cb8fd58675ddfca0e89f99a7ed1be38d9a9bbd4d84721e0599e4a4d59779",
+          "size": 6413
+        },
+        {
+          "rel_path": "flashcli-bundle.json",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/8/versions/68/flashcli-bundle.json",
+          "sha256": "055f14bd26789368c7ef5c99bf35829e586e1a8e994fa4e1216675d4b067823a",
+          "size": 4889
+        },
+        {
+          "rel_path": "serve.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/8/versions/68/serve.py",
+          "sha256": "4d72d02fdf49972583b96f3f42089edc0d49dd49be311d59caf82c35f7bd2733",
+          "size": 6721
+        },
+        {
+          "rel_path": "flash_rt/pipeline_rtx.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/8/versions/68/flash_rt/pipeline_rtx.py",
+          "sha256": "79aa137b460e4412a209f26f0ebc2f175873641a12a8315edff863669276a072",
+          "size": 62270
+        },
+        {
+          "rel_path": "flash_rt/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/8/versions/68/flash_rt/__init__.py",
+          "sha256": "cd28dfcf94a3cd313ad9fedbbe537b6e49e799ed4902ff89b607a8648e4221a2",
+          "size": 546
+        },
+        {
+          "rel_path": "runtime/sm120-cu130-linux-x86_64-py312/flash_rt_omnivoice-1.0.0-sm120-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/8/versions/68/runtime/sm120-cu130-linux-x86_64-py312/flash_rt_omnivoice-1.0.0-sm120-cu130-linux-x86_64-py312.so",
+          "sha256": "6220247dd278ae6cd6ff073f9bd944a3c32a6b50b478505506faa12736f39f8c",
+          "size": 2392888
+        },
+        {
+          "rel_path": "runtime/sm86-cu130-linux-x86_64-py312/flash_rt_omnivoice-1.0.0-sm86-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/8/versions/68/runtime/sm86-cu130-linux-x86_64-py312/flash_rt_omnivoice-1.0.0-sm86-cu130-linux-x86_64-py312.so",
+          "sha256": "dac8be8173f06cb996027d392f43fa859fb32bfdf82da7e49449a798254116e4",
+          "size": 2995000
+        },
+        {
+          "rel_path": "runtime/sm89-cu130-linux-x86_64-py312/flash_rt_omnivoice-1.0.0-sm89-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/8/versions/68/runtime/sm89-cu130-linux-x86_64-py312/flash_rt_omnivoice-1.0.0-sm89-cu130-linux-x86_64-py312.so",
+          "sha256": "e6d625a5ca1d4f651b054866c5860d9630e5afed6d674b212403f5b85954aa86",
+          "size": 1708856
+        }
+      ]
+    },
+    {
+      "slots": [
+        "separation"
+      ],
+      "release": {
+        "release_id": "fh-xym-melband-roformer-1.0.10",
+        "version": "1.0.10",
+        "digest": "sha256:89ec87ea13aa09e00ad2e3f2c19a4adb0633e532ca4ca05aaeb2db2d677e4843",
+        "channel": "product-admitted-interim"
+      },
+      "download_bytes": 35507250,
+      "cache_reuse_bytes": 0,
+      "install_bytes": 35507250,
+      "peak_staging_bytes": 35507250,
+      "permissions": [
+        "filesystem_write"
+      ],
+      "license": {
+        "license_id": "flashhub-candidate-unverified",
+        "license_name": "FlashHub candidate (license unverified; product interim lock)",
+        "notice_keys": [
+          "installation.license_unverified"
+        ]
+      },
+      "requires_restart": false,
+      "source": {
+        "flashhub_repo": "xym/melband-roformer",
+        "flashhub_repo_id": 9,
+        "flashhub_version_id": 87,
+        "release_status": "pre-release",
+        "note": "Product-admitted interim SHA-256 lock computed from CDN bytes. NOT a signed ReleaseManifest."
+      },
+      "files": [
+        {
+          "rel_path": "serve.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/serve.py",
+          "sha256": "d0ab1faa133ddb32154ebc72a6fcbbbf9ca9c2c3781c81f8fadb0457607a7e98",
+          "size": 6649
+        },
+        {
+          "rel_path": "run.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/run.py",
+          "sha256": "020b001b8522fe1f715e8d68c4dd858ed94405d8a47f47f20b69b9bc63b9f8a6",
+          "size": 2561
+        },
+        {
+          "rel_path": "_model.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/_model.py",
+          "sha256": "83baed923ef8cf0b17f03359411ff8519db56a3da848985f10f4e9072878ef04",
+          "size": 12504
+        },
+        {
+          "rel_path": "flashcli-bundle.json",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flashcli-bundle.json",
+          "sha256": "5ed3f64b20d6836a3cd2894f9a4755b1b54673e86c6c06951e045758db1a416d",
+          "size": 4790
+        },
+        {
+          "rel_path": "README.md",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/README.md",
+          "sha256": "5dc628a537eab6f3507131a87bd192ebf3a4b45ff4ac355b07b43a9b4dc6ddb0",
+          "size": 17208
+        },
+        {
+          "rel_path": "calib/int8_calibration.json",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/calib/int8_calibration.json",
+          "sha256": "9145c7750cce39c0ad68620015f71d3af325e6c311ba27eef023d3002aeb7f3d",
+          "size": 232879
+        },
+        {
+          "rel_path": "calib/fp8_calibration.json",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/calib/fp8_calibration.json",
+          "sha256": "6babcafe1523290c384b3588e3f6e8b91848020db4e0f874f20c6ba637d40db2",
+          "size": 18276
+        },
+        {
+          "rel_path": "flash_rt/_extensions.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/_extensions.py",
+          "sha256": "5dff3a027d7f046a9e8ec8a3220357ac283d28d6e67db4dc44aa59a88ce482d0",
+          "size": 5174
+        },
+        {
+          "rel_path": "flash_rt/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/__init__.py",
+          "sha256": "b470f13ccf7a52e15dd596014d509332272525c40756af103de67838a5b46269",
+          "size": 4004
+        },
+        {
+          "rel_path": "runtime/sm120-cu130-linux-x86_64-py312/flash_rt_kernels-v1.0.0-sm120-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/runtime/sm120-cu130-linux-x86_64-py312/flash_rt_kernels-v1.0.0-sm120-cu130-linux-x86_64-py312.so",
+          "sha256": "853073f5fff0f750fa34e873f0a39e419f30883be12b2c706f658809069da945",
+          "size": 23487648
+        },
+        {
+          "rel_path": "runtime/sm89-cu130-linux-x86_64-py312/flash_rt_kernels-v1.0.0-sm89-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/runtime/sm89-cu130-linux-x86_64-py312/flash_rt_kernels-v1.0.0-sm89-cu130-linux-x86_64-py312.so",
+          "sha256": "16861c31532f52d608c044ce76389d928deeac8d1aec47ae253974cfaa36445a",
+          "size": 5237184
+        },
+        {
+          "rel_path": "flash_rt/models/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/models/__init__.py",
+          "sha256": "beddefcd6a1fe2dc23b881ea48de26a680c73694b49c44398b40faaf6aa141b6",
+          "size": 500
+        },
+        {
+          "rel_path": "runtime/sm86-cu130-linux-x86_64-py312/flash_rt_kernels-v1.0.0-sm86-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/runtime/sm86-cu130-linux-x86_64-py312/flash_rt_kernels-v1.0.0-sm86-cu130-linux-x86_64-py312.so",
+          "sha256": "c99180d1fb4868a8a98a944a9cf65ea191758c715c7cc1f76cd7fc5d01fa6045",
+          "size": 6310584
+        },
+        {
+          "rel_path": "flash_rt/models/melband_roformer/pipeline.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/models/melband_roformer/pipeline.py",
+          "sha256": "a50b50b0ea120f5abe6d1a861fc13e27e23f5224cbeb862fd682c382b787d90a",
+          "size": 16069
+        },
+        {
+          "rel_path": "flash_rt/models/melband_roformer/pipeline_rtx.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/models/melband_roformer/pipeline_rtx.py",
+          "sha256": "266d1e02433b52581820376ba1433939cc5ce73bcd0a1d7d4a9fc6d34843819d",
+          "size": 48375
+        },
+        {
+          "rel_path": "flash_rt/models/melband_roformer/pipeline_rtx_sm120.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/models/melband_roformer/pipeline_rtx_sm120.py",
+          "sha256": "aa19feb6c7f6746798b726a6cc548d9bdb0c05fa7f75b1316a28b2c26a01e29c",
+          "size": 7898
+        },
+        {
+          "rel_path": "flash_rt/models/melband_roformer/pipeline_rtx_sm86.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/models/melband_roformer/pipeline_rtx_sm86.py",
+          "sha256": "30037313680bba2b09528ec23f9fb31e46c34f0f1b5db7de2505b614c1bbbee5",
+          "size": 51050
+        },
+        {
+          "rel_path": "flash_rt/models/melband_roformer/pipeline_rtx_sm89.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/models/melband_roformer/pipeline_rtx_sm89.py",
+          "sha256": "33f2ea8232f257cec78d6adc3e2beb5ea3dd10ca50e1eecdc8240fa5b2b63a04",
+          "size": 43303
+        },
+        {
+          "rel_path": "flash_rt/models/melband_roformer/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/9/versions/87/flash_rt/models/melband_roformer/__init__.py",
+          "sha256": "39e0ee3c45bcb794f0ca35bce59cce11de8f9da3d55a6823e320fcb28db0ccd9",
+          "size": 594
+        }
+      ]
+    },
+    {
+      "slots": [
+        "asr"
+      ],
+      "release": {
+        "release_id": "fh-asr-qwen3_asr-1.0.1",
+        "version": "1.0.1",
+        "digest": "sha256:5aff804c4649b65cdaffeffdbb6d5fb14a27ddc8af747f27721d8674097ce47d",
+        "channel": "product-admitted-interim"
+      },
+      "download_bytes": 79696988,
+      "cache_reuse_bytes": 0,
+      "install_bytes": 79696988,
+      "peak_staging_bytes": 79696988,
+      "permissions": [
+        "filesystem_write"
+      ],
+      "license": {
+        "license_id": "flashhub-candidate-unverified",
+        "license_name": "FlashHub candidate (license unverified; product interim lock)",
+        "notice_keys": [
+          "installation.license_unverified"
+        ]
+      },
+      "requires_restart": false,
+      "source": {
+        "flashhub_repo": "asr/qwen3_asr",
+        "flashhub_repo_id": 36,
+        "flashhub_version_id": 92,
+        "release_status": "pre-release",
+        "note": "Product-admitted interim SHA-256 lock computed from CDN bytes. NOT a signed ReleaseManifest."
+      },
+      "files": [
+        {
+          "rel_path": "flashcli-bundle.json",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flashcli-bundle.json",
+          "sha256": "b70c272c0894a05b62cde38678ccb27b76f3bca5c77236cf7121cf62d9ff3fcb",
+          "size": 4462
+        },
+        {
+          "rel_path": "run.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/run.py",
+          "sha256": "5f7ed44df3a7d65ecc7e7c761f09da5e03858aa8a8b712d7652efa573ceaab08",
+          "size": 11864
+        },
+        {
+          "rel_path": "flash_rt/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/__init__.py",
+          "sha256": "b470f13ccf7a52e15dd596014d509332272525c40756af103de67838a5b46269",
+          "size": 4004
+        },
+        {
+          "rel_path": "flash_rt/_extensions.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/_extensions.py",
+          "sha256": "846b3a5fca031adf4580bb79a0bad1f1d60c0a988cbf63a290b5666f0121366f",
+          "size": 5347
+        },
+        {
+          "rel_path": "qwen_asr/LICENSE",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/qwen_asr/LICENSE",
+          "sha256": "a44a6081c73ad75f0255bb2bb5cab74ef1829565a895a24e53a4f11290ab7655",
+          "size": 11343
+        },
+        {
+          "rel_path": "qwen_asr/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/qwen_asr/__init__.py",
+          "sha256": "0022160970fa449caa4db609d2948fcf20f6eebbc277cc5b4449275872d1ae14",
+          "size": 361
+        },
+        {
+          "rel_path": "flash_rt/frontends/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/frontends/__init__.py",
+          "sha256": "bf81cb213e70299c531d31dd584eb574eecd1c909005fa9d0f1c7ea65126b69c",
+          "size": 296
+        },
+        {
+          "rel_path": "flash_rt/models/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/models/__init__.py",
+          "sha256": "beddefcd6a1fe2dc23b881ea48de26a680c73694b49c44398b40faaf6aa141b6",
+          "size": 500
+        },
+        {
+          "rel_path": "runtime/sm120-cu130-linux-x86_64-py312/flash_rt_fa2-af6eaffa-sm120-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm120-cu130-linux-x86_64-py312/flash_rt_fa2-af6eaffa-sm120-cu130-linux-x86_64-py312.so",
+          "sha256": "85a7231254be088152656d89efc488fe6b54289f6b88b4f91a2107d172494957",
+          "size": 24679792
+        },
+        {
+          "rel_path": "runtime/sm120-cu130-linux-x86_64-py312/flash_rt_kernels-af6eaffa-sm120-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm120-cu130-linux-x86_64-py312/flash_rt_kernels-af6eaffa-sm120-cu130-linux-x86_64-py312.so",
+          "sha256": "f88e7bd2945140836a2b85eb63c640ae653490be97a4bbcc12267cb7be80ffc6",
+          "size": 9050384
+        },
+        {
+          "rel_path": "runtime/sm86-cu130-linux-x86_64-py312/flash_rt_fa2-af6eaffa-sm86-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm86-cu130-linux-x86_64-py312/flash_rt_fa2-af6eaffa-sm86-cu130-linux-x86_64-py312.so",
+          "sha256": "9f24109790f4164df9ed76766fd57a87697cab089e152333f26b4ef741c9ad62",
+          "size": 14296432
+        },
+        {
+          "rel_path": "runtime/sm120-cu130-linux-x86_64-py312/flash_rt_qwen3_asr_kernels-af6eaffa-sm120-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm120-cu130-linux-x86_64-py312/flash_rt_qwen3_asr_kernels-af6eaffa-sm120-cu130-linux-x86_64-py312.so",
+          "sha256": "f09df27951913dd0867abec35faf64ae3d05f31cbc3e647c6f39405b3e9a33c6",
+          "size": 573992
+        },
+        {
+          "rel_path": "runtime/sm86-cu130-linux-x86_64-py312/flash_rt_kernels-af6eaffa-sm86-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm86-cu130-linux-x86_64-py312/flash_rt_kernels-af6eaffa-sm86-cu130-linux-x86_64-py312.so",
+          "sha256": "131c85ce5b65ed7492fb17408e8da9bb030368bf67a45a5b883ce9b5af36afa3",
+          "size": 7715088
+        },
+        {
+          "rel_path": "runtime/sm86-cu130-linux-x86_64-py312/flash_rt_qwen3_asr_kernels-af6eaffa-sm86-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm86-cu130-linux-x86_64-py312/flash_rt_qwen3_asr_kernels-af6eaffa-sm86-cu130-linux-x86_64-py312.so",
+          "sha256": "f4dedf92e42d334a5ff793bc6b2ace2f226ab4ea187a126d9ac985841e84ccde",
+          "size": 557608
+        },
+        {
+          "rel_path": "runtime/sm89-cu130-linux-x86_64-py312/flash_rt_fa2-af6eaffa-sm89-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm89-cu130-linux-x86_64-py312/flash_rt_fa2-af6eaffa-sm89-cu130-linux-x86_64-py312.so",
+          "sha256": "e32c74b8c64ba92f73e9e5dddea7a0c010f69406747d4d8f42fd82407f3c4f17",
+          "size": 14296432
+        },
+        {
+          "rel_path": "runtime/sm89-cu130-linux-x86_64-py312/flash_rt_kernels-af6eaffa-sm89-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm89-cu130-linux-x86_64-py312/flash_rt_kernels-af6eaffa-sm89-cu130-linux-x86_64-py312.so",
+          "sha256": "4edae5ee1f1ab63c2a053a49062e6fe267f53e80f70c7284934a9756ce3fb911",
+          "size": 7563536
+        },
+        {
+          "rel_path": "runtime/sm89-cu130-linux-x86_64-py312/flash_rt_qwen3_asr_kernels-af6eaffa-sm89-cu130-linux-x86_64-py312.so",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/runtime/sm89-cu130-linux-x86_64-py312/flash_rt_qwen3_asr_kernels-af6eaffa-sm89-cu130-linux-x86_64-py312.so",
+          "sha256": "69c78a57144a9db265a4fdc7652904e3ea3c57f3db4e3c9c4ba01a325370c1c7",
+          "size": 557608
+        },
+        {
+          "rel_path": "qwen_asr/inference/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/qwen_asr/inference/__init__.py",
+          "sha256": "bb2bae35db7d6e8297c7c9631f189541a3a2065031bd7b6f6d66ffd36bc25f53",
+          "size": 74
+        },
+        {
+          "rel_path": "qwen_asr/inference/qwen3_forced_aligner.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/qwen_asr/inference/qwen3_forced_aligner.py",
+          "sha256": "f955173b9a66e254f49978543eb3c5958fe1b348f9aa3a3250f4e54683bddfd7",
+          "size": 8498
+        },
+        {
+          "rel_path": "qwen_asr/inference/utils.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/qwen_asr/inference/utils.py",
+          "sha256": "503b17b4e4f6f47d6362c14a64722bf0608d45cdf9e3a054ec07fece7a49f513",
+          "size": 8297
+        },
+        {
+          "rel_path": "flash_rt/models/qwen3_asr/dims.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/models/qwen3_asr/dims.py",
+          "sha256": "ff47e3834d466aa2fca4f44c1cfb0f1fbcc59415a25e272410dae23c05e1a1f5",
+          "size": 7796
+        },
+        {
+          "rel_path": "flash_rt/models/qwen3_asr/pipeline_rtx.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/models/qwen3_asr/pipeline_rtx.py",
+          "sha256": "9b24e89121f2688262dcf5cf8abb7e4ed19971ad6043f6bcb994261c09293eb0",
+          "size": 24288
+        },
+        {
+          "rel_path": "flash_rt/models/qwen3_asr/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/models/qwen3_asr/__init__.py",
+          "sha256": "04fa12f96a50d85fc1c39ea6292c7da931ac505e55bdf0c806a28195f29160b3",
+          "size": 835
+        },
+        {
+          "rel_path": "qwen_asr/inference/assets/korean_dict_jieba.dict",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/qwen_asr/inference/assets/korean_dict_jieba.dict",
+          "sha256": "cc157a9ab78f92bf11ed98a69b285768d6627cf5cd57a581e6c06693effce37d",
+          "size": 275834
+        },
+        {
+          "rel_path": "flash_rt/frontends/torch/qwen3_asr_rtx.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/frontends/torch/qwen3_asr_rtx.py",
+          "sha256": "8863735df5ed6960a48f6d3a5f95b70b37b45fe0da3584360504dd6a3717252c",
+          "size": 31480
+        },
+        {
+          "rel_path": "flash_rt/frontends/torch/__init__.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/frontends/torch/__init__.py",
+          "sha256": "d7d1a83bb513ee7469bad2fa4826ae54def92794e644bdb2d4063d74a6f08d2a",
+          "size": 70
+        },
+        {
+          "rel_path": "flash_rt/frontends/torch/_qwen3_asr_rtx_spec.py",
+          "url": "https://flashhub-cdn.aodianyun.com/repo/36/versions/92/flash_rt/frontends/torch/_qwen3_asr_rtx_spec.py",
+          "sha256": "55283f832a1a1bc3664ec6aa78d99d53e0d29eb67b69db1964ec0e88ea58e5c0",
+          "size": 10767
+        }
+      ]
+    }
+  ]
+}

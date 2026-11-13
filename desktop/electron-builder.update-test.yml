@@ -1,0 +1,19 @@
+# 仅用于本地升级验证的 electron-builder 配置。
+#
+# 不参与 release workflow，也不得替代生产 electron-builder.yml。
+# 用途：生成指向本地/内网 generic feed 的 Windows NSIS 包，验证
+# 0.1.0 -> 0.1.1 的检查、下载、确认、排空与安装链路。
+#
+# 使用：
+#   npm run dist:update-test
+# 然后按 docs/app-update-delivery.md 的「本地 generic feed 验证」章节操作。
+
+extends: ./electron-builder.yml
+
+publish:
+  provider: generic
+  url: http://127.0.0.1:8765/
+
+win:
+  target:
+    - nsis

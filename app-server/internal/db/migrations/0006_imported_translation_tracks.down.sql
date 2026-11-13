@@ -1,0 +1,1 @@
+ALTER TABLE workflow_runs DROP COLUMN imported_translation_tracks_json;

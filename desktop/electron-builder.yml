@@ -1,0 +1,87 @@
+# electron-builder 配置。自动更新走 electron-updater + GitHub Releases
+# （先 GitHub，公测版再补 CDN）。签名/公证由环境变量驱动（见 release.yml）。
+
+appId: com.aodianyun.yaomustudio
+productName: YaoMu Studio
+
+# electron-builder 无法从被 workspace 提升的 node_modules 推断版本，而 devDependency 是范围；
+# 显式钉住与 desktop/package.json 一致的 Electron 版本（升级 Electron 时同步此处）。
+electronVersion: 44.10.0
+
+directories:
+  output: dist-app
+  buildResources: build
+
+# 打包内容：主进程/preload 编译产物 + renderer（ui/dist 映射进 asar）。
+files:
+  - dist/**/*
+  # 高权限 IPC 来源探针仅开发态使用（smoke.ts 以 !app.isPackaged 动态导入）；
+  # 负 glob 放在包含规则之后，后规则覆盖前规则，发行包不得携带该模块。
+  - "!dist/smoke-probe.js"
+  - "!dist/smoke-probe.js.map"
+  - from: ../ui/dist
+    to: ui/dist
+
+asar: true
+
+# Electron fuses：发行包禁止 Node 调试/环境变量入口，并强制 asar 完整性与唯一加载来源。
+# 由 electron-builder 26 内置 electronFuses 执行（@electron/fuses 为传递依赖），不新增 hook/依赖；
+# 不在此处改 cookieEncryption、fileProtocol 或 V8 snapshot 策略。
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+
+# 随包资源（不入 asar）：由 scripts/build-core.sh 暂存到 build/core-<arch>/。
+# 打包后主进程按 process.resourcesPath/core/yaomu-core 拉起 Core。
+# resources/core/runner_src 与 resources/core/runner-manifest.json 是打包态
+# 默认 WSL Runner 的唯一来源；清单对实际暂存文件生成，不是签名。
+# resources/core/yaomu-runner(.cmd) 是随包启动器：非 Windows 打包态由 Main
+# 在校验通过后注入 YAOMU_RUNNER_BIN；Windows 继续走 WSL 镜像路径。
+extraResources:
+  - from: build/core-${arch}
+    to: core
+
+# 发布源：公开仓 GitHub Releases（tag 触发的多平台流水线自动公开）。
+publish:
+  provider: github
+  owner: YaomuStudio
+  repo: YaomuStudio
+  releaseType: release
+
+win:
+  target:
+    - nsis
+  artifactName: YaoMuStudio-${version}-win-${arch}.${ext}
+  icon: resources/icon.ico
+  # 代码签名：WIN_CSC_LINK（.pfx base64）+ WIN_CSC_KEY_PASSWORD
+  # 开发/内测可不配置证书（产出无签名构建，SmartScreen 会告警）；
+  # 公开发布/公测前由发布方确认证书或显式豁免，见 docs/app-update-delivery.md §5。
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+# 首发矩阵：Windows x64、macOS arm64/x64、Linux x64；签名仍按各平台注释处理。
+mac:
+  category: public.app-category.video
+  icon: resources/icon.icns
+  artifactName: YaoMuStudio-${version}-mac-${arch}.${ext}
+  target:
+    - dmg
+    - zip   # electron-updater 的 latest-mac.yml 引用 zip
+  # macOS 签名 + 公证是发布前置（证书与 notarytool 凭据只进 CI secret），此处不配置：
+  # identity: null 显式关闭签名，但不能保证硬化后的 arm64 包可直接运行；本地验证须先检查签名封装。
+  # 必要时在新的测试输出目录用 CLI identity=- 做 ad-hoc 验证，不等于正式签名/公证策略。
+  identity: null
+
+linux:
+  target:
+    - AppImage
+  artifactName: YaoMuStudio-${version}-linux-${arch}.${ext}
+  # Linux AppImage 从 workspace scoped name 推导会得到非法 executableName；显式固定。
+  executableName: yaomustudio
+  icon: resources/icon.png
+  category: AudioVideo

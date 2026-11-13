@@ -1,0 +1,2 @@
+ALTER TABLE exports ADD COLUMN bilingual INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE exports ADD COLUMN source_revision_id TEXT;

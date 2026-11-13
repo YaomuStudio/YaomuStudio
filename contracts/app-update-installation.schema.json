@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yaomustudio.local/contracts/app-update-installation.schema.json",
+  "title": "Host application update installation state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "phase", "reason", "version", "canCancel"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "phase": { "enum": ["idle", "waiting", "preparing", "stopping", "installing", "blocked"] },
+    "reason": {
+      "enum": [null, "active_work", "request_in_flight", "executor_starting", "runtime_unavailable", "runtime_changed", "executor_unconfirmed", "prepare_failed", "stop_unconfirmed", "restart_required", "update_unavailable", "install_failed"]
+    },
+    "version": { "type": ["string", "null"], "minLength": 1, "maxLength": 200 },
+    "canCancel": { "type": "boolean" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "phase": { "const": "waiting" } } },
+      "then": {
+        "properties": {
+          "canCancel": { "const": true },
+          "version": { "type": "string" },
+          "reason": { "enum": [null, "active_work", "request_in_flight", "executor_starting"] }
+        }
+      },
+      "else": { "properties": { "canCancel": { "const": false } } }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "idle" } } },
+      "then": { "properties": { "version": { "const": null }, "reason": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "phase": { "enum": ["preparing", "stopping", "installing"] } } },
+      "then": { "properties": { "version": { "type": "string" }, "reason": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "blocked" } } },
+      "then": {
+        "properties": {
+          "reason": { "enum": ["runtime_unavailable", "runtime_changed", "executor_unconfirmed", "prepare_failed", "stop_unconfirmed", "restart_required", "update_unavailable", "install_failed"] }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+# Public repository secret scan.
+# Keep gitleaks' default rules; the private repository's evidence allowlist is
+# intentionally not copied here.
+
+[extend]
+useDefault = true

@@ -1,0 +1,17 @@
+[project]
+name = "yaomustudio-runner"
+version = "0.1.0"
+description = "曜幕执行适配器 Runner：与 UI/Core 分进程，受控执行 FlashCLI / FFmpeg"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["yaomustudio_runner"]
+package-dir = {"" = "src"}

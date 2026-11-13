@@ -1,0 +1,36 @@
+#!/bin/sh
+# 提交前拦截：密钥文件与密钥特征内容。
+# 由 scripts/setup-dev.sh 通过 core.hooksPath 启用。
+
+blocked_name='(^|/)\.env$|(^|/)\.env\.[^/]+$|\.(pem|key|p12|pfx|jks|keystore)$|(^|/)id_(rsa|dsa|ecdsa|ed25519)$|(^|/)\.netrc$|(^|/)credentials\.json$|(^|/)\.design-build/'
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+failed=0
+
+bad_name=$(printf '%s\n' "$staged" | grep -E "$blocked_name")
+if [ -n "$bad_name" ]; then
+  echo "❌ 命中密钥/环境文件或过程产物，禁止提交：" >&2
+  printf '%s\n' "$bad_name" | sed 's/^/   /' >&2
+  failed=1
+fi
+
+# 内容特征扫描（只看新增行）
+secret_hit=$(git diff --cached -U0 --diff-filter=ACMR |
+  grep -aE '^\+' |
+  grep -aE 'BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|glpat-[A-Za-z0-9_-]{20}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,}' |
+  head -5)
+if [ -n "$secret_hit" ]; then
+  echo "❌ 新增内容疑似包含密钥/令牌，禁止提交（已隐去原文）：" >&2
+  printf '%s\n' "$secret_hit" | cut -c1-40 | sed 's/^/   /' >&2
+  failed=1
+fi
+
+if [ "$failed" -ne 0 ]; then
+  echo "" >&2
+  echo "密钥只走 CI Secrets，不进仓库。如确属误判，请修正内容而不是绕过 hook。" >&2
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,33 @@
+# Dependencies and build output
+node_modules/
+dist/
+dist-app/
+out/
+build/
+release/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Local run artifacts
+.design-build/
+outputs/
+
+# Environment and keys
+.env
+.env.*
+!.env.example
+*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

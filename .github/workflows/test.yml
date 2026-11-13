@@ -1,0 +1,244 @@
+name: test
+
+# 测试 CI：Go（vet + race + ffprobe 必需媒体集成）、Python Runner（pytest）、
+# UI/Desktop（typecheck + build + desktop Node tests）、UI E2E（Playwright + Chromium），以及
+# macOS / Linux 隐藏窗口 smoke 评估作业。
+# 与 release.yml 分离：发布只处理 tag 与打包；这里只跑可重复的测试。
+on:
+  # 只在 main 推送、PR 和手动触发时运行；功能分支推送不再自动触发。
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: go (vet + race)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app-server/go.mod
+          cache-dependency-path: app-server/go.sum
+
+      - name: Install ffmpeg (includes ffprobe)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffprobe -version | head -n 1
+
+      - name: Vet
+        working-directory: app-server
+        run: go vet ./...
+
+      - name: Test (race)
+        working-directory: app-server
+        run: go test -race ./... -count=1
+
+      # ffprobe 缺失时该测试默认降级；CI 用 FFPROBE_REQUIRED=1 强制真实探测断言，
+      # 并确认没有跳过/降级，避免“跳过当通过”。
+      - name: Media integration (ffprobe required)
+        working-directory: app-server
+        env:
+          FFPROBE_REQUIRED: "1"
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/media-integration.log"
+          go test -run '^TestExportExecutionIntegration$' ./internal/scheduler -count=1 -v 2>&1 | tee "$log"
+          if grep -Eq 'FFPROBE_UNAVAILABLE|FFMPEG_NOT_AVAILABLE|PYTHON_NOT_AVAILABLE|MEDIA_HELPER_UNSUPPORTED|^[[:space:]]*--- SKIP:' "$log"; then
+            echo "media integration skipped or degraded; see $log" >&2
+            exit 1
+          fi
+          grep -q 'ffprobe .*format=' "$log"
+
+  runner:
+    name: runner (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: runner/pyproject.toml
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "runner[dev]"
+
+      - name: Run Runner tests
+        run: python -m pytest runner/tests -q -rs
+
+  web:
+    name: web (typecheck + build + desktop tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+      - run: npm run check:i18n
+      - run: npm run test:i18n-guard
+      - run: npm run test:runner-manifest
+      - run: npm run test:readme
+      - run: npm run test:release-workflow
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:asset-save -w desktop
+      - run: npm run test:asset-stream -w desktop
+      - run: npm run test:api-timeout -w desktop
+      - run: npm run test:media-scan -w desktop
+      - run: npm run test:preferences -w desktop
+      - run: npm run test:bootstrap -w desktop
+      - run: npm run test:host-runtime -w desktop
+      - run: npm run test:runner-resources -w desktop
+      - run: npm run test:update -w desktop
+
+  e2e:
+    name: e2e (playwright chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run UI E2E
+        run: npm run test:e2e
+
+      # Playwright 的 results.json 会记录 runner 绝对路径；上传前替换为占位符，
+      # 不上传未脱敏的 harness 路径，也不上传可能含路径的 HTML 报告。
+      # workspace 与 RUNNER_TEMP 都在 HOME 之下，必须先替换更长前缀。
+      - name: Redact runner paths from E2E report
+        id: redact
+        if: always()
+        run: |
+          report=".design-build/e2e/results.json"
+          if [ -f "$report" ]; then
+            sed -i -e "s|$GITHUB_WORKSPACE|<workspace>|g" \
+              -e "s|$RUNNER_TEMP|<tmp>|g" \
+              -e "s|$HOME|<home>|g" "$report"
+            if grep -Eq '/(home|Users)/[^"[:space:]]+' "$report"; then
+              echo "unredacted absolute path remains in $report" >&2
+              exit 1
+            fi
+          fi
+
+      # 脱敏步骤失败时不上传 artifact，避免发布未脱敏报告。
+      - name: Upload E2E results
+        if: always() && steps.redact.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: .design-build/e2e/results.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  # macOS 隐藏窗口 smoke（必需）：已在 GitHub macOS runner 连续 3 次通过
+  # （run 41379385411 / 41379583396 / 41379746566），ready 13/13、no-core 6/6、console errors 0。
+  macos-smoke:
+    name: macos-smoke (hidden Electron)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app-server/go.mod
+          cache-dependency-path: app-server/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      # 脚本内部会构建 Core 与 ui/desktop（不设 SMOKE_SKIP_BUILD），
+      # 以 show:false 运行 ready / no-core 两个场景。
+      - name: Hidden-window smoke
+        env:
+          SMOKE_TIMEOUT_MS: "180000"
+        run: node desktop/scripts/smoke.mjs
+
+  # Linux 隐藏窗口 smoke（验证基线）：Ubuntu 24.04 amd64，覆盖开发态/打包态启动与 AppImage 构建。
+  # 容器/CI 无 GPU、无真实桌面会话；模型执行、Wayland、托盘/输入法不在本作业范围。
+  linux-smoke:
+    name: linux-smoke (hidden Electron)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app-server/go.mod
+          cache-dependency-path: app-server/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Linux Electron runtime deps
+        run: bash scripts/install-linux-electron-deps.sh
+
+      - run: npm ci
+
+      # 与本地验证使用同一入口；--no-sandbox 仅用于 CI/容器测试环境，
+      # 不进入生产启动路径（见 scripts/linux-smoke.sh 与环境变量说明）。
+      - name: Linux smoke (dev + packaged + AppImage)
+        env:
+          SMOKE_ELECTRON_ARGS: "--no-sandbox"
+          SMOKE_TIMEOUT_MS: "180000"
+        run: bash scripts/linux-smoke.sh
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: desktop/dist-app/*.AppImage
+          if-no-files-found: warn
+          retention-days: 7
+
+      # 只上传截图，不上传含 runner 绝对路径的日志。
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-smoke-screenshots
+          path: .design-build/linux-smoke/**/screenshots/*
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,66 @@
+/* 全局 range 滑块：统一 18px 触控圆点，媒体时间轴与擦除滑杆共用。 */
+input[type="range"] {
+  cursor: pointer;
+}
+input[type="range"]:not(.scale-range)::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  /* 不设置 margin-top：Chromium 默认将 thumb 与轨道垂直居中。
+     固定负 margin 会在 80%–150% UI 缩放下把圆点顶离轨道中心。 */
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+input[type="range"]:not(.scale-range)::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/*
+ * 无边框窗口标题栏（AppShell 挂 is-frameless / os-mac / os-win / os-linux）。
+ * 全宽顶栏与人工修正页头是拖拽区；其内的可交互元素恢复 no-drag。
+ * mac 在顶栏左侧为红黄绿按钮留位；win 在顶栏右侧为系统 WCO 控件留位；
+ * Linux 无系统控件，由 TopBar 自绘与 WCO 同视觉的按钮，无需留位。
+ */
+html.is-frameless .topbar,
+html.is-frameless .mcs-top {
+  -webkit-app-region: drag;
+}
+html.is-frameless .topbar :is(button, a, input, .topbar__left, .topbar__right),
+html.is-frameless .mcs-top :is(button, a, input, select, textarea, .mcs-top__controls) {
+  -webkit-app-region: no-drag;
+}
+html.is-frameless.os-mac .topbar {
+  padding-left: 78px;
+}
+html.is-frameless.os-mac .mcs-top {
+  padding-left: 84px;
+}
+html.is-frameless.os-win .topbar {
+  padding-right: 162px;
+}
+html.is-frameless.os-win .mcs-top {
+  padding-right: 150px;
+}
+html.is-frameless .onboarding__top {
+  position: relative;
+  -webkit-app-region: drag;
+}
+html.is-frameless .onboarding__top :is(button, a, input, select, textarea) {
+  -webkit-app-region: no-drag;
+}
+html.is-frameless.os-mac .onboarding__top {
+  padding-left: 78px;
+}
+html.is-frameless.os-win .onboarding__top {
+  padding-right: 162px;
+}
+html.is-frameless.os-linux .onboarding__top {
+  padding-right: 150px;
+}

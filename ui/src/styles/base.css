@@ -1,0 +1,245 @@
+/* 基础样式：reset + 排版 + 滚动条。tokens 见 tokens.css。 */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* 桌面壳只允许内部滚动容器滚动，文档本身不可滚动。
+   overflow: clip 同时阻止聚焦元素触发 scrollIntoView 把整个壳滚走；
+   overflow: hidden 仍可被程序化滚动，不能单独承担这个约束。 */
+#app {
+  position: relative;
+  overflow: clip;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* 深色下提高工作台推荐卡暗纹可见度。
+   必须写全局样式：scoped 样式里的 :global(html[data-theme="dark"]) 后代选择器
+   会被编译成 html[data-theme="dark"] { opacity: ... }，把整页降到半透明。 */
+html[data-theme="dark"] .recommend-card__watermark {
+  opacity: 0.3;
+}
+html[data-theme="dark"] .recommend-card--feature .recommend-card__watermark {
+  opacity: 0.45;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  line-height: var(--line-height-tight);
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background: var(--color-primary-soft);
+}
+
+/* 滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 环境态：品牌色低频呼吸光，仅用于运行中/产出中。 */
+.ym-ambient {
+  position: relative;
+  isolation: isolate;
+}
+.ym-ambient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--ambient-glow);
+  opacity: 0.3;
+  pointer-events: none;
+  animation: ym-ambient-breathe var(--motion-duration-ambient) var(--motion-ease-out) infinite;
+}
+@keyframes ym-ambient-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 滚动边缘渐隐：7 段非线性 alpha。由 v-scroll-fade 指令按真实滚动范围
+   写入 --ym-fade-top/bottom；不可滚动或停靠边界时对应值为 0，避免永久发虚。 */
+@property --ym-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --ym-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.ym-scroll-fade {
+  --ym-fade-top: 0px;
+  --ym-fade-bottom: 0px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgb(0 0 0 / 15%) calc(var(--ym-fade-top) * 0.15),
+    rgb(0 0 0 / 30%) calc(var(--ym-fade-top) * 0.3),
+    rgb(0 0 0 / 45%) calc(var(--ym-fade-top) * 0.45),
+    rgb(0 0 0 / 60%) calc(var(--ym-fade-top) * 0.6),
+    rgb(0 0 0 / 75%) calc(var(--ym-fade-top) * 0.75),
+    rgb(0 0 0 / 87%) calc(var(--ym-fade-top) * 0.87),
+    #000 var(--ym-fade-top),
+    #000 calc(100% - var(--ym-fade-bottom)),
+    rgb(0 0 0 / 87%) calc(100% - var(--ym-fade-bottom) * 0.87),
+    rgb(0 0 0 / 75%) calc(100% - var(--ym-fade-bottom) * 0.75),
+    rgb(0 0 0 / 60%) calc(100% - var(--ym-fade-bottom) * 0.6),
+    rgb(0 0 0 / 45%) calc(100% - var(--ym-fade-bottom) * 0.45),
+    rgb(0 0 0 / 30%) calc(100% - var(--ym-fade-bottom) * 0.3),
+    rgb(0 0 0 / 15%) calc(100% - var(--ym-fade-bottom) * 0.15),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgb(0 0 0 / 15%) calc(var(--ym-fade-top) * 0.15),
+    rgb(0 0 0 / 30%) calc(var(--ym-fade-top) * 0.3),
+    rgb(0 0 0 / 45%) calc(var(--ym-fade-top) * 0.45),
+    rgb(0 0 0 / 60%) calc(var(--ym-fade-top) * 0.6),
+    rgb(0 0 0 / 75%) calc(var(--ym-fade-top) * 0.75),
+    rgb(0 0 0 / 87%) calc(var(--ym-fade-top) * 0.87),
+    #000 var(--ym-fade-top),
+    #000 calc(100% - var(--ym-fade-bottom)),
+    rgb(0 0 0 / 87%) calc(100% - var(--ym-fade-bottom) * 0.87),
+    rgb(0 0 0 / 75%) calc(100% - var(--ym-fade-bottom) * 0.75),
+    rgb(0 0 0 / 60%) calc(100% - var(--ym-fade-bottom) * 0.6),
+    rgb(0 0 0 / 45%) calc(100% - var(--ym-fade-bottom) * 0.45),
+    rgb(0 0 0 / 30%) calc(100% - var(--ym-fade-bottom) * 0.3),
+    rgb(0 0 0 / 15%) calc(100% - var(--ym-fade-bottom) * 0.15),
+    transparent 100%
+  );
+  transition:
+    --ym-fade-top var(--motion-duration-snap) var(--motion-ease-out),
+    --ym-fade-bottom var(--motion-duration-snap) var(--motion-ease-out);
+}
+
+/* 工具类 */
+.mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+.truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 减少动画（无障碍）
+   无限动画只保留一次迭代，避免 spinner 变成高频闪烁。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ym-ambient::after {
+    animation: none;
+    opacity: 0.5;
+  }
+}
