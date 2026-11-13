@@ -211,6 +211,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - run: npm ci
+
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
