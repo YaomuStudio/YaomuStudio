@@ -1,6 +1,6 @@
 # Application release publication contract (v5)
 
-This is the CI contract for application installers published from `YaomuStudio/YaomuStudio`. The official download source and the domestic app update feed are an OBS-compatible object store; GitHub Releases remain the build archive and the international update feed. It replaces the Windows-only draft/evidence/approval gate. It is not a model ReleaseManifest, signing-key provisioner, or authorization to publish. Tag creation and public release remain separate owner actions.
+This is the CI contract for application installers published from `YaomuStudio/YaomuStudio`. The official download source and the domestic app update feed are an OBS-compatible object store; GitHub Releases remain the build archive and the international update feed. It replaces the Windows-only draft/evidence/approval gate. It is not a model ReleaseManifest, signing-key provisioner, or authorization to publish. Tag creation is an owner action in the private GitLab repository; the public tag is a derived artifact created by the mirror pipeline.
 
 ## Release identity
 
@@ -11,7 +11,9 @@ This is the CI contract for application installers published from `YaomuStudio/Y
 
 ## Trigger and publication
 
-- Automatic builds run only on `push` of a `v*` tag.
+- Automatic builds run only on `push` of a public `v*` tag.
+- The private GitLab `v*` tag is the release intent and the only tag source. `scripts/public-mirror/release-tag.mjs` validates the tag name, the private tag target version, and the mirrored `main` version, then creates the equivalent public annotated tag on the verified public HEAD. Only the version name crosses repositories; the private tag object, target commit, and metadata are not copied.
+- Public tags are read-only. A tag deleted in GitLab is deleted from the public repo unless a GitHub Release exists for it; deleting a tag with a Release requires the owner to remove the Release manually first. Reconciliation runs after each mirror promote to catch missed tag events.
 - `workflow_dispatch` is a manual rerun/repair path and requires an existing tag; it does not accept branches.
 - A tag push builds the current platform matrix: Windows and Linux. macOS builds are temporarily excluded until macOS packaging is fixed and models are ready. Only after every configured build succeeds does the publish job upload immutable artifacts to OBS, create the GitHub Release archive, and finally switch the OBS update manifests. A failed build publishes nothing.
 - The release is public by default. There is no draft/approval step in this contract.
@@ -115,6 +117,7 @@ Beta tags must also pass `--prerelease`.
 - Publish job: `contents: write` for the GitHub archive, using `secrets.GITHUB_TOKEN`.
 - OBS repository variables: `OBS_ENDPOINT`, `OBS_BUCKET`, `OBS_PREFIX` (optional), `OBS_FEED_BASE_URL`.
 - OBS secrets: `OBS_ACCESS_KEY_ID`, `OBS_SECRET_ACCESS_KEY`; optional `OBS_SECURITY_TOKEN` for temporary credentials.
+- Tag sync tagger: the sync uses `PUBLIC_RELEASE_TAGGER` when provided; otherwise it uses a fixed noreply bot identity. A provided value must be noreply.
 - The OBS IAM identity must only allow `PutObject`, `GetObject`, and `HeadObject` on the release bucket/prefix, not bucket administration. The bucket/prefix is anonymously readable over HTTPS; the feed contains no credentials.
 - Windows signing, if configured, reads `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` from secrets. Missing secrets produce an unsigned build; they do not block the pipeline.
 - No long-lived PAT, no cross-repository token, and no credentials in client binaries or release assets.

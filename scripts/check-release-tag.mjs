@@ -35,7 +35,7 @@ function git(repoRoot, args) {
   return result.stdout.trim();
 }
 
-function packageVersionAt(repoRoot, commit, file) {
+export function packageVersionAt(repoRoot, commit, file) {
   let raw;
   try {
     raw = git(repoRoot, ["show", `${commit}:${file}`]);
