@@ -25,11 +25,11 @@ test("subtitle language detection prefers content script over filename tokens", 
     { chinese: srt("你好，这是原文字幕。"), thai: srt("สวัสดี นี่คือคำบรรยาย"), latin: srt("Hello world") },
   );
 
-  // 文件名里的 cs 是“泰语cs”的一部分，不能盖过中文/泰文内容。
+  // 文件名里的 cs / 泰语 一律不参与识别，只按字幕全文内容的脚本判断。
   expect(result.chinese).toBe("zh-CN");
   expect(result.thai).toBe("th");
-  // 明确的独立语言码仍然有效。
-  expect(result.nameCode).toBe("cs");
+  // 纯拉丁内容按英文兜底；文件名里的 cs 不再覆盖内容。
+  expect(result.nameCode).toBe("en");
   expect(result.latinFallback).toBe("en");
 });
 

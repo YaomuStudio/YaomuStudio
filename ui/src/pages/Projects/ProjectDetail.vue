@@ -13,13 +13,7 @@ import {
   projectStatusBucket,
   type ProjectStatusBucket,
 } from "@/domain/projects";
-import {
-  nodeStatusLabelKey,
-  nodeStatusTone,
-  runStatusLabelKey,
-  runStatusTone,
-  type Tone,
-} from "@/domain/status";
+import { type Tone } from "@/domain/status";
 import { ASR_LANGUAGES, TARGET_LANGUAGES, UI_LANGUAGES } from "@/domain/languages";
 import { evaluateAccess } from "@/domain/capabilityAccess";
 import type {
@@ -27,7 +21,6 @@ import type {
   AssetStatus,
   AssetType,
   Language,
-  PipelineNodeKey,
   SubtitleTrack,
   Task,
   WorkflowRun,
@@ -408,9 +401,6 @@ function assetStatusTone(status: AssetStatus): Tone {
   }
 }
 
-function nodeLabel(key: PipelineNodeKey): string {
-  return t(`projectDetail.node.${key}`);
-}
 </script>
 
 <template>
@@ -596,41 +586,6 @@ function nodeLabel(key: PipelineNodeKey): string {
         </ul>
       </YmCard>
 
-      <YmCard>
-        <template #header>
-          <h2 class="card-title">{{ t("projectDetail.runs.title") }}</h2>
-        </template>
-        <YmEmpty
-          v-if="!project.runs.length"
-          icon="play"
-          :title="t('projectDetail.runs.empty')"
-        />
-        <ul v-else class="run-list">
-          <li v-for="run in project.runs" :key="run.id" class="run">
-            <div class="run__head">
-              <div class="run__title">
-                <span class="run__name">{{ run.name }}</span>
-                <span class="muted">
-                  <bdi>{{ langName(run.sourceLanguage) }}</bdi> →
-                  <bdi>{{ run.languages.map(langName).join(" / ") }}</bdi> ·
-                  <bdi>{{ formatDate(run.updatedAt) }}</bdi>
-                </span>
-              </div>
-              <YmBadge :tone="runStatusTone(run.status)">
-                {{ t(runStatusLabelKey(run.status)) }}
-              </YmBadge>
-            </div>
-            <div class="run__nodes">
-              <div v-for="node in run.nodes" :key="node.key" class="run-node">
-                <span class="run-node__label">{{ nodeLabel(node.key) }}</span>
-                <YmBadge :tone="nodeStatusTone(node.status)">
-                  {{ t(nodeStatusLabelKey(node.status)) }}
-                </YmBadge>
-              </div>
-            </div>
-          </li>
-        </ul>
-      </YmCard>
 
     </template>
 
@@ -753,51 +708,6 @@ function nodeLabel(key: PipelineNodeKey): string {
 .task-row__bar {
   flex: 0 1 120px;
 }
-.run-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.run {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.run__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.run__title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.run__name {
-  font-weight: 500;
-}
-.run__nodes {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-.run-node {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-2);
-  background: var(--color-surface-2);
-  border-radius: var(--radius-md);
-}
-.run-node__label {
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-}
 .loading {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
@@ -817,11 +727,6 @@ function nodeLabel(key: PipelineNodeKey): string {
   margin-top: var(--space-2);
   color: var(--color-error-strong);
   font-size: var(--font-size-sm);
-}
-@media (max-width: 900px) {
-  .run__nodes {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 @media (max-width: 640px) {
       .asset-row,

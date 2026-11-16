@@ -5,7 +5,7 @@ import { formatBytes, getLocale, t } from "@/i18n";
 import { errorText, preflightIssueKey } from "@/i18n/errorDisplay";
 import { messageNotice, renderNotice, type SafeNotice } from "@/i18n/notice";
 import { TARGET_LANGUAGES, targetLanguageLabel } from "@/domain/languages";
-import { detectFileLanguage, detectLanguageFromName } from "@/domain/subtitleLanguage";
+import { detectFileLanguage } from "@/domain/subtitleLanguage";
 import type {
   AudioCandidate,
   Capability,
@@ -301,7 +301,7 @@ async function onTranslatedSubtitles(files: File[]): Promise<void> {
     const picked = toPicked(file);
     const key = fileKey(picked);
     if (keys.has(key)) continue;
-    // 先按内容识别（中文/泰文等脚本优先），再入列表，避免文件名里的 cs 覆盖真实语种。
+    // 只按字幕全文内容识别语种，文件名不参与判断。
     const detected = await detectFileLanguage(file);
     translatedSubtitles.value.push({ ...picked, language: detected });
     keys.add(key);

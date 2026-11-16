@@ -1,60 +1,61 @@
-import { TARGET_LANGUAGES } from "./languages";
-
 /**
- * 文件名里的语言码/名称只接受常见分隔符包围的独立 token。
- * 不能用“任意非字母数字”做边界：`wsy泰语cs_原文字幕.srt` 里的 `cs`
- * 会被误判成捷克语。这里只认 ASCII 分隔符，CJK 字符不算边界。
+ * 字幕语种识别只看文件内容，不看文件名/标题。
+ *
+ * 识别基于整份字幕的字符脚本统计：中文/日文/韩文/泰文/阿拉伯文等脚本
+ * 各自计数后取占比最高者；纯拉丁内容无法仅凭字符集区分语种，按英文兜底。
+ * 文件名里的 `cs`、`泰语` 等字样不参与判断，避免“wsy泰语cs_原文字幕.srt”
+ * 这类素材名把中文字幕误判成泰语或捷克语。
  */
-const NAME_SEPARATOR = String.raw`[._\-\s()\[\]{}（）【】]`;
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** 从文件名识别语言码；语言码/名称必须作为独立 token 出现。 */
-export function detectLanguageFromName(fileName: string): string | undefined {
-  const lower = fileName.toLowerCase();
-  const byCodeLength = [...TARGET_LANGUAGES].sort((a, b) => b.code.length - a.code.length);
-  for (const language of byCodeLength) {
-    const code = escapeRegExp(language.code.toLowerCase());
-    const token = new RegExp(`(?:^|${NAME_SEPARATOR})${code}(?:$|${NAME_SEPARATOR})`, "u");
-    if (token.test(lower)) return language.code;
-  }
-  const byNameLength = [...TARGET_LANGUAGES].sort((a, b) => b.name.length - a.name.length);
-  for (const language of byNameLength) {
-    const names = [language.name, language.nativeName ?? ""].filter((name) => name.length >= 2);
-    if (names.some((name) => lower.includes(name.toLowerCase()))) return language.code;
-  }
-  return undefined;
-}
-
-/** 字幕内容里的强脚本信号；拉丁文字无法只靠字符集区分语言，留给文件名判断。 */
 interface ScriptSignal {
   code?: string;
   hasLatin: boolean;
 }
 
+const SCRIPTS = {
+  kana: { pattern: /[\u3040-\u30ff]/gu, code: "ja" },
+  hangul: { pattern: /[\uac00-\ud7af]/gu, code: "ko" },
+  arabic: { pattern: /[\u0600-\u06ff]/gu, code: "ar" },
+  hebrew: { pattern: /[\u0590-\u05ff]/gu, code: "he" },
+  devanagari: { pattern: /[\u0900-\u097f]/gu, code: "hi" },
+  thai: { pattern: /[\u0e00-\u0e7f]/gu, code: "th" },
+  cyrillic: { pattern: /[\u0400-\u04ff]/gu, code: "ru" },
+  han: { pattern: /[\u4e00-\u9fff]/gu, code: "zh-CN" },
+  latin: { pattern: /[A-Za-z\u00c0-\u024f]/gu, code: "en" },
+} as const;
+
 function detectScriptLanguage(text: string): ScriptSignal {
-  if (/[\u3040-\u30ff]/u.test(text)) return { code: "ja", hasLatin: false };
-  if (/[\uac00-\ud7af]/u.test(text)) return { code: "ko", hasLatin: false };
-  if (/[\u0600-\u06ff]/u.test(text)) return { code: "ar", hasLatin: false };
-  if (/[\u0590-\u05ff]/u.test(text)) return { code: "he", hasLatin: false };
-  if (/[\u0900-\u097f]/u.test(text)) return { code: "hi", hasLatin: false };
-  if (/[\u0e00-\u0e7f]/u.test(text)) return { code: "th", hasLatin: false };
-  if (/[\u0400-\u04ff]/u.test(text)) return { code: "ru", hasLatin: false };
-  if (/[\u4e00-\u9fff]/u.test(text)) return { code: "zh-CN", hasLatin: false };
-  return { hasLatin: /[A-Za-z\u00c0-\u024f]/u.test(text) };
+  const counts: Record<keyof typeof SCRIPTS, number> = {
+    kana: 0,
+    hangul: 0,
+    arabic: 0,
+    hebrew: 0,
+    devanagari: 0,
+    thai: 0,
+    cyrillic: 0,
+    han: 0,
+    latin: 0,
+  };
+  for (const key of Object.keys(SCRIPTS) as (keyof typeof SCRIPTS)[]) {
+    counts[key] = [...text.matchAll(SCRIPTS[key].pattern)].length;
+  }
+  let winner: keyof typeof SCRIPTS | undefined;
+  for (const key of Object.keys(SCRIPTS) as (keyof typeof SCRIPTS)[]) {
+    if (counts[key] === 0) continue;
+    if (!winner || counts[key] > counts[winner]) winner = key;
+  }
+  if (winner && winner !== "latin") return { code: SCRIPTS[winner].code, hasLatin: false };
+  return { hasLatin: counts.latin > 0 };
 }
 
-/** 去掉时间轴与标签，避免把 `-->` 等符号计入判断。 */
+/** 去掉时间轴与标签，避免把 `-->` 等符号计入判断；不截断内容。 */
 function stripSubtitleSyntax(text: string): string {
   return text
     .replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}/g, " ")
-    .replace(/<[^>]*>/g, " ")
-    .slice(0, 20000);
+    .replace(/<[^>]*>/g, " ");
 }
 
-async function readSubtitleSample(file: File): Promise<string> {
+async function readSubtitleContent(file: File): Promise<string> {
   try {
     return stripSubtitleSyntax(await file.text());
   } catch {
@@ -62,23 +63,22 @@ async function readSubtitleSample(file: File): Promise<string> {
   }
 }
 
-/** 仅按内容做脚本级判断；无法区分拉丁语种时返回 undefined。 */
+/** 仅按整份字幕内容做脚本级判断；无法区分拉丁语种时返回 undefined。 */
 export async function detectSubtitleLanguage(file: File): Promise<string | undefined> {
-  const sample = await readSubtitleSample(file);
-  return sample ? detectScriptLanguage(sample).code : undefined;
+  const content = await readSubtitleContent(file);
+  return content ? detectScriptLanguage(content).code : undefined;
 }
 
 /**
- * 文件语言识别优先级（与网页端口径一致）：
- * 1. 内容出现明确非拉丁脚本（中文/泰文/日文/韩文等）时以内容为准；
- * 2. 否则使用文件名里的独立语言码/名称（如 `movie.th.srt`）；
- * 3. 纯拉丁内容按英文兜底。
+ * 文件语言识别只使用内容：
+ * 1. 全量统计字符脚本，取占比最高的非拉丁脚本；
+ * 2. 纯拉丁内容按英文兜底。
+ * 文件名不参与识别。
  */
 export async function detectFileLanguage(file: File): Promise<string | undefined> {
-  const sample = await readSubtitleSample(file);
-  const script = detectScriptLanguage(sample);
+  const content = await readSubtitleContent(file);
+  if (!content) return undefined;
+  const script = detectScriptLanguage(content);
   if (script.code) return script.code;
-  const byName = detectLanguageFromName(file.name);
-  if (byName) return byName;
   return script.hasLatin ? "en" : undefined;
 }
