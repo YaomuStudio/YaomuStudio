@@ -50,6 +50,9 @@ extraResources:
 publish:
   provider: generic
   url: https://mls-long.yaomuai.com/mls/yaomustudio/
+  # 显式固定通道，避免 beta 版本被 generic provider 写成 beta.yml；
+  # 客户端与 GitHub provider 都按 latest 通道读取。
+  channel: latest
 
 win:
   target:

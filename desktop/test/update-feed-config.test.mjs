@@ -16,6 +16,7 @@ const config = yaml.load(fs.readFileSync(configPath, "utf8"));
 test("electron-builder publishes to the domestic object-storage feed", () => {
   assert.equal(config.publish?.provider, "generic");
   assert.equal(config.publish?.url, DOMESTIC_UPDATE_FEED_URL);
+  assert.equal(config.publish?.channel, "latest");
 });
 
 test("Simplified Chinese locale prefers the domestic feed with GitHub fallback", () => {
