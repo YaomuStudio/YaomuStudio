@@ -285,6 +285,9 @@ test("renders target languages as complete chips without a generic language row"
   const row = card.locator(".recent-card__detail--languages");
   await expect(row).toBeVisible();
   await expect(row.locator(".recent-card__lang-chip").first()).toHaveText("English");
+  await expect(card.getByTestId("recent-card-lang-count")).toContainText(
+    "Translation & dubbing languages count",
+  );
 });
 
 test("target language chips follow the dark theme tokens", async ({ page }) => {

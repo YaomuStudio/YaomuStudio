@@ -1525,6 +1525,7 @@
   "workbench.card.langBoth": "Übersetzung & Synchron",
   "workbench.card.langCountShort.one": "{count}",
   "workbench.card.langCountShort.other": "{count}",
+  "workbench.card.langCountSuffix": " Anzahl",
   "workbench.card.langDub": "Synchron",
   "workbench.card.langTranslate": "Übersetzung",
   "workbench.card.languageShort": "Sprache",

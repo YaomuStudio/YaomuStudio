@@ -1525,6 +1525,7 @@
   "workbench.card.langBoth": "Traducción y doblaje",
   "workbench.card.langCountShort.one": "{count}",
   "workbench.card.langCountShort.other": "{count}",
+  "workbench.card.langCountSuffix": " cantidad",
   "workbench.card.langDub": "Idiomas de doblaje",
   "workbench.card.langTranslate": "Idiomas de traducción",
   "workbench.card.languageShort": "Idioma",

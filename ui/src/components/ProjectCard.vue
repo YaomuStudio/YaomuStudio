@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "@/api";
-import { formatDate, formatDuration, getLocale, t } from "@/i18n";
+import { formatDate, formatDuration, getLocale, t, tCount } from "@/i18n";
 import { messageNotice, renderNotice, type SafeNotice } from "@/i18n/notice";
 import { ASR_LANGUAGES, TARGET_LANGUAGES, UI_LANGUAGES } from "@/domain/languages";
 import { projectStatusBucket, type ProjectStatusBucket } from "@/domain/projects";
@@ -99,8 +99,10 @@ const sourceDurationMs = computed(() => {
   const pick =
     imported.find((asset) => asset.type === "video") ??
     imported.find((asset) => asset.type === "audio") ??
+    imported.find((asset) => asset.type === "audio_track") ??
     ready.find((asset) => asset.type === "video") ??
-    ready.find((asset) => asset.type === "audio");
+    ready.find((asset) => asset.type === "audio") ??
+    ready.find((asset) => asset.type === "audio_track");
   return pick?.meta?.durationMs ?? 0;
 });
 const durationMs = computed(
@@ -178,10 +180,20 @@ const sourceLanguageCode = computed(() => {
  */
 const targetRowLabelKey = computed(() => {
   const cloneType = primaryTypeKey.value === "clone";
-  if (capTranslate.value && (capClone.value || cloneType)) return "workbench.card.targets";
+  if (capTranslate.value && (capClone.value || cloneType)) return "workbench.card.langBoth";
   if (capClone.value || cloneType) return "workbench.card.langDub";
   if (capTranslate.value) return "workbench.card.langTranslate";
   return "workbench.card.targets";
+});
+
+/** 语言数量行对齐网页端：只在有目标语言的翻译/克隆类卡片出现。 */
+const languageCountRow = computed(() => {
+  if (!targetLangChips.value.length) return null;
+  const roleKey = targetRowLabelKey.value;
+  return {
+    label: `${t(roleKey)}${t("workbench.card.langCountSuffix")}`,
+    value: tCount("workbench.card.langCountShort", targetLangChips.value.length),
+  };
 });
 
 function paramOf<K extends keyof NonNullable<WorkflowRun["params"]>>(
@@ -204,7 +216,25 @@ const detailRows = computed<
     warning?: boolean;
   }[] = [];
   const eraseMode = paramOf("eraseMode");
-  if (capErase.value && eraseMode) {
+  if (primaryTypeKey.value === "pipeline") {
+    rows.push({
+      key: "adjust",
+      labelKey: "workbench.card.adjustDuration",
+      value: runOptionValueText("adjustDuration", paramOf("adjustDuration")),
+      warning: paramOf("adjustDuration") === true,
+    });
+    if (capErase.value && eraseMode) {
+      rows.push({
+        key: "erase",
+        labelKey: "workbench.card.eraseMode",
+        value: t(
+          eraseMode === "dialog_and_art"
+            ? "workbench.card.eraseArt"
+            : "workbench.card.eraseDialog",
+        ),
+      });
+    }
+  } else if (capErase.value && eraseMode) {
     rows.push({
       key: "erase",
       labelKey: "workbench.card.eraseMode",
@@ -213,14 +243,6 @@ const detailRows = computed<
           ? "workbench.card.eraseArt"
           : "workbench.card.eraseDialog",
       ),
-    });
-  }
-  if (primaryTypeKey.value === "pipeline") {
-    rows.push({
-      key: "adjust",
-      labelKey: "workbench.card.adjustDuration",
-      value: runOptionValueText("adjustDuration", paramOf("adjustDuration")),
-      warning: paramOf("adjustDuration") === true,
     });
   }
   if ((capClone.value || primaryTypeKey.value === "clone") && primaryTypeKey.value !== "pipeline") {
@@ -618,6 +640,14 @@ async function downloadAsset(asset: Asset, filename?: string): Promise<void> {
         <div class="recent-card__detail recent-card__detail--full">
           <span class="recent-card__detail-label">{{ t("workbench.card.assets") }}：</span>
           <span class="recent-card__detail-value" :title="materialText"><bdi dir="ltr">{{ materialText }}</bdi></span>
+        </div>
+        <div
+          v-if="languageCountRow"
+          class="recent-card__detail recent-card__detail--full"
+          data-testid="recent-card-lang-count"
+        >
+          <span class="recent-card__detail-label">{{ languageCountRow.label }}：</span>
+          <span class="recent-card__detail-value">{{ languageCountRow.value }}</span>
         </div>
         <div
           v-for="row in packedDetails"
