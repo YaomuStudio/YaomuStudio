@@ -170,6 +170,15 @@ function primaryPlatform(name) {
   return null;
 }
 
+/** 官网使用的固定安装包名；内容每次发布覆盖，缓存策略见调用方。 */
+function fixedAliasName(name) {
+  if (name.endsWith("-win-x64.exe")) return "YaoMuStudio-latest-win-x64.exe";
+  if (name.endsWith("-linux-x64.AppImage")) return "YaoMuStudio-latest-linux-x64.AppImage";
+  const mac = /-mac-(arm64|x64)\.(dmg|zip)$/.exec(name);
+  if (mac) return `YaoMuStudio-latest-mac-${mac[1]}.${mac[2]}`;
+  return null;
+}
+
 async function buildLatestJson({ files, root, version, feedBaseUrl, publishedAt }) {
   const platforms = {};
   for (const name of files) {
@@ -177,8 +186,10 @@ async function buildLatestJson({ files, root, version, feedBaseUrl, publishedAt 
     if (!platform) continue;
     if (platform.endsWith("-zip") && platforms[platform.slice(0, -4)]) continue;
     const file = path.join(root, name);
+    const alias = fixedAliasName(name);
     platforms[platform.replace(/-zip$/, "")] = {
       url: name,
+      ...(alias ? { latest_url: alias } : {}),
       size: assetSize(file),
       sha512: await assetHash(file, "sha512", "base64"),
     };
@@ -224,6 +235,22 @@ function planFor({ assets, config, stage, version, publishedAt, latestJson }) {
       contentType: contentType("latest.json"),
     });
   }
+  // 官网固定下载别名：服务端复制当前版本化安装包，内容每次发布覆盖。
+  const aliases = artifacts
+    .filter((item) => fixedAliasName(item.name))
+    .map((item) => {
+      const name = fixedAliasName(item.name);
+      return {
+        name,
+        sourceName: item.name,
+        sourceKey: item.key,
+        key: `${prefix}${name}`,
+        url: publicUrl(config.feedBaseUrl, name),
+        size: item.size,
+        cacheControl: MANIFEST_CACHE,
+        contentType: contentType(name),
+      };
+    });
   return {
     version,
     publishedAt,
@@ -231,8 +258,14 @@ function planFor({ assets, config, stage, version, publishedAt, latestJson }) {
     prefix,
     feedBaseUrl: config.feedBaseUrl,
     artifacts,
+    aliases,
     manifests,
-    uploads: stage === "artifacts" ? artifacts : stage === "manifests" ? manifests : [...artifacts, ...manifests],
+    uploads:
+      stage === "artifacts"
+        ? artifacts
+        : stage === "manifests"
+          ? [...aliases, ...manifests]
+          : [...artifacts, ...aliases, ...manifests],
   };
 }
 
@@ -339,6 +372,23 @@ async function uploadManifest({ client, bucket, item, root, latestJson, log }) {
   return { key: item.key, skipped: false };
 }
 
+/** 服务端复制版本化安装包到官网固定别名，避免重复上传大文件。 */
+async function copyFixedAlias({ client, bucket, item, log }) {
+  await withRetry(`copy ${item.key}`, () =>
+    call(client, "copyObject", {
+      Bucket: bucket,
+      Key: item.key,
+      CopySource: `${bucket}/${item.sourceKey}`,
+      MetadataDirective: "REPLACE",
+      ContentType: item.contentType,
+      CacheControl: item.cacheControl,
+      ContentDisposition: `attachment; filename="${item.name}"`,
+    }),
+  );
+  log(`[publish-obs] published fixed alias ${item.key} -> ${item.sourceKey}`);
+  return { key: item.key, skipped: false };
+}
+
 function noCacheUrl(url) {
   const next = new URL(url);
   next.searchParams.set("noCache", Date.now().toString(36));
@@ -381,6 +431,9 @@ async function verifyLatestJson(fetchImpl, url) {
       throw new PublishObsError("latest-json-invalid", `${url}#${platform}`);
     }
     await verifyPublic(fetchImpl, { url: new URL(entry.url, url).href, size: entry.size });
+    if (typeof entry.latest_url === "string" && entry.latest_url.length > 0) {
+      await verifyPublic(fetchImpl, { url: new URL(entry.latest_url, url).href, size: entry.size });
+    }
   }
   return doc;
 }
@@ -440,6 +493,13 @@ export async function publishToObs({
     if (stage !== "artifacts") {
       // 切清单前先确认所有安装包已通过公开 URL 可读；否则旧清单继续生效。
       for (const item of plan.artifacts) {
+        await verifyPublic(fetchImpl, item);
+      }
+      // 官网固定别名先于应用清单更新；别名失败时不切换 latest*.yml。
+      for (const item of plan.aliases) {
+        uploaded.push(await copyFixedAlias({ client: obs, bucket: config.bucket, item, log }));
+      }
+      for (const item of plan.aliases) {
         await verifyPublic(fetchImpl, item);
       }
       for (const item of plan.manifests) {

@@ -268,8 +268,9 @@ jobs:
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
         run: gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY"
 
-      # 清单最后发布：只有 GitHub 归档和对象存储安装包都成功后，官网/自动更新才切到新版本。
-      - name: Publish update manifests to object storage
+      # 固定别名先于清单更新；清单最后发布，作为应用切版点。
+      # CDN 接入后，在此步骤之后增加刷新 YaoMuStudio-latest-* / latest*.yml / latest.json。
+      - name: Publish fixed aliases and update manifests to object storage
         env:
           OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
           OBS_BUCKET: ${{ vars.OBS_BUCKET }}

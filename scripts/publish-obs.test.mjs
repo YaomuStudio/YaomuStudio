@@ -64,6 +64,17 @@ function fakeObs(initial = new Map()) {
       calls.push({ method: "putObject", key, cacheControl: params.CacheControl });
       callback(null, okResponse(etag));
     },
+    copyObject(params, callback) {
+      const sourceKey = params.CopySource.slice(params.CopySource.indexOf("/") + 1);
+      const source = objects.get(sourceKey);
+      calls.push({ method: "copyObject", key: params.Key, source: sourceKey, cacheControl: params.CacheControl });
+      if (!source) {
+        callback(null, { CommonMsg: { Status: 404, Code: "NoSuchKey" } });
+        return;
+      }
+      objects.set(params.Key, { content: source.content, etag: source.etag });
+      callback(null, okResponse(source.etag));
+    },
     getObjectMetadata(params, callback) {
       const object = objects.get(params.Key);
       calls.push({ method: "getObjectMetadata", key: params.Key });
@@ -134,6 +145,10 @@ test("dry run plans artifacts before manifests and needs no credentials", async 
     const artifact = result.plan.uploads.find((item) => item.name.endsWith(".exe"));
     assert.equal(artifact.cacheControl, "public, max-age=31536000, immutable");
     assert.equal(artifact.key, `YaoMuStudio-${VERSION}-win-x64.exe`);
+    assert.deepEqual(
+      result.plan.aliases.map((item) => item.name).sort(),
+      ["YaoMuStudio-latest-linux-x64.AppImage", "YaoMuStudio-latest-win-x64.exe"],
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -172,10 +187,22 @@ test("manifests stage publishes latest.json last and verifies platform URLs", as
     assert.equal(puts.at(-1), "latest.json");
     assert.ok(puts.includes("latest.yml"));
     assert.ok(puts.includes("latest-linux.yml"));
+    const copies = obs.calls.filter((call) => call.method === "copyObject");
+    assert.deepEqual(
+      copies.map((call) => call.key).sort(),
+      ["YaoMuStudio-latest-linux-x64.AppImage", "YaoMuStudio-latest-win-x64.exe"],
+    );
+    assert.equal(copies[0].cacheControl, "no-cache");
+    assert.equal(
+      obs.objects.get("YaoMuStudio-latest-win-x64.exe").content.length,
+      obs.objects.get(`YaoMuStudio-${VERSION}-win-x64.exe`).content.length,
+    );
     const latest = JSON.parse(obs.objects.get("latest.json").content.toString("utf8"));
     assert.equal(latest.version, VERSION);
     assert.equal(latest.platforms.win.url, `YaoMuStudio-${VERSION}-win-x64.exe`);
     assert.equal(latest.platforms.linux.url, `YaoMuStudio-${VERSION}-linux-x64.AppImage`);
+    assert.equal(latest.platforms.win.latest_url, "YaoMuStudio-latest-win-x64.exe");
+    assert.equal(latest.platforms.linux.latest_url, "YaoMuStudio-latest-linux-x64.AppImage");
     assert.equal(latest.platforms.win.size, obs.objects.get(latest.platforms.win.url).content.length);
     assert.equal(result.uploaded.at(-1).key, "latest.json");
   } finally {
