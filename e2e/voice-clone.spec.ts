@@ -91,8 +91,7 @@ test("clones translated lines and saves a candidate", async ({ page }) => {
   await openClone(page);
   await createRun(page);
 
-  await expect(page.getByText("Imported line one.")).toBeVisible();
-  await expect(page.getByText(/Recommended · flash-clone/).first()).toBeVisible();
+  await expect(page.getByText("full-zh-CN.wav")).toBeVisible();
 
   const imports = await probe<ImportTrackProbe[]>(page, "lastImportTrackInputs");
   expect(imports?.map((item) => `${item.type}:${item.language}`)).toEqual([
@@ -112,14 +111,14 @@ test("clones translated lines and saves a candidate", async ({ page }) => {
   await expect(page.getByText(/Saved to ~\/Downloads\/clone-.*\.wav/)).toBeVisible();
   const saved = await probe<SaveAssetProbe>(page, "lastSaveAssetInput");
   expect(saved?.assetId).toBeTruthy();
-  expect(saved?.suggestedName).toMatch(/^clone-zh-CN-.*\.wav$/);
+  expect(saved?.suggestedName).toMatch(/^clone-zh-CN\.wav$/);
 });
 
 test("shows the execution log for a completed clone", async ({ page }) => {
   await openClone(page);
   await createRun(page);
 
-  await expect(page.getByText("Imported line one.")).toBeVisible();
+  await expect(page.getByText("full-zh-CN.wav")).toBeVisible();
   await expect(page.getByText("Execution log")).toBeVisible();
   await expect(page.getByText("启动受管 FlashCLI 克隆")).toBeVisible();
   await expect(page.getByText("克隆音频合成完成")).toBeVisible();
@@ -139,7 +138,7 @@ test("shows a readable no-candidate state", async ({ page }) => {
   await setMockValue(page, "voiceCloneNoCandidates", true);
   await createRun(page);
 
-  await expect(page.getByText("No audio candidate for this line.").first()).toBeVisible();
+  await expect(page.getByText("Clone finished, but the full dubbing track was not produced.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Save audio" })).toHaveCount(0);
 });
 
@@ -155,7 +154,7 @@ test("keeps duration adjustment unavailable and shows frozen run options", async
   // 时间戳校验仍可切换，并传入实际选择。
   await validate.check({ force: true });
   await createRun(page);
-  await expect(page.getByText("Imported line one.")).toBeVisible();
+  await expect(page.getByText("full-zh-CN.wav")).toBeVisible();
 
   const input = await probe<RunInputProbe>(page, "lastRunInput");
   expect(input?.validateTimestamps).toBe(true);
@@ -189,7 +188,7 @@ test("rejects out-of-range timestamps only while validation is enabled", async (
     .getByRole("checkbox", { name: "Validate subtitle timestamps" })
     .uncheck({ force: true });
   await createRun(page);
-  await expect(page.getByText("Imported line one.")).toBeVisible();
+  await expect(page.getByText("full-zh-CN.wav")).toBeVisible();
 
   const input = await probe<RunInputProbe>(page, "lastRunInput");
   expect(input?.validateTimestamps).toBe(false);

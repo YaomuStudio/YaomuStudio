@@ -314,6 +314,8 @@ const base: AreaMessages = {
       "Clone stopped: subtitle timing is outside the media duration. This task keeps the inputs it was created with, so retrying it cannot pass; fix the subtitle timing and start a new clone run.",
     "task.clone_timeline_unknown_duration":
       "Clone stopped: the media duration is unknown. This task keeps the inputs it was created with, so retrying it cannot pass; re-import the media and start a new clone run.",
+    "task.clone_audio_plan_invalid":
+      "The full dub could not be assembled from the cloned lines. Check the subtitles and source audio, then start a new clone run.",
     "task.mix_plan_invalid": "The mix plan is invalid. Check the selected tracks, then retry.",
     "task.mix_plan_unavailable":
       "The mix plan could not be prepared. Check the selected tracks and retry.",
@@ -673,6 +675,8 @@ const base: AreaMessages = {
       "克隆已停止：字幕时间轴超出素材时长。该任务沿用创建时的素材，原地重试无法通过；请修正字幕后重新创建克隆任务。",
     "task.clone_timeline_unknown_duration":
       "克隆已停止：素材缺少可靠时长。该任务沿用创建时的素材，原地重试无法通过；请重新导入素材后重新创建克隆任务。",
+    "task.clone_audio_plan_invalid":
+      "无法把已克隆的句子合成完整配音。请检查字幕与声源后重新创建克隆任务。",
     "task.mix_plan_invalid": "混音计划无效，请检查所选轨道后重试。",
     "task.mix_plan_unavailable": "无法准备混音计划，请检查所选轨道后重试。",
     "task.oom": "任务内存不足，请关闭其他应用或降低负载后重试。",

@@ -179,7 +179,7 @@ test("voice clone save notices re-render on locale switch without resaving", asy
   await expect(page.locator(".language-select__chips")).toHaveCount(0);
   await page.locator('input[accept=".srt"][multiple]').setInputFiles(SAMPLE_TRANSLATED_SRT);
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByText("Imported line one.")).toBeVisible();
+  await expect(page.getByText("full-zh-CN.wav")).toBeVisible();
 
   await page.getByRole("button", { name: "Save audio" }).first().click();
   await expect(page.getByText(/Saved to ~\/Downloads\/clone-.*\.wav/)).toBeVisible();

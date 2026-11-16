@@ -2302,19 +2302,18 @@ export const fixtureApi: YaoMuApi = {
         }
         if (!control?.voiceCloneNoCandidates) {
           for (const language of input.targetLanguages) {
-            const translated = project.tracks.find(
-              (item) => item.type === "translation" && item.language === language,
-            );
-            const revision = translated?.revisions.find(
-              (item) => item.id === translated.currentRevisionId,
-            );
-            for (const segment of revision?.segments ?? []) {
-              const existing = candidatesFor(segment.id, language);
-              candidateStore.set(candidateKey(segment.id, language), [
-                ...existing,
-                ...makeCandidates(segment.id, language, segment.contentRevision),
-              ]);
-            }
+            project.assets.push({
+              id: id("asset"),
+              projectId: input.projectId,
+              runId: run.id,
+              type: "audio",
+              role: "full_dub_audio",
+              language,
+              name: `full-${language}.wav`,
+              sizeBytes: 1024 * 1024,
+              status: "ready",
+              importedAt: now(),
+            });
           }
         }
         const task: Task = {
