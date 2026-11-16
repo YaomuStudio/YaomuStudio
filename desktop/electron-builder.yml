@@ -49,7 +49,7 @@ extraResources:
 # GitHub Release 仍保留为构建归档与旧客户端过渡源，不是官方下载地址。
 publish:
   provider: generic
-  url: https://mls-long.yaomuai.com/mls/yaomustudio/
+  url: https://yaomustudio-obs.yaomuai.com/mls/yaomustudio/
   # 显式固定通道，避免 beta 版本被 generic provider 写成 beta.yml；
   # 客户端与 GitHub provider 都按 latest 通道读取。
   channel: latest

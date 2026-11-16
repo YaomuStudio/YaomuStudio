@@ -9,7 +9,7 @@ export type UpdateFeed =
   | { id: "international"; provider: "github"; owner: string; repo: string };
 
 /** 公开对象存储 feed；必须与 desktop/electron-builder.yml 的 publish.url 一致。 */
-export const DOMESTIC_UPDATE_FEED_URL = "https://mls-long.yaomuai.com/mls/yaomustudio/";
+export const DOMESTIC_UPDATE_FEED_URL = "https://yaomustudio-obs.yaomuai.com/mls/yaomustudio/";
 
 export const GITHUB_UPDATE_FEED = {
   owner: "YaomuStudio",
