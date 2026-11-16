@@ -234,7 +234,7 @@ const messages: AreaMessages = {
     "onboarding.ready.telemetrySwitch": "分享匿名功能计数",
     "onboarding.start": "开始使用",
     "onboarding.next": "继续",
-    "onboarding.back": "返回",
+    "onboarding.back": "上一步",
     "onboarding.skip": "暂时跳过",
     "onboarding.finish": "完成并进入工作台",
     "onboarding.finishHint": "缺失的模型可稍后在「设置 → 模型」中下载。",

@@ -26,6 +26,22 @@ test("shows local environment checks before model setup", async ({ page }) => {
   await expect(page.getByText("FFmpeg is available.")).toBeVisible();
 });
 
+test("supports going back to the previous setup step and restores focus", async ({ page }) => {
+  await page.goto("/");
+
+  // 第一步没有“上一步”，避免把用户带回不存在的步骤。
+  await expect(page.getByTestId("onboarding-back")).toHaveCount(0);
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  const back = page.getByTestId("onboarding-back");
+  await expect(back).toBeVisible();
+  await back.click();
+
+  await expect(page.getByRole("heading", { name: "Welcome to YaomuStudio" })).toBeVisible();
+  // 步骤切换后焦点进入新步骤区域，屏幕阅读器不会停在已消失的按钮上。
+  await expect(page.getByTestId("onboarding-step-panel")).toBeFocused();
+});
+
 test("keeps the environment list scrollable without a page-level scrollbar", async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 480 });
   await page.addInitScript(() => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import brandMark from "@/assets/brand/yaomu-mark.svg";
 import { formatBytes, t } from "@/i18n";
@@ -73,6 +73,7 @@ function loadStep(): StepKey {
 }
 
 const step = ref<StepKey>(loadStep());
+const panelRef = ref<HTMLElement | null>(null);
 const busy = ref<CapabilitySlotKey | null>(null);
 const planTarget = ref<InstallationPlan | null>(null);
 const bulkPlans = ref<InstallationPlan[]>([]);
@@ -121,14 +122,19 @@ const environmentLoading = ref(false);
 const environmentError = ref<SafeNotice | null>(null);
 const environmentErrorText = computed(() => renderNotice(environmentError.value));
 
-watch(step, (value) => {
+watch(step, async (value) => {
   localStorage.setItem(STEP_STORAGE_KEY, value);
   error.value = null;
   notice.value = null;
   if (value === "environment") void loadEnvironment();
+  // 步骤切换后把阅读位置和焦点交给新步骤，避免焦点留在已消失的按钮上。
+  await nextTick();
+  panelRef.value?.scrollTo({ top: 0 });
+  panelRef.value?.focus({ preventScroll: true });
 });
 
 const stepIndex = computed(() => STEPS.findIndex((s) => s.key === step.value));
+const currentStepLabel = computed(() => t(STEPS[stepIndex.value]?.labelKey ?? "onboarding.step.welcome"));
 const stepperSteps = computed(() =>
   STEPS.map((s) => ({ key: s.key, label: t(s.labelKey) })),
 );
@@ -488,7 +494,7 @@ onBeforeUnmount(() => {
           <p class="brand__tag">{{ t("app.tagline") }}</p>
         </div>
       </div>
-      <p class="step-count">
+      <p class="step-count" aria-live="polite" aria-atomic="true">
         {{ t("onboarding.stepProgress", { current: stepIndex + 1, total: STEPS.length }) }}
       </p>
       <div
@@ -534,8 +540,13 @@ onBeforeUnmount(() => {
       </div>
 
       <section
+        ref="panelRef"
         class="panel"
         :class="{ 'panel--scroll': step !== 'models' && step !== 'environment' }"
+        role="region"
+        tabindex="-1"
+        :aria-label="currentStepLabel"
+        data-testid="onboarding-step-panel"
       >
         <template v-if="step === 'welcome'">
           <div class="hero">
@@ -840,7 +851,8 @@ onBeforeUnmount(() => {
       <footer class="onboarding__actions">
         <YmButton
           v-if="stepIndex > 0"
-          variant="ghost"
+          data-testid="onboarding-back"
+          variant="secondary"
           icon="chevron-left"
           @click="back"
         >
@@ -995,6 +1007,10 @@ onBeforeUnmount(() => {
 /* 无长列表的步骤在面板内部兜底滚动，仍然不影响整页。 */
 .panel--scroll {
   overflow-y: auto;
+}
+.panel:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 .panel__title {
   font-size: var(--font-size-xl);
@@ -1317,7 +1333,9 @@ onBeforeUnmount(() => {
 .onboarding__actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
+  row-gap: var(--space-2);
   flex: none;
 }
 .spacer {
