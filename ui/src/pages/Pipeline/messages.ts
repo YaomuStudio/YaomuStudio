@@ -138,7 +138,7 @@ const messages: AreaMessages = {
 
     "pipeline.import.title": "Import media",
     "pipeline.import.dropTitle": "Drop video or audio here",
-    "pipeline.import.dropHint": "or click to choose files",
+    "pipeline.import.dropHint": "or click to choose files.",
     "pipeline.import.selectFiles": "Choose media files",
     "pipeline.import.selectFolder": "Choose folder",
     "pipeline.import.mediaFilter": "Media files",
@@ -487,7 +487,7 @@ const messages: AreaMessages = {
 
     "pipeline.import.title": "导入素材",
     "pipeline.import.dropTitle": "拖拽视频或音频到这里",
-    "pipeline.import.dropHint": "或点击选择文件",
+    "pipeline.import.dropHint": "或点击选择文件。",
     "pipeline.import.selectFiles": "选择媒体文件",
     "pipeline.import.selectFolder": "选择文件夹",
     "pipeline.import.mediaFilter": "媒体文件",

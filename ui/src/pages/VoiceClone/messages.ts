@@ -13,7 +13,7 @@ const messages: AreaMessages = {
 
     "voiceClone.source.label": "Clean vocal track",
     "voiceClone.source.upload": "Upload clean vocal track",
-    "voiceClone.source.dropHint": "Click to choose a vocal file without music or effects",
+    "voiceClone.source.dropHint": "Click to choose a vocal file without music or effects.",
     "voiceClone.source.hint": "MP3 / WAV / AAC / FLAC / M4A, up to 120 minutes. A lossless WAV dry vocal is recommended.",
     "voiceClone.source.err": "Upload a clean vocal track.",
     "voiceClone.source.warn": "Background music, ambience, reverb, or overlapping speakers interfere with voice cloning and may add noise or make the result sound unlike the speaker.",
@@ -90,7 +90,7 @@ const messages: AreaMessages = {
 
     "voiceClone.source.label": "纯净人声轨",
     "voiceClone.source.upload": "上传纯净人声轨",
-    "voiceClone.source.dropHint": "点击选择无背景音乐、无音效的人声文件",
+    "voiceClone.source.dropHint": "点击选择无背景音乐、无音效的人声文件。",
     "voiceClone.source.hint": "支持 MP3 / WAV / AAC / FLAC / M4A，时长 ≤120 分钟；建议使用 WAV 无损干声。",
     "voiceClone.source.err": "请上传纯净人声轨。",
     "voiceClone.source.warn": "背景音乐、环境音、混响或多人对白会干扰音色还原，可能导致杂音或不像本人。",
