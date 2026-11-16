@@ -20,7 +20,7 @@
     "check:i18n": "node scripts/check-i18n-keys.mjs",
     "test:i18n-guard": "node --test scripts/check-i18n-keys.test.mjs",
     "test:runner-manifest": "node --test scripts/generate-runner-manifest.test.mjs",
-    "test:release-workflow": "node --test scripts/check-release-tag.test.mjs scripts/collect-release-assets.test.mjs scripts/verify-release-assets.test.mjs scripts/release-workflow.test.mjs",
+    "test:release-workflow": "node --test scripts/check-release-tag.test.mjs scripts/check-app-update-yml.test.mjs scripts/collect-release-assets.test.mjs scripts/verify-release-assets.test.mjs scripts/publish-obs.test.mjs scripts/release-workflow.test.mjs",
     "test:readme": "node scripts/check-readme.mjs",
     "build": "npm run build:ui && npm run build -w desktop",
     "pack:dir": "node scripts/pack-dir.mjs",
@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
-    "@playwright/test": "^1.64.1"
+    "@playwright/test": "^1.64.1",
+    "esdk-obs-nodejs": "3.26.10"
   }
 }

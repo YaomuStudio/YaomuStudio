@@ -223,6 +223,18 @@ jobs:
         run: |
           node scripts/verify-release-assets.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform win,linux
 
+      # 先上传不可变安装包；清单在 GitHub 归档成功后才发布，作为 OBS 的原子切换点。
+      - name: Upload installers to OBS
+        env:
+          OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
+          OBS_BUCKET: ${{ vars.OBS_BUCKET }}
+          OBS_PREFIX: ${{ vars.OBS_PREFIX }}
+          OBS_FEED_BASE_URL: ${{ vars.OBS_FEED_BASE_URL }}
+          OBS_ACCESS_KEY_ID: ${{ secrets.OBS_ACCESS_KEY_ID }}
+          OBS_SECRET_ACCESS_KEY: ${{ secrets.OBS_SECRET_ACCESS_KEY }}
+        run: |
+          node scripts/publish-obs.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform win,linux --stage artifacts
+
       - name: Refuse to overwrite an existing release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -255,3 +267,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
         run: gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY"
+
+      # 清单最后发布：只有 GitHub 归档和 OBS 安装包都成功后，官网/自动更新才切到新版本。
+      - name: Publish update manifests to OBS
+        env:
+          OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
+          OBS_BUCKET: ${{ vars.OBS_BUCKET }}
+          OBS_PREFIX: ${{ vars.OBS_PREFIX }}
+          OBS_FEED_BASE_URL: ${{ vars.OBS_FEED_BASE_URL }}
+          OBS_ACCESS_KEY_ID: ${{ secrets.OBS_ACCESS_KEY_ID }}
+          OBS_SECRET_ACCESS_KEY: ${{ secrets.OBS_SECRET_ACCESS_KEY }}
+        run: |
+          node scripts/publish-obs.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform win,linux --stage manifests

@@ -55,6 +55,31 @@ test("publish waits for every build and has write permission", () => {
   assert.doesNotMatch(runs, /RELEASE_APPROVED/);
 });
 
+test("publish uploads immutable OBS artifacts first and flips update manifests last", () => {
+  const steps = workflow.jobs?.publish?.steps ?? [];
+  const runs = steps.map((step) => String(step.run ?? ""));
+  const artifactUpload = runs.findIndex(
+    (run) => run.includes("publish-obs.mjs") && run.includes("--stage artifacts"),
+  );
+  const releaseCreate = runs.findIndex((run) => run.includes("gh release create"));
+  const releaseUpload = runs.findIndex((run) => run.includes("gh release upload"));
+  const manifestUpload = runs.findIndex(
+    (run) => run.includes("publish-obs.mjs") && run.includes("--stage manifests"),
+  );
+  assert.ok(artifactUpload >= 0, "artifacts upload step missing");
+  assert.ok(manifestUpload >= 0, "manifests upload step missing");
+  assert.ok(artifactUpload < releaseCreate, "artifacts must be uploaded before GitHub release");
+  assert.ok(manifestUpload > releaseUpload, "manifests must be published after GitHub archive");
+  for (const index of [artifactUpload, manifestUpload]) {
+    const env = steps[index].env ?? {};
+    assert.equal(env.OBS_ENDPOINT, "${{ vars.OBS_ENDPOINT }}");
+    assert.equal(env.OBS_BUCKET, "${{ vars.OBS_BUCKET }}");
+    assert.equal(env.OBS_FEED_BASE_URL, "${{ vars.OBS_FEED_BASE_URL }}");
+    assert.equal(env.OBS_ACCESS_KEY_ID, "${{ secrets.OBS_ACCESS_KEY_ID }}");
+    assert.equal(env.OBS_SECRET_ACCESS_KEY, "${{ secrets.OBS_SECRET_ACCESS_KEY }}");
+  }
+});
+
 test("validate job checks tag against package versions", () => {
   const runs = jobSteps("validate").join("\n");
   assert.match(runs, /check-release-tag\.mjs/);
