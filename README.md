@@ -43,12 +43,12 @@ It is built for translating subtitles, dubbing in the original speaker's voice, 
 
 ## Download
 
-Installers are built by GitHub Actions on `v*` tags. Download them from [Releases](https://github.com/YaomuStudio/YaomuStudio/releases). The current builds are unsigned.
+Installers are built by GitHub Actions on `v*` tags. Download them from the [official site](https://yaomustudio.yaomuai.com/). The current builds are unsigned.
 
 | Platform | Installer | Notes |
 |---|---|---|
-| Windows x64 | `YaoMuStudio-0.1.0-beta.1-win-x64.exe` | NSIS. SmartScreen may warn. Model execution uses WSL2. |
-| Linux x64 | `YaoMuStudio-0.1.0-beta.1-linux-x64.AppImage` | Preview; requires a GPU driver. Model execution is best-effort. |
+| Windows x64 | `YaoMuStudio-0.1.0-beta.2-win-x64.exe` | NSIS. SmartScreen may warn. Model execution uses WSL2. |
+| Linux x64 | `YaoMuStudio-0.1.0-beta.2-linux-x64.AppImage` | Preview; requires a GPU driver. Model execution is best-effort. |
 | macOS | — | Release builds are temporarily excluded until macOS packaging is fixed and models are ready. |
 
 **Requirements:** model execution on Windows needs a working WSL2 environment. Linux is best-effort. macOS release builds are temporarily unavailable. Windows builds are unsigned; SmartScreen may warn.

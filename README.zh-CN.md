@@ -43,12 +43,12 @@
 
 ## 下载
 
-安装包由 GitHub Actions 在 `v*` tag 上构建，前往 [Releases](https://github.com/YaomuStudio/YaomuStudio/releases) 下载。当前版本未签名。
+安装包由 GitHub Actions 在 `v*` tag 上构建，前往[官网](https://yaomustudio.yaomuai.com/)下载。当前版本未签名。
 
 | 平台 | 安装包 | 说明 |
 |---|---|---|
-| Windows x64 | `YaoMuStudio-0.1.0-beta.1-win-x64.exe` | NSIS；SmartScreen 可能提示。模型执行走 WSL2。 |
-| Linux x64 | `YaoMuStudio-0.1.0-beta.1-linux-x64.AppImage` | preview；需要 GPU 驱动。模型执行 best-effort。 |
+| Windows x64 | `YaoMuStudio-0.1.0-beta.2-win-x64.exe` | NSIS；SmartScreen 可能提示。模型执行走 WSL2。 |
+| Linux x64 | `YaoMuStudio-0.1.0-beta.2-linux-x64.AppImage` | preview；需要 GPU 驱动。模型执行 best-effort。 |
 | macOS | — | 发布构建暂时排除；等 macOS 打包修复且模型就绪后再提供。 |
 
 **前置条件**：Windows 的模型执行需要可用的 WSL2 环境；Linux 为 best-effort；macOS 发布构建暂时排除，等修复打包并确认模型就绪后再提供。Windows 安装包未签名，SmartScreen 可能提示。
