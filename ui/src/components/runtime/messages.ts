@@ -38,7 +38,7 @@ const messages: AreaMessages = {
       "Your unsaved changes and the original version were kept. Nothing was saved or submitted automatically; saving again still compares against the original version.",
   },
   zhCN: {
-    "runtime.init.title": "正在启动曜幕",
+    "runtime.init.title": "正在启动 YaomuStudio",
     "runtime.init.body":
       "正在准备本地引擎环境。媒体与草稿只保留在本机，不会隐式下载或上传到云服务。",
     "runtime.init.status": "状态",

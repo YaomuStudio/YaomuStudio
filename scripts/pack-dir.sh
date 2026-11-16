@@ -34,9 +34,9 @@ npm run pack -w desktop
 # macOS 本地无发行证书时 electron-builder 不签名；ad-hoc 签名是 packaged smoke 的
 # 可运行前提。正式 Developer ID/公证仍在发布流水线完成，不把 ad-hoc 当发布签名。
 if [ "$(uname -s)" = "Darwin" ]; then
-  app="$root/desktop/dist-app/mac-arm64/YaoMu Studio.app"
+  app="$root/desktop/dist-app/mac-arm64/YaomuStudio.app"
   if [ ! -d "$app" ]; then
-    app=$(find "$root/desktop/dist-app" -maxdepth 2 -type d -name "YaoMu Studio.app" | head -n 1)
+    app=$(find "$root/desktop/dist-app" -maxdepth 2 -type d -name "YaomuStudio.app" | head -n 1)
   fi
   if [ -n "${app:-}" ] && [ -d "$app" ]; then
     echo "[pack:dir] ad-hoc sign for local packaged smoke"

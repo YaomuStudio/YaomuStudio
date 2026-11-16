@@ -2,7 +2,7 @@
 /**
  * 一键重拉开发态桌面客户端：停掉本仓 electron → 构建 desktop/ui → electron .
  * 不启 Vite；UI 改动需再跑本命令（或改用 VITE_DEV_SERVER_URL 热重载流程）。
- * 不碰打包态 YaoMu Studio.app。
+ * 不碰打包态 YaomuStudio.app。
  *
  * 用法：npm run relaunch
  */

@@ -2,7 +2,7 @@
 # （先 GitHub，公测版再补 CDN）。签名/公证由环境变量驱动（见 release.yml）。
 
 appId: com.aodianyun.yaomustudio
-productName: YaoMu Studio
+productName: YaomuStudio
 
 # electron-builder 无法从被 workspace 提升的 node_modules 推断版本，而 devDependency 是范围；
 # 显式钉住与 desktop/package.json 一致的 Electron 版本（升级 Electron 时同步此处）。

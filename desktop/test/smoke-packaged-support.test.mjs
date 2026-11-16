@@ -132,7 +132,7 @@ test("resolveResourcesDir requires sibling resources for explicit apps", async (
   try {
     const unpacked = path.join(root, "win-unpacked");
     await mkdir(path.join(unpacked, "resources", "core"), { recursive: true });
-    const executable = path.join(unpacked, "YaoMu Studio.exe");
+    const executable = path.join(unpacked, "YaomuStudio.exe");
     await writeFile(executable, "fake");
     assert.equal(
       resolveResourcesDir(executable, "win32"),
@@ -152,12 +152,12 @@ test("resolveResourcesDir requires sibling resources for explicit apps", async (
 test("resolveResourcesDir understands macOS app bundles", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "yaomu-resources-mac-"));
   try {
-    const appDir = path.join(root, "YaoMu Studio.app");
+    const appDir = path.join(root, "YaomuStudio.app");
     const resources = path.join(appDir, "Contents", "Resources");
     const macos = path.join(appDir, "Contents", "MacOS");
     await mkdir(resources, { recursive: true });
     await mkdir(macos, { recursive: true });
-    const executable = path.join(macos, "YaoMu Studio");
+    const executable = path.join(macos, "YaomuStudio");
     await writeFile(executable, "fake");
     assert.equal(resolveResourcesDir(executable, "darwin"), resources);
     assert.equal(resolveResourcesDir(appDir, "darwin"), resources);

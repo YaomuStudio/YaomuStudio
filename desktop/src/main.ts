@@ -136,7 +136,7 @@ function coreDataDir(): string {
 }
 
 /** 与 electron-builder.yml `productName` / 打包 Info.plist 对齐。 */
-const PRODUCT_NAME = "YaoMu Studio";
+const PRODUCT_NAME = "YaomuStudio";
 /** 与 electron-builder.yml `appId` 对齐（Windows 任务栏分组）。 */
 const APP_USER_MODEL_ID = "com.aodianyun.yaomustudio";
 /**

@@ -62,7 +62,7 @@ export function createTray(options: CreateTrayOptions): boolean {
   try {
     instance = new Tray(trayImage());
     const labels = trayMenuLabels(options.locale);
-    instance.setToolTip("YaoMu Studio");
+    instance.setToolTip("YaomuStudio");
     instance.setContextMenu(
       Menu.buildFromTemplate([
         { label: labels.show, click: () => options.onShow() },

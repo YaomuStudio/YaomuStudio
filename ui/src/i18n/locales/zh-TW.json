@@ -875,7 +875,7 @@
   "runtime.init.theme.dark": "深色",
   "runtime.init.theme.light": "淺色",
   "runtime.init.theme.system": "跟隨系統",
-  "runtime.init.title": "正在啟動曜幕",
+  "runtime.init.title": "正在啟動 YaomuStudio",
   "runtime.phase.failed": "啟動失敗",
   "runtime.phase.preparing": "正在準備本地環境",
   "runtime.phase.ready": "本地服務已就緒",
