@@ -1,6 +1,6 @@
 {
   "name": "@yaomustudio/ui",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "private": true,
   "description": "曜幕产品 UI：Vue 3 + TypeScript renderer（三栏工作区、编辑器/候选、能力状态、i18n）",
   "type": "module",
