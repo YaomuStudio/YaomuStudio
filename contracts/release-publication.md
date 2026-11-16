@@ -59,7 +59,7 @@ latest-linux.yml
 
 ## Verification before publication
 
-The publish job downloads all build artifacts into one directory and runs `scripts/verify-release-assets.mjs`. While macOS is excluded it runs `--platform win` and `--platform linux`; when macOS is re-enabled, add `--platform mac` (or `--platform all`).
+The publish job downloads all build artifacts into one directory and runs `scripts/verify-release-assets.mjs`. While macOS is excluded it runs once with `--platform win,linux`, which validates the merged directory against the union of both platforms' expected assets; when macOS is re-enabled, use `--platform win,mac,linux` (or `--platform all`).
 
 1. Reject unknown or non-regular files.
 2. Require every expected asset.

@@ -221,8 +221,7 @@ jobs:
 
       - name: Verify release assets and update manifests
         run: |
-          node scripts/verify-release-assets.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform win
-          node scripts/verify-release-assets.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform linux
+          node scripts/verify-release-assets.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform win,linux
 
       - name: Refuse to overwrite an existing release
         env:

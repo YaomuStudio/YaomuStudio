@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 发布资产校验：资产集、更新清单引用、SHA-512/大小、macOS 双架构、未知文件拒绝。
- * 用法：node scripts/verify-release-assets.mjs --dir <assets> --version 0.1.0 [--platform all|win|mac|linux]
+ * 用法：node scripts/verify-release-assets.mjs --dir <assets> --version 0.1.0 [--platform all|win|mac|linux|win,linux]
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -28,25 +28,33 @@ function parseArgs(argv) {
       options[arg.slice(2)] = value;
       i += 1;
     } else if (arg === "--help" || arg === "-h") {
-      console.log("usage: node scripts/verify-release-assets.mjs --dir <assets> --version 0.1.0 [--platform all|win|mac|linux]");
+      console.log("usage: node scripts/verify-release-assets.mjs --dir <assets> --version 0.1.0 [--platform all|win|mac|linux|win,linux]");
       process.exit(0);
     } else {
       throw new ReleaseAssetError("argument-invalid", arg);
     }
   }
   if (!options.dir || !options.version) throw new ReleaseAssetError("argument-missing", "dir/version");
-  if (!["all", "win", "mac", "linux"].includes(options.platform)) {
-    throw new ReleaseAssetError("platform-invalid", options.platform);
-  }
+  parsePlatforms(options.platform);
   return options;
 }
 
-function expectedFor(platform, version) {
-  if (platform !== "all") return expectedAssets(platform, version);
+const PLATFORMS = ["win", "mac", "linux"];
+
+function parsePlatforms(value) {
+  if (value === "all") return [...PLATFORMS];
+  const parts = String(value).split(",").map((part) => part.trim());
+  if (parts.length === 0 || parts.some((part) => !PLATFORMS.includes(part))) {
+    throw new ReleaseAssetError("platform-invalid", value);
+  }
+  return [...new Set(parts)];
+}
+
+function expectedFor(platforms, version) {
   const required = new Set();
   const optional = new Set();
-  for (const item of ["win", "mac", "linux"]) {
-    const set = expectedAssets(item, version);
+  for (const platform of platforms) {
+    const set = expectedAssets(platform, version);
     for (const name of set.required) required.add(name);
     for (const name of set.optional) optional.add(name);
   }
@@ -127,6 +135,7 @@ async function verifyManifest(dir, name, version, requireBothMacArch = false) {
 }
 
 export async function verifyReleaseAssets({ dir, version, platform = "all" }) {
+  const platforms = parsePlatforms(platform);
   const root = path.resolve(dir);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
     throw new ReleaseAssetError("assets-dir-missing", root);
@@ -134,7 +143,7 @@ export async function verifyReleaseAssets({ dir, version, platform = "all" }) {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-beta\.(0|[1-9]\d*))?$/.test(version)) {
     throw new ReleaseAssetError("version-invalid", version);
   }
-  const { required, optional } = expectedFor(platform, version);
+  const { required, optional } = expectedFor(platforms, version);
   const allowed = new Set([...required, ...optional]);
   const entries = fs.readdirSync(root, { withFileTypes: true });
   for (const entry of entries) {
@@ -145,15 +154,15 @@ export async function verifyReleaseAssets({ dir, version, platform = "all" }) {
     if (!fs.existsSync(path.join(root, name))) throw new ReleaseAssetError("asset-missing", name);
   }
 
-  if (platform === "all" || platform === "win") {
+  if (platforms.includes("win")) {
     const urls = await verifyManifest(root, "latest.yml", version);
     const installer = `YaoMuStudio-${version}-win-x64.exe`;
     if (!urls.has(installer)) throw new ReleaseAssetError("manifest-win-installer-missing", installer);
   }
-  if (platform === "all" || platform === "mac") {
+  if (platforms.includes("mac")) {
     await verifyManifest(root, "latest-mac.yml", version, true);
   }
-  if (platform === "all" || platform === "linux") {
+  if (platforms.includes("linux")) {
     const urls = await verifyManifest(root, "latest-linux.yml", version);
     const appimage = `YaoMuStudio-${version}-linux-x64.AppImage`;
     if (!urls.has(appimage)) throw new ReleaseAssetError("manifest-linux-appimage-missing", appimage);

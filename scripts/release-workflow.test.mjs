@@ -46,8 +46,8 @@ test("publish waits for every build and has write permission", () => {
   assert.equal(publish?.permissions?.contents, "write");
   const runs = jobSteps("publish").join("\n");
   assert.match(runs, /verify-release-assets\.mjs/);
-  assert.match(runs, /--platform win/);
-  assert.match(runs, /--platform linux/);
+  assert.match(runs, /--platform win,linux/);
+  assert.equal(runs.match(/verify-release-assets\.mjs/g)?.length, 1);
   assert.match(runs, /gh release create/);
   assert.match(runs, /--verify-tag/);
   assert.doesNotMatch(runs, /--clobber/);

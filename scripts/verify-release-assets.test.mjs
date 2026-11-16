@@ -39,6 +39,12 @@ function windowsSet() {
   return dir;
 }
 
+function addLinuxSet(dir) {
+  const appimage = writeAsset(dir, "YaoMuStudio-0.1.0-linux-x64.AppImage", "linux-appimage");
+  writeAsset(dir, "YaoMuStudio-0.1.0-linux-x64.AppImage.blockmap", "linux-blockmap");
+  writeManifest(dir, "latest-linux.yml", [appimage]);
+}
+
 test("accepts a valid Windows asset set", async () => {
   const dir = windowsSet();
   try {
@@ -111,6 +117,43 @@ test("rejects manifest URLs that escape the asset directory", async () => {
     await assert.rejects(
       verifyReleaseAssets({ dir, version: "0.1.0", platform: "win" }),
       (error) => error instanceof ReleaseAssetError && error.code === "manifest-url-invalid",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("accepts merged Windows and Linux assets when both platforms are declared", async () => {
+  const dir = windowsSet();
+  try {
+    addLinuxSet(dir);
+    const result = await verifyReleaseAssets({ dir, version: "0.1.0", platform: "win,linux" });
+    assert.equal(result.ok, true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("rejects assets from a platform not included in the merged verification set", async () => {
+  const dir = windowsSet();
+  try {
+    addLinuxSet(dir);
+    writeFileSync(path.join(dir, "YaoMuStudio-0.1.0-mac-x64.dmg"), "mac");
+    await assert.rejects(
+      verifyReleaseAssets({ dir, version: "0.1.0", platform: "win,linux" }),
+      (error) => error instanceof ReleaseAssetError && error.code === "asset-unexpected",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("rejects invalid platform lists", async () => {
+  const dir = windowsSet();
+  try {
+    await assert.rejects(
+      verifyReleaseAssets({ dir, version: "0.1.0", platform: "win,android" }),
+      (error) => error instanceof ReleaseAssetError && error.code === "platform-invalid",
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
