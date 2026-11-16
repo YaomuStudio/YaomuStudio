@@ -93,7 +93,13 @@ for (const [rel, text] of Object.entries(texts)) {
   }
 }
 
-for (const rel of ["assets/readme/logo.svg", "assets/readme/workbench-light.png", "assets/readme/workbench-dark.png"]) {
+for (const rel of [
+  "assets/readme/logo.svg",
+  "assets/readme/workbench-light.png",
+  "assets/readme/workbench-dark.png",
+  "assets/readme/workbench-zh-light.png",
+  "assets/readme/workbench-zh-dark.png",
+]) {
   if (!fs.existsSync(path.join(root, rel))) failures.push(`missing asset ${rel}`);
 }
 

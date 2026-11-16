@@ -21,8 +21,8 @@
 它适合需要翻译字幕、保留原说话人音色做配音、擦除画面内嵌字幕，或在受限网络环境中继续处理已准备项目的场景。
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/workbench-dark.png">
-  <img src="assets/readme/workbench-light.png" alt="YaomuStudio 工作台">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/workbench-zh-dark.png">
+  <img src="assets/readme/workbench-zh-light.png" alt="YaomuStudio 工作台">
 </picture>
 
 <p align="center"><sub>工作台 · 演示数据</sub></p>
