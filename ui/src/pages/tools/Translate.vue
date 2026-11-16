@@ -605,7 +605,12 @@ async function restoreLastRun(): Promise<void> {
           <p v-else class="run-status">{{ runPhaseLabel }}</p>
         </YmCard>
 
-        <ExecutionLogPanel :task-id="translateTask?.id" :active="runBusy" :task-status="translateTask?.status" />
+        <ExecutionLogPanel
+          :task-id="translateTask?.id"
+          :active="runBusy"
+          :task-status="translateTask?.status"
+          :waiting-message-key="translateTask?.error?.messageKey"
+        />
 
         <YmCard v-if="resultTracks.length">
           <template #header>

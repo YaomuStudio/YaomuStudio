@@ -13,7 +13,7 @@ import {
   projectStatusBucket,
   type ProjectStatusBucket,
 } from "@/domain/projects";
-import { type Tone } from "@/domain/status";
+import { runnerWaitingMessageKey, type Tone } from "@/domain/status";
 import { ASR_LANGUAGES, TARGET_LANGUAGES, UI_LANGUAGES } from "@/domain/languages";
 import { evaluateAccess } from "@/domain/capabilityAccess";
 import type {
@@ -467,7 +467,7 @@ function assetStatusTone(status: AssetStatus): Tone {
         tone="warning"
         :title="t('state.waitingResource')"
       >
-        {{ t("task.runner_unavailable") }}
+        {{ t(runnerWaitingMessageKey(waitingTask?.error?.messageKey)) }}
         <template #actions>
           <YmButton size="sm" variant="secondary" icon="gear" @click="openModels">
             {{ t("access.viewModels") }}

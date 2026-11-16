@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { api } from "@/api";
 import { t } from "@/i18n";
 import type { ExecutionLogLine, TaskStatus } from "@/domain/types";
+import { runnerWaitingMessageKey } from "@/domain/status";
 import { useExecutionLogsStore } from "@/stores/executionLogs";
 import YmBadge from "@/components/ui/YmBadge.vue";
 import YmCard from "@/components/ui/YmCard.vue";
@@ -14,8 +15,10 @@ const props = withDefaults(
     active?: boolean;
     /** 当前节点任务状态：等待执行器时不能谎称“实时”。 */
     taskStatus?: TaskStatus;
+    /** 等待执行器时的任务 messageKey，用来区分未配置、启动中和已隔离。 */
+    waitingMessageKey?: string;
   }>(),
-  { taskId: "", active: false, taskStatus: undefined },
+  { taskId: "", active: false, taskStatus: undefined, waitingMessageKey: undefined },
 );
 
 const logs = useExecutionLogsStore();
@@ -91,7 +94,7 @@ watch(
           loading
             ? t("tools.executionLog.loading")
             : waitingForRunner
-              ? t("task.runner_unavailable")
+              ? t(runnerWaitingMessageKey(props.waitingMessageKey))
               : t("tools.executionLog.empty")
         }}
       </p>

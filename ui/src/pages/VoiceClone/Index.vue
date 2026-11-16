@@ -751,7 +751,12 @@ onMounted(() => {
           <RunOptionsSummary :params="currentRun?.params" />
         </YmCard>
 
-        <ExecutionLogPanel :task-id="cloneTask?.id" :active="runBusy" :task-status="cloneTask?.status" />
+        <ExecutionLogPanel
+          :task-id="cloneTask?.id"
+          :active="runBusy"
+          :task-status="cloneTask?.status"
+          :waiting-message-key="cloneTask?.error?.messageKey"
+        />
 
         <YmCard v-for="group in resultGroups" :key="group.language">
           <template #header>

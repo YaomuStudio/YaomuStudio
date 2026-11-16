@@ -116,6 +116,18 @@ export const runStatusTone = (s: RunStatus): Tone => RUN_TONE[s];
 export const nodeStatusLabelKey = (s: NodeStatus): string => NODE_LABEL[s];
 export const nodeStatusTone = (s: NodeStatus): Tone => NODE_TONE[s];
 
+const RUNNER_WAITING_KEYS = new Set([
+  "task.runner_starting",
+  "task.runner_unavailable",
+  "task.runner_isolated",
+]);
+
+/** 等待执行器时显示任务自己的原因；未知原因才回退到未配置。 */
+export function runnerWaitingMessageKey(messageKey: string | undefined): string {
+  if (messageKey && RUNNER_WAITING_KEYS.has(messageKey)) return messageKey;
+  return "task.runner_unavailable";
+}
+
 /** 项目卡片只展示四个业务状态：待制作、制作中、已完成、制作失败。 */
 const PROJECT_STATUS_LABEL: Record<RunStatus, string> = {
   DRAFT: "state.queued",
