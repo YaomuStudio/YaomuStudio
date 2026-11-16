@@ -508,6 +508,7 @@ async function restoreLastRun(): Promise<void> {
               <YmDropzone
                 v-else
                 :title="t('tools.translate.source.upload')"
+                :hint="t('tools.translate.source.hint')"
                 accept=".srt"
                 @files="onSourceSubtitle($event[0])"
               />
@@ -517,7 +518,7 @@ async function restoreLastRun(): Promise<void> {
         </YmPanel>
 
         <CreationNotice
-          :items="[t('tools.translate.source.hint'), t('tools.translate.outputHint')]"
+          :items="[t('tools.translate.outputHint')]"
         />
 
         <YmPanel :title="t('tools.translate.step.languages')">
