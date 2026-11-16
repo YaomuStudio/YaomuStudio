@@ -1,5 +1,5 @@
-# electron-builder 配置。自动更新走 electron-updater + GitHub Releases
-# （先 GitHub，公测版再补 CDN）。签名/公证由环境变量驱动（见 release.yml）。
+# electron-builder 配置。自动更新走 electron-updater：默认对象存储 feed，
+# 运行时按区域切换到 GitHub。签名/公证由环境变量驱动（见 release.yml）。
 
 appId: com.aodianyun.yaomustudio
 productName: YaomuStudio
@@ -44,7 +44,7 @@ extraResources:
   - from: build/core-${arch}
     to: core
 
-# 发布源：华为云 OBS 的固定 feed 基地址（官网唯一下载源）。
+# 发布源：对象存储（OBS）的固定 feed 基地址（官网唯一下载源）。
 # 必须与 CI 变量 OBS_FEED_BASE_URL 一致。
 # GitHub Release 仍保留为构建归档与旧客户端过渡源，不是官方下载地址。
 publish:

@@ -9,7 +9,7 @@ import { PublishObsError, publishToObs } from "./publish-obs.mjs";
 
 const VERSION = "0.1.0-beta.1";
 const ENV = {
-  OBS_ENDPOINT: "https://obs.cn-north-4.myhuaweicloud.com",
+  OBS_ENDPOINT: "https://obs.example.com",
   OBS_BUCKET: "test-bucket",
   OBS_FEED_BASE_URL: "https://dl.example.com/",
 };

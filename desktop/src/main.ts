@@ -41,6 +41,7 @@ import {
   UpdateInstallController,
   createUpdatePreparationClient,
 } from "./update-install";
+import { selectUpdateFeeds, type UpdateFeed } from "./update-feed";
 import { UpdateScheduler, type UpdateCheckSource } from "./update-scheduler";
 import { selectUpdateReplay } from "./update-state";
 import {
@@ -96,6 +97,10 @@ let updateScheduler: UpdateScheduler | null = null;
 let updateAvailableVersion: string | null = null;
 let updateDownloadInFlight = false;
 let updateDownloadSource: "auto" | "manual" | null = null;
+let updateFeeds: ReturnType<typeof selectUpdateFeeds> | null = null;
+let activeUpdateFeed: UpdateFeed | null = null;
+let updateFeedFallbackUsed = false;
+let updateFeedFallbackArmed = false;
 // 手动检查失败时保留错误状态，不用状态重放把它覆盖成 idle。
 let manualCheckFailed = false;
 // 初始化闸门：WSL/工具探测与 Core 启动前的准备只运行一次；退出时先取消再等待收敛。
@@ -697,6 +702,51 @@ function sendCurrentUpdateState(): void {
   sendUpdate(event.channel, event.payload);
 }
 
+/** 按区域选择首选更新通道；构建产物默认指向对象存储，运行时可按平台覆盖。 */
+function applyUpdateFeed(feed: UpdateFeed): void {
+  activeUpdateFeed = feed;
+  if (feed.provider === "generic") {
+    autoUpdater.setFeedURL({ provider: "generic", url: feed.url });
+  } else {
+    autoUpdater.setFeedURL({ provider: "github", owner: feed.owner, repo: feed.repo });
+  }
+}
+
+function initializeUpdateFeed(): void {
+  if (updateFeeds) return;
+  updateFeeds = selectUpdateFeeds(
+    app.getLocale(),
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
+  applyUpdateFeed(updateFeeds.primary);
+  log(`更新通道：${updateFeeds.primary.id}（备用 ${updateFeeds.fallback.id}）`);
+}
+
+/**
+ * 首选通道检查失败时切换到备用通道一次；同一会话内成功切换后保持备用源。
+ * `updateFeedFallbackArmed` 让 error 事件先不向 Renderer 暴露，避免首源失败瞬间闪错。
+ */
+async function checkForUpdatesWithFeedFallback(): Promise<
+  Awaited<ReturnType<typeof autoUpdater.checkForUpdates>>
+> {
+  if (!updateFeeds) initializeUpdateFeed();
+  const feeds = updateFeeds;
+  if (!feeds) throw new Error("update feeds unavailable");
+  updateFeedFallbackArmed = !updateFeedFallbackUsed;
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    updateFeedFallbackArmed = false;
+    return result;
+  } catch (error) {
+    updateFeedFallbackArmed = false;
+    if (updateFeedFallbackUsed) throw error;
+    updateFeedFallbackUsed = true;
+    log(`更新通道切换：${activeUpdateFeed?.id ?? "unknown"} -> ${feeds.fallback.id}`);
+    applyUpdateFeed(feeds.fallback);
+    return autoUpdater.checkForUpdates();
+  }
+}
+
 /**
  * 自动检查更新调度：仅在打包态创建；开关关闭时不发起任何检查。
  * 手动 `update:check` 由白名单 IPC 独立触发，不受该开关限制。
@@ -718,7 +768,7 @@ function startUpdateScheduler(): void {
       );
     },
     check: async () => {
-      const result = await autoUpdater.checkForUpdates();
+      const result = await checkForUpdatesWithFeedFallback();
       // 自动下载时 checkForUpdates 返回的 downloadPromise 也必须挂 catch，
       // 否则下载失败会成为未处理拒绝；UI 侧仍由 error 事件收敛。
       void result?.downloadPromise?.catch(() => undefined);
@@ -790,6 +840,7 @@ function registerDevUpdateIpc(): void {
 }
 
 function setupAutoUpdater(): void {
+  initializeUpdateFeed();
   // 自动下载跟随用户设置；安装始终需要显式确认（FR-MODEL-04）。
   autoUpdater.autoDownload = autoDownloadUpdates;
   // 普通退出绝不隐式安装：安装只能经排空守卫显式调用 quitAndInstall。
@@ -823,6 +874,11 @@ function setupAutoUpdater(): void {
     sendUpdate("update:downloaded", info);
   });
   autoUpdater.on("error", (err) => {
+    if (updateFeedFallbackArmed) {
+      updateFeedFallbackArmed = false;
+      log(`更新源检查失败，准备切换：${err.message}`);
+      return;
+    }
     log(`更新器错误：${err.message}`);
     // 6.x BaseUpdater 安装失败走 dispatchError 而非 throw；守卫把 installing 收敛为
     // 有限 install_failed（Core 已停止，绝不自动重装）。

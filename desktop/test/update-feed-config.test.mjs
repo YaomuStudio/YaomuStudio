@@ -4,16 +4,55 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
+import {
+  DOMESTIC_UPDATE_FEED_URL,
+  selectUpdateFeeds,
+} from "../dist/update-feed.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.join(here, "..", "electron-builder.yml");
 const config = yaml.load(fs.readFileSync(configPath, "utf8"));
 
-test("electron-builder publishes to the public YaomuStudio repository", () => {
-  assert.equal(config.publish?.provider, "github");
-  assert.equal(config.publish?.owner, "YaomuStudio");
-  assert.equal(config.publish?.repo, "YaomuStudio");
-  assert.equal(config.publish?.releaseType, "release");
+test("electron-builder publishes to the domestic object-storage feed", () => {
+  assert.equal(config.publish?.provider, "generic");
+  assert.equal(config.publish?.url, DOMESTIC_UPDATE_FEED_URL);
+});
+
+test("Simplified Chinese locale prefers the domestic feed with GitHub fallback", () => {
+  const { primary, fallback } = selectUpdateFeeds("zh-CN", "Asia/Shanghai");
+  assert.equal(primary.id, "domestic");
+  assert.equal(primary.provider, "generic");
+  assert.equal(primary.url, DOMESTIC_UPDATE_FEED_URL);
+  assert.equal(fallback.id, "international");
+  assert.equal(fallback.provider, "github");
+  assert.equal(fallback.owner, "YaomuStudio");
+  assert.equal(fallback.repo, "YaomuStudio");
+});
+
+test("international locale prefers GitHub with domestic fallback", () => {
+  const { primary, fallback } = selectUpdateFeeds("en-US", "America/New_York");
+  assert.equal(primary.id, "international");
+  assert.equal(primary.provider, "github");
+  assert.equal(fallback.id, "domestic");
+  assert.equal(fallback.provider, "generic");
+});
+
+test("China timezone selects the domestic feed even with an English locale", () => {
+  const { primary } = selectUpdateFeeds("en-US", "Asia/Shanghai");
+  assert.equal(primary.id, "domestic");
+});
+
+test("Traditional Chinese outside the mainland selects the international feed", () => {
+  const { primary } = selectUpdateFeeds("zh-TW", "Asia/Taipei");
+  assert.equal(primary.id, "international");
+});
+
+test("main wires locale feed selection and one-shot fallback", () => {
+  const main = fs.readFileSync(new URL("../dist/main.js", import.meta.url), "utf8");
+  assert.match(main, /selectUpdateFeeds/);
+  assert.match(main, /checkForUpdatesWithFeedFallback/);
+  assert.match(main, /updateFeedFallbackArmed/);
+  assert.match(main, /setFeedURL/);
 });
 
 test("publish block contains no embedded credentials", () => {

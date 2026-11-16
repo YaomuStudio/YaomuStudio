@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 将已校验的发布资产上传到华为云 OBS。
+ * 将已校验的发布资产上传到对象存储（OBS）。
  *
  * 布局：固定 feed 基地址 + 带版本号的文件名；latest*.yml 与 latest.json 最后发布。
  * CI 用法：
@@ -8,7 +8,7 @@
  *   node scripts/publish-obs.mjs --dir release-assets --version 0.1.0-beta.1 --stage manifests
  *
  * 环境变量：
- *   OBS_ENDPOINT          https://obs.<region>.myhuaweicloud.com
+ *   OBS_ENDPOINT          https://<object-storage-endpoint>
  *   OBS_BUCKET            bucket 名称
  *   OBS_ACCESS_KEY_ID     IAM AK
  *   OBS_SECRET_ACCESS_KEY IAM SK

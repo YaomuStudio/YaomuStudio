@@ -223,8 +223,8 @@ jobs:
         run: |
           node scripts/verify-release-assets.mjs --dir release-assets --version ${{ needs.validate.outputs.version }} --platform win,linux
 
-      # 先上传不可变安装包；清单在 GitHub 归档成功后才发布，作为 OBS 的原子切换点。
-      - name: Upload installers to OBS
+      # 先上传不可变安装包；清单在 GitHub 归档成功后才发布，作为对象存储的原子切换点。
+      - name: Upload installers to object storage
         env:
           OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
           OBS_BUCKET: ${{ vars.OBS_BUCKET }}
@@ -268,8 +268,8 @@ jobs:
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
         run: gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY"
 
-      # 清单最后发布：只有 GitHub 归档和 OBS 安装包都成功后，官网/自动更新才切到新版本。
-      - name: Publish update manifests to OBS
+      # 清单最后发布：只有 GitHub 归档和对象存储安装包都成功后，官网/自动更新才切到新版本。
+      - name: Publish update manifests to object storage
         env:
           OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
           OBS_BUCKET: ${{ vars.OBS_BUCKET }}

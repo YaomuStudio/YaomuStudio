@@ -274,7 +274,7 @@ test("main disables implicit install and routes install through the guarded brid
   assert.match(main, /getAcceptedIdentity\(\)/);
   assert.match(main, /noteDownloadedVersion\(downloadedVersion\)/);
   // BaseUpdater 6.x 安装失败走 error 事件而非 throw：必须收敛为 install_failed。
-  assert.match(main, /autoUpdater\.on\("error"[\s\S]{0,400}noteInstallerError/);
+  assert.match(main, /autoUpdater\.on\("error"[\s\S]{0,800}noteInstallerError/);
   // 不存在生产环境变量绕过守卫或注入 fake updater。
   assert.doesNotMatch(main, /YAOMU_[A-Z_]*UPDATE/);
   assert.doesNotMatch(main, /fakeUpdater|FakeUpdater/);
