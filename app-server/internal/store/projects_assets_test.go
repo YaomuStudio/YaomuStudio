@@ -71,6 +71,9 @@ func TestProjectCRUDAndSummary(t *testing.T) {
 			if summary.LatestRunStatus != domain.RunStatusDraft {
 				t.Errorf("latest run status = %s, want DRAFT", summary.LatestRunStatus)
 			}
+			if summary.TotalDurationMs != 3000 {
+				t.Errorf("summary total duration = %d, want 3000", summary.TotalDurationMs)
+			}
 		}
 	}
 	if !found {

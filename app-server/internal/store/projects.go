@@ -114,6 +114,8 @@ func (q *querier) ListProjectSummaries(ctx context.Context, workspaceID domain.I
 				ORDER BY r.created_at DESC, r.id DESC LIMIT 1),
 			(SELECT r.mode_type FROM workflow_runs r WHERE r.project_id = p.id
 				ORDER BY r.created_at DESC, r.id DESC LIMIT 1),
+			(SELECT COALESCE(SUM(json_extract(a.meta_json, '$.duration_ms')), 0)
+				FROM assets a WHERE a.project_id = p.id),
 			(SELECT EXISTS(
 				SELECT 1 FROM tasks t WHERE t.status = 'WAITING_RESOURCE' AND t.run_id = (
 					SELECT r.id FROM workflow_runs r WHERE r.project_id = p.id
@@ -140,7 +142,7 @@ func (q *querier) ListProjectSummaries(ctx context.Context, workspaceID domain.I
 			modeType sql.NullString
 		)
 		if err := rows.Scan(&s.Seq, &s.ID, &s.Name, &s.EditVersion, &episode, &created, &updated, &lastOpen,
-			&s.AssetCount, &s.RunCount, &latest, &modeType, &s.WaitingResource); err != nil {
+			&s.AssetCount, &s.RunCount, &latest, &modeType, &s.TotalDurationMs, &s.WaitingResource); err != nil {
 			return nil, fmt.Errorf("scan project summary: %w", err)
 		}
 		if episode.Valid {
