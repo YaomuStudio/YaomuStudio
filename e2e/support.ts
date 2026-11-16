@@ -269,11 +269,13 @@ export const SAMPLE_SRT = {
   buffer: Buffer.from("1\n00:00:00,000 --> 00:00:01,000\nHello\n\n2\n00:00:01,200 --> 00:00:02,000\nWorld\n"),
 };
 
-/** 文件名带目标语言码的译文字幕：验证克隆页按文件名识别语言（zh-CN 须作为独立 token）。 */
+/** 中文译文字幕：语言按内容识别为 zh-CN，不依赖文件名。 */
 export const SAMPLE_TRANSLATED_SRT = {
   name: "e2e-sample.zh-CN.srt",
   mimeType: "application/x-subrip",
-  buffer: SAMPLE_SRT.buffer,
+  buffer: Buffer.from(
+    "1\n00:00:00,000 --> 00:00:02,000\n这是第一行译文。\n",
+  ),
 };
 
 /** 通过 Pipeline 的隐藏 file input 上传，并等待资产与导入提示出现。 */

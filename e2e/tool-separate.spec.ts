@@ -64,10 +64,10 @@ test("separates a source into two tracks and saves one", async ({ page }) => {
   const notice = page.locator(".creation-notice");
   await expect(notice).toBeVisible();
   await expect(notice).toContainText(
-    "Avoid audio with heavily mixed vocals and background music; separation quality may suffer.",
+    "Use the original mix containing vocals and background music or ambience. Already-separated stems do not need this tool.",
   );
   await expect(notice).toContainText(
-    "For best results, use source files with clear vocals and a clean background.",
+    "Clear, prominent vocals separate better; overlapping speakers or strong noise can reduce quality.",
   );
 
   await createRun(page);

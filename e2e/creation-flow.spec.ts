@@ -12,6 +12,12 @@ test("creation page offers project navigation and continuous creation", async ({
   await expect(page.getByRole("button", { name: "Create another" })).toBeVisible({
     timeout: 20_000,
   });
+  // 创建后保持当前页面：右侧进度/结果面板不能一闪而过或自动跳转。
+  await expect(page).toHaveURL(/#\/tools\/separate$/);
+  await expect(page.locator(".results-stack")).toBeVisible();
+  await expect(
+    page.locator(".results-stack").getByText("E2E continuous create").first(),
+  ).toBeVisible();
   // 运行中只用次级「查看详情」离开；完成后主按钮才是「查看详情」，不出现两个同名按钮。
   await expect(page.getByRole("button", { name: "View details" })).toHaveCount(1);
 

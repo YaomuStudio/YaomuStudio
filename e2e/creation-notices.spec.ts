@@ -56,7 +56,7 @@ test("creation notices share one visual treatment and contain no billing copy", 
   await expect(page.getByRole("heading", { level: 1, name: "Subtitle erase" })).toBeVisible();
   await expectNotice(page);
   await expect(page.locator(".creation-notice")).toContainText(
-    "Large subtitle areas can reduce repair quality.",
+    "Larger subtitle areas and complex backgrounds make repair harder; check the subtitle region before creating.",
   );
   styles.push(await noticeStyle(page));
 
@@ -95,21 +95,21 @@ test("extract always shows output guidance and the audio note only for audio sou
   // 输出说明常显；音频误用提示只在音频源时追加。
   const notice = page.locator(".creation-notice");
   await expect(notice).toHaveCount(1);
-  await expect(notice).toContainText("Outputs an SRT with timestamps.");
-  await expect(notice).not.toContainText("Audio sources support ASR extraction only.");
+  await expect(notice).toContainText("Outputs a timestamped SRT ready for translation or review.");
+  await expect(notice).not.toContainText("Audio sources support ASR only; use a video for on-screen hard subtitles.");
 
   await page.locator('input[type="file"]').setInputFiles(SAMPLE_MEDIA);
   await expect(page.getByText(SAMPLE_MEDIA.name)).toBeVisible();
   await expect(notice).toHaveCount(1);
-  await expect(notice).not.toContainText("Audio sources support ASR extraction only.");
+  await expect(notice).not.toContainText("Audio sources support ASR only; use a video for on-screen hard subtitles.");
 
   await page.getByRole("button", { name: "Remove" }).click();
   await page.locator('input[type="file"]').setInputFiles(SAMPLE_AUDIO);
   await expect(page.getByText(SAMPLE_AUDIO.name)).toBeVisible();
 
   await expect(notice).toHaveCount(1);
-  await expect(notice).toContainText("Outputs an SRT with timestamps.");
-  await expect(notice).toContainText("Audio sources support ASR extraction only.");
+  await expect(notice).toContainText("Outputs a timestamped SRT ready for translation or review.");
+  await expect(notice).toContainText("Audio sources support ASR only; use a video for on-screen hard subtitles.");
 });
 
 test("voiceClone shows the source warning only once", async ({ page }) => {
@@ -119,7 +119,7 @@ test("voiceClone shows the source warning only once", async ({ page }) => {
   ).toBeVisible();
 
   const warning =
-    "Background music or noise mixed into the source will affect clone quality.";
+    "Background music, ambience, reverb, or overlapping speakers interfere with voice cloning and may add noise or make the result sound unlike the speaker.";
   const notice = page.locator(".creation-notice");
   await expect(notice).toHaveCount(1);
   await expect(notice).toContainText(warning);
