@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "@/api";
-import { formatDate, formatDuration, getLocale, t, tCount } from "@/i18n";
+import { formatDate, formatDuration, getLocale, t } from "@/i18n";
 import { messageNotice, renderNotice, type SafeNotice } from "@/i18n/notice";
 import { ASR_LANGUAGES, TARGET_LANGUAGES, UI_LANGUAGES } from "@/domain/languages";
 import { projectStatusBucket, type ProjectStatusBucket } from "@/domain/projects";
@@ -151,7 +151,7 @@ const waitMinutes = computed(() => {
 /** 目标语言 chips：只用 Run 语言/多次 Run 语言并集，不退回项目轨道。 */
 const targetLangChips = computed(() => {
   const langs = run.value?.languages.length ? run.value.languages : mergedLanguages.value;
-  return langs.map((code) => targetLanguageName(code, getLocale()));
+  return langs.map((code) => ({ code, label: targetLanguageName(code, getLocale()) }));
 });
 
 /** und/auto 等是“未判定”占位，不是可展示语言；分离、擦除等无语言任务不应出现语言行。 */
@@ -172,24 +172,13 @@ const sourceLanguageCode = computed(() => {
   );
 });
 
-const languageSummary = computed(() => {
-  const source = sourceLanguageCode.value ? langName(sourceLanguageCode.value) : "";
-  const count = targetLangChips.value.length;
-  const countText = tCount("workbench.card.langCountShort", count);
-  if (source && count) return `${source} → ${countText}`;
-  if (source) return source;
-  return count ? countText : "—";
-});
-
-/** 与网页端一致：没有 Run/任务语言时不展示语言摘要。 */
-const showLanguageSummary = computed(
-  () => !!primaryRun.value && (!!sourceLanguageCode.value || targetLangChips.value.length > 0),
-);
-
-/** 语言行标题按能力：译制 / 配音 / 译制配音（对齐文档第三节）。 */
-const languageRowLabelKey = computed(() => {
+/**
+ * 只展示目标语言，且只展示一次；源语言在提取任务的工具参数里展示。
+ * 标签按能力取“配音语言/译制语言/目标语言”，与网页端口径一致。
+ */
+const targetRowLabelKey = computed(() => {
   const cloneType = primaryTypeKey.value === "clone";
-  if (capTranslate.value && (capClone.value || cloneType)) return "workbench.card.langBoth";
+  if (capTranslate.value && (capClone.value || cloneType)) return "workbench.card.targets";
   if (capClone.value || cloneType) return "workbench.card.langDub";
   if (capTranslate.value) return "workbench.card.langTranslate";
   return "workbench.card.targets";
@@ -286,18 +275,7 @@ const packedDetails = computed<{
   value: string;
   warning?: boolean;
   full: boolean;
-}[]>(() => {
-  const rows = detailRows.value.map((row) => ({ ...row, full: false }));
-  if (targetLangChips.value.length) {
-    rows.push({
-      key: "targets",
-      labelKey: languageRowLabelKey.value,
-      value: targetLangChips.value.join("、"),
-      full: targetLangChips.value.length > 2,
-    });
-  }
-  return rows;
-});
+}[]>(() => detailRows.value.map((row) => ({ ...row, full: false })));
 
 /** 仅真正制作中的状态禁止删除；已完成项目仍可删除。 */
 const isDeleteBlocked = computed(
@@ -641,10 +619,6 @@ async function downloadAsset(asset: Asset, filename?: string): Promise<void> {
           <span class="recent-card__detail-label">{{ t("workbench.card.assets") }}：</span>
           <span class="recent-card__detail-value" :title="materialText"><bdi dir="ltr">{{ materialText }}</bdi></span>
         </div>
-        <div v-if="showLanguageSummary" class="recent-card__detail recent-card__detail--full">
-          <span class="recent-card__detail-label">{{ t("workbench.card.languageShort") }}：</span>
-          <span class="recent-card__detail-value" :title="languageSummary"><bdi>{{ languageSummary }}</bdi></span>
-        </div>
         <div
           v-for="row in packedDetails"
           :key="row.key"
@@ -657,6 +631,17 @@ async function downloadAsset(asset: Asset, filename?: string): Promise<void> {
             :class="{ 'recent-card__detail-value--warning': row.warning }"
             :title="row.value"
           ><bdi>{{ row.value }}</bdi></span>
+        </div>
+        <div
+          v-if="targetLangChips.length"
+          class="recent-card__detail recent-card__detail--full recent-card__detail--languages"
+        >
+          <span class="recent-card__detail-label">{{ t(targetRowLabelKey) }}：</span>
+          <span class="recent-card__lang-list">
+            <span v-for="lang in targetLangChips" :key="lang.code" class="recent-card__lang-chip">
+              {{ lang.label }}
+            </span>
+          </span>
         </div>
       </div>
 
@@ -1291,6 +1276,31 @@ async function downloadAsset(asset: Asset, filename?: string): Promise<void> {
 }
 .recent-card__detail-value--warning {
   color: var(--color-warning-strong);
+}
+.recent-card__detail--languages {
+  align-items: center;
+  white-space: normal;
+}
+.recent-card__lang-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+.recent-card__lang-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  max-width: 100%;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  color: var(--color-primary-ink);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
 }
 .dl-menu {
   position: relative;

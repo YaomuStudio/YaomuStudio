@@ -274,6 +274,48 @@ test("shows simulated type-specific details for clone and extract cards", async 
   await expect(extract.getByText(/语言：/)).toHaveCount(0);
 });
 
+test("renders target languages as complete chips without a generic language row", async ({ page }) => {
+  await page.goto("/#/projects");
+
+  const card = page
+    .locator("article.recent-card")
+    .filter({ hasText: "星际译制 · 试播集" });
+  // 旧的泛化“语言”行已移除；目标语言行只保留一次。
+  await expect(card.getByText("Language：", { exact: true })).toHaveCount(0);
+  const row = card.locator(".recent-card__detail--languages");
+  await expect(row).toBeVisible();
+  await expect(row.locator(".recent-card__lang-chip").first()).toHaveText("English");
+});
+
+test("target language chips follow the dark theme tokens", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "yaomu.settings",
+      JSON.stringify({ onboarded: true, locale: "en", theme: "dark" }),
+    );
+  });
+  await page.goto("/#/projects");
+
+  const chip = page
+    .locator("article.recent-card")
+    .filter({ hasText: "星际译制 · 试播集" })
+    .locator(".recent-card__lang-chip")
+    .first();
+  const styles = await chip.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      theme: document.documentElement.getAttribute("data-theme"),
+      color: style.color,
+      background: style.backgroundColor,
+      border: style.borderColor,
+    };
+  });
+  expect(styles.theme).toBe("dark");
+  // 深色主题使用 --color-primary-ink 的暗色值，不能落回浅色主题的深蓝。
+  expect(styles.color).toBe("rgb(102, 170, 255)");
+  expect(styles.background).not.toBe("rgb(255, 255, 255)");
+});
+
 test("project detail shows type and latest run status badges without dropping main actions", async ({
   page,
 }) => {
@@ -286,10 +328,7 @@ test("project detail shows type and latest run status badges without dropping ma
     /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/,
   );
 
-  // 内部 WAITING_REVIEW 不再显示为“待审核”：Run 与 06 节点都投影为已完成。
-  const run = page.locator(".run").filter({ hasText: "星际译制 · 试播集" });
-  await expect(run.locator(".run__head").getByText("Succeeded", { exact: true })).toBeVisible();
-  await expect(run.getByText("Pending review", { exact: true })).toHaveCount(0);
+  // 内部 WAITING_REVIEW 不再显示为“待审核”；项目事实状态已在页头展示。
   await expect(page.getByText("Pending review", { exact: true })).toHaveCount(0);
 
   // main 独有入口保持不变：人工校正、打开目录；有 Run 时不显示创建任务。
@@ -334,7 +373,7 @@ test("no-run project detail shows the not-started guide and opens configuration 
   expect(lastRun).toBeUndefined();
 });
 
-test("active run shows status without a per-node production progress panel", async ({ page }) => {
+test("active run shows status without run history or a per-node progress panel", async ({ page }) => {
   await page.addInitScript(() => {
     const scope = window as Window & { __yaomuMock?: Record<string, unknown> };
     const control = (scope.__yaomuMock ??= {});
@@ -347,10 +386,9 @@ test("active run shows status without a per-node production progress panel", asy
   // 节点百分比无法保证实时同步，制作进度面板已移除；只保留事实状态。
   await expect(page.getByTestId("project-detail-progress")).toHaveCount(0);
 
-  const run = page.locator(".run").filter({ hasText: "星际译制 · 试播集" });
-  await expect(run.locator(".run-node")).toHaveCount(8);
-  await expect(run.locator(".run-node").first()).toContainText("Import");
-  await expect(run.locator(".run-node .ym-progress")).toHaveCount(0);
+  // 运行记录卡片已移除：详情只保留项目事实状态、素材与字幕轨。
+  await expect(page.locator(".run")).toHaveCount(0);
+  await expect(page.locator(".run-node")).toHaveCount(0);
   await expect(page.getByTestId("project-detail-not-started")).toHaveCount(0);
 });
 
