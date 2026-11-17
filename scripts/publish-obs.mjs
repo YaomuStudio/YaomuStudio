@@ -7,6 +7,10 @@
  *   node scripts/publish-obs.mjs --dir release-assets --version 0.1.0-beta.1 --stage artifacts
  *   node scripts/publish-obs.mjs --dir release-assets --version 0.1.0-beta.1 --stage manifests
  *
+ * 修复已发布对象的下载文件名（历史上的 Content-Disposition 误带引号，下载会多出下划线）：
+ *   node scripts/publish-obs.mjs --version 0.1.0-beta.6 --repair-disposition
+ * 目标文件名取自线上 latest.json，只做服务端 copy-to-self 改元数据，不需要本地安装包。
+ *
  * 环境变量：
  *   OBS_ENDPOINT          https://<object-storage-endpoint>
  *   OBS_BUCKET            bucket 名称
@@ -44,10 +48,14 @@ function parseArgs(argv) {
       options.dryRun = true;
       continue;
     }
+    if (arg === "--repair-disposition") {
+      options.repairDisposition = true;
+      continue;
+    }
     if (arg === "--help" || arg === "-h") {
       console.log(
         "usage: node scripts/publish-obs.mjs --dir <assets> --version <V> " +
-          "[--stage artifacts|manifests|all] [--platform win,linux] [--dry-run]",
+          "[--stage artifacts|manifests|all] [--platform win,linux] [--dry-run] [--repair-disposition]",
       );
       process.exit(0);
     }
@@ -60,7 +68,9 @@ function parseArgs(argv) {
     }
     throw new PublishObsError("argument-invalid", arg);
   }
-  if (!options.dir || !options.version) throw new PublishObsError("argument-missing", "dir/version");
+  if (!options.version) throw new PublishObsError("argument-missing", "version");
+  // 修复模式只读线上清单、只改对象元数据，不需要本地资产目录。
+  if (!options.dir && !options.repairDisposition) throw new PublishObsError("argument-missing", "dir");
   if (!["artifacts", "manifests", "all"].includes(options.stage)) {
     throw new PublishObsError("stage-invalid", options.stage);
   }
@@ -146,6 +156,20 @@ function assetHash(file, algorithm, encoding) {
     stream.on("error", reject);
     stream.on("end", () => resolve(hash.digest(encoding)));
   });
+}
+
+/**
+ * Content-Disposition 的 filename 参数。
+ *
+ * 曾经无条件写成 `filename="<name>"`。下载器少剥一层引号时，那个 `"` 会被当成文件名的一部分；
+ * `"` 在 Windows 上是非法字符，浏览器再把它替换成 `_`，用户保存出来就是 `...exe_`。
+ * 发布资产名都是纯 ASCII、无空格，按 RFC 6266 可以走不带引号的 token 形式；
+ * 只有确实含必须加引号的字符时才加引号并转义。
+ */
+export function contentDisposition(name) {
+  const cleaned = name.replace(/[\r\n]/g, "");
+  if (/^[A-Za-z0-9._-]+$/.test(cleaned)) return `attachment; filename=${cleaned}`;
+  return `attachment; filename="${cleaned.replace(/["\\]/g, "\\$&")}"`;
 }
 
 function contentType(name) {
@@ -278,8 +302,33 @@ function obsError(method, result) {
   );
 }
 
+/**
+ * 单次 OBS 调用的时间上限。
+ *
+ * SDK 自带的 socket 超时只覆盖读写停顿；beta.6 发布实际出现过
+ * 「33 分钟零输出、一个对象都没传上去」的悬死（连第一次 getObjectMetadata 都没回调）。
+ * 这里在应用层兜一层，让 withRetry 能接上重试，最终以明确错误快速失败。
+ */
+function attemptTimeoutMs() {
+  const value = Number(process.env.OBS_ATTEMPT_TIMEOUT_MS ?? "120000");
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function withAttemptTimeout(promise, label) {
+  const ms = attemptTimeoutMs();
+  if (!ms) return promise;
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new PublishObsError("obs-attempt-timeout", `${label} 超过 ${ms}ms 未响应`)),
+      ms,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 function call(client, method, params) {
-  return new Promise((resolve, reject) => {
+  const pending = new Promise((resolve, reject) => {
     client[method](params, (error, result) => {
       if (error) return reject(new PublishObsError("obs-client-error", `${method}: ${error}`));
       const status = Number(result?.CommonMsg?.Status);
@@ -290,23 +339,30 @@ function call(client, method, params) {
       resolve(result);
     });
   });
+  return withAttemptTimeout(pending, method);
 }
 
 function headObject(client, bucket, key) {
-  return new Promise((resolve, reject) => {
-    client.getObjectMetadata({ Bucket: bucket, Key: key }, (error, result) => {
-      if (error) return reject(new PublishObsError("obs-client-error", `getObjectMetadata: ${error}`));
-      const status = Number(result?.CommonMsg?.Status);
-      if (status === 404) return resolve(null);
-      if (!Number.isFinite(status)) return reject(new PublishObsError("obs-response-invalid", "getObjectMetadata"));
-      if (status >= 300) return reject(obsError("getObjectMetadata", result));
-      const meta = result.InterfaceResult ?? {};
-      return resolve({
-        contentLength: Number(meta.ContentLength),
-        etag: String(meta.ETag ?? "").replace(/"/g, "").toLowerCase(),
-      });
-    });
-  });
+  // 每次重试都要重新发起调用：复用同一个 pending Promise 只会在原位继续挂着。
+  const attempt = () =>
+    withAttemptTimeout(
+      new Promise((resolve, reject) => {
+        client.getObjectMetadata({ Bucket: bucket, Key: key }, (error, result) => {
+          if (error) return reject(new PublishObsError("obs-client-error", `getObjectMetadata: ${error}`));
+          const status = Number(result?.CommonMsg?.Status);
+          if (status === 404) return resolve(null);
+          if (!Number.isFinite(status)) return reject(new PublishObsError("obs-response-invalid", "getObjectMetadata"));
+          if (status >= 300) return reject(obsError("getObjectMetadata", result));
+          const meta = result.InterfaceResult ?? {};
+          return resolve({
+            contentLength: Number(meta.ContentLength),
+            etag: String(meta.ETag ?? "").replace(/"/g, "").toLowerCase(),
+          });
+        });
+      }),
+      "getObjectMetadata",
+    );
+  return withRetry(`head ${key}`, attempt);
 }
 
 function sleep(ms) {
@@ -346,7 +402,7 @@ async function uploadArtifact({ client, bucket, item, root, log }) {
       SourceFile: file,
       ContentType: item.contentType,
       CacheControl: item.cacheControl,
-      ContentDisposition: `attachment; filename="${item.name}"`,
+      ContentDisposition: contentDisposition(item.name),
     }),
   );
   const after = await headObject(client, bucket, item.key);
@@ -382,11 +438,101 @@ async function copyFixedAlias({ client, bucket, item, log }) {
       MetadataDirective: "REPLACE",
       ContentType: item.contentType,
       CacheControl: item.cacheControl,
-      ContentDisposition: `attachment; filename="${item.name}"`,
+      ContentDisposition: contentDisposition(item.name),
     }),
   );
   log(`[publish-obs] published fixed alias ${item.key} -> ${item.sourceKey}`);
   return { key: item.key, skipped: false };
+}
+
+/**
+ * 就地修复已发布对象的 Content-Disposition。
+ *
+ * 版本化安装包的键是不可变的，uploadArtifact 遇到已存在的对象会跳过，
+ * 因此头写错的旧版本不会被重新上传覆盖。这里用服务端 copy-to-self + REPLACE 元数据修复，
+ * 不产生大文件传输。
+ */
+function createObsClient(config) {
+  return new ObsClient({
+    access_key_id: config.accessKeyId,
+    secret_access_key: config.secretAccessKey,
+    security_token: config.securityToken,
+    server: config.endpoint,
+  });
+}
+
+/**
+ * 从线上 latest.json 反推需要修复的对象名。
+ *
+ * 刻意不复制打包命名规则：文件名以当前公开清单为准，构建侧改名（artifactName、别名）时
+ * 这里自动跟着走，不会留下一份会腐化的平行命名表。
+ */
+async function repairTargets({ config, version, platform, fetchImpl }) {
+  const url = noCacheUrl(publicUrl(config.feedBaseUrl, "latest.json"));
+  let response;
+  try {
+    response = await fetchImpl(url);
+  } catch (error) {
+    throw new PublishObsError("repair-manifest-unavailable", `${url}: ${error}`);
+  }
+  if (!response.ok) {
+    throw new PublishObsError("repair-manifest-unavailable", `${url} -> ${response.status}`, response.status);
+  }
+  let doc;
+  try {
+    doc = await response.json();
+  } catch (error) {
+    throw new PublishObsError("repair-manifest-invalid", `${url}: ${error}`);
+  }
+  if (doc?.version !== version) {
+    throw new PublishObsError("repair-version-mismatch", `latest.json 是 ${doc?.version}，请求的是 ${version}`);
+  }
+
+  const targets = [];
+  const seen = new Set();
+  for (const key of platform.split(",").map((item) => item.trim())) {
+    const entry = doc.platforms?.[key];
+    if (!entry) continue;
+    const names = [entry.url, entry.latest_url];
+    if (typeof entry.url === "string" && entry.url.endsWith(".exe")) names.push(`${entry.url}.blockmap`);
+    for (const name of names) {
+      if (typeof name !== "string" || name.length === 0 || seen.has(name)) continue;
+      if (name.includes("/") || name.includes("\\") || name.startsWith(".")) {
+        throw new PublishObsError("repair-name-invalid", name);
+      }
+      seen.add(name);
+      targets.push({
+        name,
+        key: `${config.prefix}${name}`,
+        // 与 planFor 一致：版本化安装包长缓存，官网固定别名每次发布覆盖。
+        cacheControl: name.startsWith("YaoMuStudio-latest") ? MANIFEST_CACHE : IMMUTABLE_CACHE,
+        contentType: contentType(name),
+      });
+    }
+  }
+  if (targets.length === 0) throw new PublishObsError("repair-target-empty", `${version}/${platform}`);
+  return targets;
+}
+
+async function repairDispositionItem({ client, bucket, item, log }) {
+  const existing = await headObject(client, bucket, item.key);
+  if (!existing) {
+    log(`[publish-obs] repair skipped ${item.key} (absent)`);
+    return { key: item.key, repaired: false };
+  }
+  await withRetry(`repair ${item.key}`, () =>
+    call(client, "copyObject", {
+      Bucket: bucket,
+      Key: item.key,
+      CopySource: `${bucket}/${item.key}`,
+      MetadataDirective: "REPLACE",
+      ContentType: item.contentType,
+      CacheControl: item.cacheControl,
+      ContentDisposition: contentDisposition(item.name),
+    }),
+  );
+  log(`[publish-obs] repaired ${item.key}`);
+  return { key: item.key, repaired: true };
 }
 
 function noCacheUrl(url) {
@@ -399,6 +545,8 @@ async function verifyPublic(fetchImpl, item, { localBytes } = {}) {
   const response = await fetchImpl(noCacheUrl(item.url), {
     method: localBytes ? "GET" : "HEAD",
     cache: "no-store",
+    // 公开面校验同样不能无限等；AbortSignal.timeout 由运行时实现，假 fetch 会忽略它。
+    signal: AbortSignal.timeout(attemptTimeoutMs() || 120000),
   });
   if (!response.ok) {
     throw new PublishObsError("public-fetch-failed", `${response.status} ${item.url}`);
@@ -447,14 +595,33 @@ export async function publishToObs({
   client,
   fetchImpl = globalThis.fetch,
   dryRun = false,
+  repairDisposition = false,
   publishedAt = new Date().toISOString(),
   log = console.log,
 } = {}) {
-  if (!dir || !version) throw new PublishObsError("argument-missing", "dir/version");
+  if (!version) throw new PublishObsError("argument-missing", "version");
+  const config = loadConfig(env, { requireCredentials: !client && !dryRun });
+
+  // 只修复已存在对象的元数据，不上传、不切清单；用于纠正历史版本写错的 Content-Disposition。
+  // 目标文件名取自线上 latest.json，因此不需要本地持有安装包。
+  if (repairDisposition) {
+    const targets = await repairTargets({ config, version, platform, fetchImpl });
+    if (dryRun) {
+      log(`[publish-obs] dry run: repair ${targets.length} object(s)`);
+      return { dryRun: true, repair: targets };
+    }
+    const repairClient = client ?? createObsClient(config);
+    const repaired = [];
+    for (const item of targets) {
+      repaired.push(await repairDispositionItem({ client: repairClient, bucket: config.bucket, item, log }));
+    }
+    return { repaired };
+  }
+
+  if (!dir) throw new PublishObsError("argument-missing", "dir");
   await verifyReleaseAssets({ dir, version, platform });
   const assets = listAssets(dir);
   if (!assets.manifests.length) throw new PublishObsError("manifest-missing");
-  const config = loadConfig(env, { requireCredentials: !client && !dryRun });
   const latestJson =
     stage === "artifacts"
       ? undefined
@@ -471,14 +638,8 @@ export async function publishToObs({
     return { dryRun: true, plan };
   }
 
-  const obs =
-    client ??
-    new ObsClient({
-      access_key_id: config.accessKeyId,
-      secret_access_key: config.secretAccessKey,
-      security_token: config.securityToken,
-      server: config.endpoint,
-    });
+  const obs = client ?? createObsClient(config);
+
   const uploaded = [];
   try {
     if (stage !== "manifests") {
@@ -531,6 +692,7 @@ async function main() {
       stage: options.stage,
       platform: options.platform,
       dryRun: Boolean(options.dryRun),
+      repairDisposition: Boolean(options.repairDisposition),
     });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {

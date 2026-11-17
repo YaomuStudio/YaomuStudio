@@ -200,6 +200,8 @@ jobs:
     name: publish GitHub Release
     needs: [validate, build-windows, build-linux]
     runs-on: ubuntu-latest
+    # 对象存储上传曾出现长时间无响应；没有上限时要空转到 GitHub 默认的 6 小时才失败。
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:

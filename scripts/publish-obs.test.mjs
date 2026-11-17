@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { PublishObsError, publishToObs } from "./publish-obs.mjs";
+import { PublishObsError, contentDisposition, publishToObs } from "./publish-obs.mjs";
 
 const VERSION = "0.1.0-beta.1";
 const ENV = {
@@ -61,13 +61,24 @@ function fakeObs(initial = new Map()) {
       const etag = md5(content);
       const key = params.Key;
       objects.set(key, { content, etag });
-      calls.push({ method: "putObject", key, cacheControl: params.CacheControl });
+      calls.push({
+        method: "putObject",
+        key,
+        cacheControl: params.CacheControl,
+        contentDisposition: params.ContentDisposition,
+      });
       callback(null, okResponse(etag));
     },
     copyObject(params, callback) {
       const sourceKey = params.CopySource.slice(params.CopySource.indexOf("/") + 1);
       const source = objects.get(sourceKey);
-      calls.push({ method: "copyObject", key: params.Key, source: sourceKey, cacheControl: params.CacheControl });
+      calls.push({
+        method: "copyObject",
+        key: params.Key,
+        source: sourceKey,
+        cacheControl: params.CacheControl,
+        contentDisposition: params.ContentDisposition,
+      });
       if (!source) {
         callback(null, { CommonMsg: { Status: 404, Code: "NoSuchKey" } });
         return;
@@ -275,6 +286,107 @@ test("public manifest content mismatch fails closed", async () => {
       (error) => error instanceof PublishObsError && error.code === "public-content-mismatch",
     );
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("安装包上传使用不带引号的 Content-Disposition", async () => {
+  const dir = makeRelease();
+  try {
+    const obs = fakeObs();
+    const fetchImpl = fakeFetch(obs.objects);
+    await publishToObs(baseOptions(dir, { stage: "artifacts", client: obs, fetchImpl }));
+    const uploads = obs.calls.filter((call) => call.method === "putObject");
+    assert.ok(uploads.length > 0);
+    for (const call of uploads) {
+      const name = call.key.slice(call.key.lastIndexOf("/") + 1);
+      assert.equal(call.contentDisposition, `attachment; filename=${name}`);
+      assert.ok(!call.contentDisposition.includes('"'), `${call.key}: 头里不应出现引号`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("contentDisposition 只在必要时加引号并转义", () => {
+  const name = "YaoMuStudio-0.1.0-beta.6-win-x64.exe";
+  assert.equal(contentDisposition(name), `attachment; filename=${name}`);
+  assert.equal(contentDisposition('a"b.exe'), 'attachment; filename="a\\"b.exe"');
+  assert.equal(contentDisposition("a b.exe"), 'attachment; filename="a b.exe"');
+  assert.ok(!/[\r\n]/.test(contentDisposition("a\r\nX-Injected: 1")));
+});
+
+test("repair 模式就地纠正已存在对象，不重新上传、不需要本地安装包", async () => {
+  const dir = makeRelease();
+  try {
+    const obs = fakeObs();
+    const fetchImpl = fakeFetch(obs.objects);
+    await publishToObs(baseOptions(dir, { client: obs, fetchImpl }));
+    obs.calls.length = 0;
+
+    const exeKey = `YaoMuStudio-${VERSION}-win-x64.exe`;
+    const result = await publishToObs(
+      baseOptions(dir, { dir: undefined, client: obs, fetchImpl, repairDisposition: true }),
+    );
+
+    assert.equal(obs.calls.filter((call) => call.method === "putObject").length, 0, "修复不应重新上传");
+    const copy = obs.calls.find((call) => call.method === "copyObject" && call.key === exeKey);
+    assert.ok(copy, "应对已存在对象发起 copy-to-self");
+    assert.equal(copy.source, exeKey);
+    assert.equal(copy.contentDisposition, `attachment; filename=${exeKey}`);
+    assert.ok(result.repaired.some((entry) => entry.key === exeKey && entry.repaired));
+    assert.ok(
+      result.repaired.some((entry) => entry.key === "YaoMuStudio-latest-win-x64.exe" && entry.repaired),
+      "官网别名也要修",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("repair 模式在清单版本不符时 fail closed", async () => {
+  const dir = makeRelease();
+  try {
+    const obs = fakeObs();
+    const fetchImpl = fakeFetch(obs.objects);
+    await publishToObs(baseOptions(dir, { client: obs, fetchImpl }));
+    obs.calls.length = 0;
+
+    await assert.rejects(
+      publishToObs(
+        baseOptions(dir, { dir: undefined, version: "0.1.0-beta.9", client: obs, fetchImpl, repairDisposition: true }),
+      ),
+      (error) => error instanceof PublishObsError && error.code === "repair-version-mismatch",
+    );
+    assert.equal(obs.calls.filter((call) => call.method === "copyObject").length, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("单次 OBS 调用悬死时按超时失败，不会无限挂起", async () => {
+  const dir = makeRelease();
+  const previous = process.env.OBS_ATTEMPT_TIMEOUT_MS;
+  process.env.OBS_ATTEMPT_TIMEOUT_MS = "20";
+  try {
+    // 永不回调的客户端，模拟 beta.6 发布时的悬死。
+    const hung = {
+      attempts: 0,
+      putObject() {},
+      copyObject() {},
+      getObjectMetadata() {
+        hung.attempts += 1;
+      },
+      close() {},
+    };
+    await assert.rejects(
+      publishToObs(baseOptions(dir, { stage: "artifacts", client: hung, fetchImpl: fakeFetch(new Map()) })),
+      (error) => error instanceof PublishObsError && error.code === "obs-attempt-timeout",
+    );
+    assert.equal(hung.attempts, 3, "应重试 3 次后放弃，而不是一直挂着");
+  } finally {
+    if (previous === undefined) delete process.env.OBS_ATTEMPT_TIMEOUT_MS;
+    else process.env.OBS_ATTEMPT_TIMEOUT_MS = previous;
     rmSync(dir, { recursive: true, force: true });
   }
 });

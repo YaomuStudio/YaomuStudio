@@ -1,0 +1,62 @@
+name: repair-download-names
+
+# 一次性运维入口：重写已发布对象的 Content-Disposition。
+#
+# 背景：历史发布把下载头写成 `attachment; filename="<name>"`，下载器少剥一层引号时
+# 用户拿到的文件名会多出下划线；服务端复制别名时还会把引号编码成 %22。
+# 这里只做服务端 copy-to-self 改元数据，不改对象内容、不动 latest*.yml / latest.json，
+# 目标文件名取自线上 latest.json，因此不需要重新打包，也不需要本地持有安装包。
+#
+# 与 release.yml 完全解耦：不构建、不发布、不切清单，只能手动触发。
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "线上 latest.json 指向的版本，如 0.1.0-beta.6"
+        required: true
+        type: string
+      dry_run:
+        description: "只列出目标对象，不实际修复"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-download-names
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - name: Rewrite Content-Disposition on published objects
+        env:
+          OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
+          OBS_BUCKET: ${{ vars.OBS_BUCKET }}
+          OBS_PREFIX: ${{ vars.OBS_PREFIX }}
+          OBS_FEED_BASE_URL: ${{ vars.OBS_FEED_BASE_URL }}
+          OBS_ACCESS_KEY_ID: ${{ secrets.OBS_ACCESS_KEY_ID }}
+          OBS_SECRET_ACCESS_KEY: ${{ secrets.OBS_SECRET_ACCESS_KEY }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          args=(--version "$INPUT_VERSION" --repair-disposition)
+          if [ "$INPUT_DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          node scripts/publish-obs.mjs "${args[@]}"
