@@ -60,7 +60,7 @@ test.describe("without the fixture flag", () => {
     await server?.close();
   });
 
-  test("plain development serves an explicit unavailable state, never fixture data", async ({
+  test("plain development shows a browser preview note and never fixture data", async ({
     page,
   }) => {
     const pageErrors: string[] = [];
@@ -68,8 +68,9 @@ test.describe("without the fixture flag", () => {
     await seedOnboardedSettings(page);
     await page.goto(`${url}#/projects`);
 
-    await expect(page.getByTestId("bridge-unavailable-banner")).toBeVisible();
-    await expect(page.getByTestId("bridge-unavailable-banner")).toContainText("Restart");
+    await expect(page.getByTestId("browser-preview-banner")).toBeVisible();
+    await expect(page.getByTestId("browser-preview-banner")).toContainText("Browser preview");
+    await expect(page.getByTestId("bridge-unavailable-banner")).toHaveCount(0);
     await expect(page.locator("article.recent-card")).toHaveCount(0);
     await expect(page.locator("main.app-shell__main")).toBeVisible();
 

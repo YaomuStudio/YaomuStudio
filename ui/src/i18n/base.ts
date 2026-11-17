@@ -202,6 +202,9 @@ const base: AreaMessages = {
       "The installation state changed. Try the rollback again.",
 
     // 无桥提示（产品不提供演示模式）
+    "shell.browserPreview.title": "Browser preview",
+    "shell.browserPreview.body":
+      "This preview shows the interface only. Local services and sample data are not connected.",
     "shell.bridgeUnavailable.title": "Desktop app unavailable",
     "shell.bridgeUnavailable.body":
       "No valid connection to the desktop app was found. Restart the app; if this persists, check the installation. No sample data is shown.",
@@ -592,6 +595,8 @@ const base: AreaMessages = {
     "installation.rollback_raced": "安装状态已变化，请重试回滚。",
 
     // 无桥提示（产品不提供演示模式）
+    "shell.browserPreview.title": "浏览器预览",
+    "shell.browserPreview.body": "当前仅展示界面，不连接本地服务，也不加载示例数据。",
     "shell.bridgeUnavailable.title": "无法连接桌面应用",
     "shell.bridgeUnavailable.body":
       "未检测到桌面应用连接。请重启应用；若仍出现，请检查安装是否完整。",

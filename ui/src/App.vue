@@ -20,6 +20,10 @@ const projects = useProjectsStore();
 const tasks = useTasksStore();
 const caps = useCapabilitiesStore();
 const notifications = useNotificationsStore();
+const isBrowserPreview =
+  import.meta.env.MODE === "development" &&
+  !window.yaomu &&
+  !navigator.userAgent.includes("Electron");
 const runtime = useRuntimeStore();
 
 /**
@@ -184,7 +188,16 @@ watch(
 <template>
   <div class="app-root" :data-api-mode="apiMode">
     <p
-      v-if="apiMode === 'unavailable'"
+      v-if="isBrowserPreview"
+      class="app-mode-note app-mode-note--info"
+      role="status"
+      data-testid="browser-preview-banner"
+    >
+      <strong class="app-mode-note__title">{{ t("shell.browserPreview.title") }}</strong>
+      <span>{{ t("shell.browserPreview.body") }}</span>
+    </p>
+    <p
+      v-else-if="apiMode === 'unavailable'"
       class="app-mode-note app-mode-note--blocked"
       role="alert"
       data-testid="bridge-unavailable-banner"
@@ -249,6 +262,10 @@ watch(
 .app-mode-note--blocked {
   background: var(--color-error-soft);
   color: var(--color-text);
+}
+.app-mode-note--info {
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  color: var(--color-text-muted);
 }
 .app-mode-note__title {
   font-weight: 600;

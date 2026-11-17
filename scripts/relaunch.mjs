@@ -7,6 +7,7 @@
  * 用法：npm run relaunch
  */
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,6 +50,18 @@ function killDevElectron() {
   spawnSync("pkill", ["-f", electronApp], { stdio: "ignore" });
 }
 
+function brandDevElectron() {
+  if (process.platform !== "darwin") return;
+  const appDir = path.join(root, "node_modules", "electron", "dist", "Electron.app");
+  const info = path.join(appDir, "Contents", "Info.plist");
+  if (!existsSync(appDir) || !existsSync(info)) return;
+  console.log("[relaunch] branding dev Electron bundle…");
+  spawnSync("plutil", ["-replace", "CFBundleName", "-string", "YaomuStudio", info], { stdio: "ignore" });
+  spawnSync("plutil", ["-replace", "CFBundleDisplayName", "-string", "YaomuStudio", info], { stdio: "ignore" });
+  // Info.plist 修改会使 Electron 自带签名失效，开发态用 ad-hoc 签名恢复可启动性。
+  spawnSync("codesign", ["--force", "--deep", "--sign", "-", appDir], { stdio: "ignore" });
+}
+
 function runNpm(args) {
   const result = spawnSync("npm", args, {
     cwd: root,
@@ -73,5 +86,6 @@ runNpm(["run", "build", "-w", "desktop"]);
 console.log("[relaunch] building ui…");
 runNpm(["run", "build:ui"]);
 
+brandDevElectron();
 console.log("[relaunch] starting electron…");
 runNpm(["run", "dev", "-w", "desktop"]);
