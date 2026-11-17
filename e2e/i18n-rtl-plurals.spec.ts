@@ -186,12 +186,17 @@ test("projects and correction use cardinal plurals", async ({ page }) => {
   await seedOnboardedSettings(page);
   await openProjects(page);
 
-  // demo 有 3 个项目；卡片语言数为 1 时显示 "1 language"，不再出现 language(s)。
+  // demo 有 3 个项目；目标语言以数量行 + chip 展示，不再出现 language(s)。
   await expect(page.getByText("3 projects", { exact: false })).toBeVisible();
   const demoCard = page
     .locator("article.recent-card")
     .filter({ hasText: "星际译制 · 试播集" });
-  await expect(demoCard.getByText("1 language", { exact: false })).toBeVisible();
+  const langRow = demoCard.locator(".recent-card__detail--languages");
+  await expect(langRow).toBeVisible();
+  await expect(langRow.locator(".recent-card__lang-chip").first()).toHaveText("English");
+  await expect(
+    demoCard.getByTestId("recent-card-lang-count").locator(".recent-card__detail-value"),
+  ).toHaveText("1");
   await expect(page.getByText(/\d+ language\(s\)/)).toHaveCount(0);
 
   await page.goto("/#/projects/proj-demo/correction");
@@ -239,7 +244,12 @@ test("zh-TW keeps its measured high-coverage copy and English fallback", async (
   const demoCard = page
     .locator("article.recent-card")
     .filter({ hasText: "星际译制 · 试播集" });
-  await expect(demoCard.getByText("1 種語言", { exact: false })).toBeVisible();
+  const langRow = demoCard.locator(".recent-card__detail--languages");
+  await expect(langRow).toBeVisible();
+  await expect(langRow.locator(".recent-card__lang-chip").first()).toHaveText("英语");
+  await expect(
+    demoCard.getByTestId("recent-card-lang-count").locator(".recent-card__detail-value"),
+  ).toHaveText("1");
 });
 
 test("RTL keeps values isolated and timecode inputs LTR", async ({ page }) => {
