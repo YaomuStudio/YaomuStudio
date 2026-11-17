@@ -20,6 +20,7 @@ import type {
   Asset,
   AssetStatus,
   AssetType,
+  ExportRecord,
   Language,
   SubtitleTrack,
   Task,
@@ -57,6 +58,7 @@ let noticeTimer: number | undefined;
 const LANGUAGES: Language[] = [...ASR_LANGUAGES, ...TARGET_LANGUAGES, ...UI_LANGUAGES];
 
 const projectId = computed<string>(() => String(route.params.id ?? ""));
+const exports = ref<ExportRecord[]>([]);
 const project = computed(() =>
   projects.current && projects.current.id === projectId.value ? projects.current : null,
 );
@@ -230,6 +232,7 @@ async function loadProject(id: string): Promise<void> {
   if (projects.current?.id === id) return;
   try {
     await projects.open(id);
+    await loadExports(id);
   } catch (value) {
     error.value = fallbackErrorNotice(value, "projectDetail.loadError");
   }
@@ -289,21 +292,40 @@ function flashNotice(): void {
   }, 5000);
 }
 
+async function loadExports(id: string): Promise<void> {
+  try {
+    exports.value = await api.listExports(id);
+  } catch {
+    exports.value = [];
+  }
+}
+
+function containingDirectory(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, "/");
+  const slash = normalized.lastIndexOf("/");
+  return slash > 0 ? filePath.slice(0, slash) : filePath;
+}
+
+/** 只打开用户可见的最近导出目录；无导出时按钮保持禁用。 */
+const exportFolder = computed(() => {
+  const completed = exports.value
+    .filter((record) => record.status === "SUCCEEDED" && record.outputPath)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const outputPath = completed[0]?.outputPath;
+  return outputPath ? containingDirectory(outputPath) : "";
+});
+
 async function openFolder(): Promise<void> {
   const current = project.value;
-  if (!current) return;
+  if (!current || !exportFolder.value) return;
   if (!desktopApi) {
     notice.value = messageNotice("projectDetail.folder.mock", { name: current.name });
     flashNotice();
     return;
   }
   error.value = null;
-  if (!current.directory) {
-    error.value = messageNotice("projectDetail.folder.unavailable");
-    return;
-  }
   try {
-    await desktopApi.openPath(current.directory);
+    await desktopApi.openPath(exportFolder.value);
   } catch {
     error.value = messageNotice("projectDetail.folder.openFailed");
   }
@@ -454,8 +476,13 @@ function assetStatusTone(status: AssetStatus): Tone {
           >
             {{ t("projects.correct") }}
           </YmButton>
-          <YmButton icon="folder-open" @click="openFolder">
-            {{ t("projectDetail.openFolder") }}
+          <YmButton
+            icon="folder-open"
+            :disabled="!exportFolder"
+            :title="exportFolder ? t('pipeline.export.openFolder') : t('pipeline.export.openFolderPending')"
+            @click="openFolder"
+          >
+            {{ t("pipeline.export.openFolder") }}
           </YmButton>
         </template>
       </PageHeader>

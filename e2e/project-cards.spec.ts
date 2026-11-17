@@ -336,7 +336,10 @@ test("project detail shows type and latest run status badges without dropping ma
 
   // main 独有入口保持不变：人工校正、打开目录；有 Run 时不显示创建任务。
   await expect(page.getByTestId("project-detail-correction")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Open project folder" })).toBeVisible();
+  const openExport = page.getByRole("button", { name: "Open containing folder" });
+  await expect(openExport).toBeVisible();
+  // 没有已完成导出时不能打开内部项目目录；按钮禁用并给出原因。
+  await expect(openExport).toBeDisabled();
   await expect(page.getByTestId("project-detail-create-task")).toHaveCount(0);
   await expect(page.getByTestId("project-detail-not-started")).toHaveCount(0);
 });
