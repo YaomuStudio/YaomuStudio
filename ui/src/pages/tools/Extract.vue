@@ -415,7 +415,13 @@ async function create(): Promise<void> {
   resultProject.value = result.project;
   exportRecord.value = null;
   if (!resultTrack.value || !resultRevision.value) {
-    resultError.value = t("tools.extract.result.noTrack");
+    const extractFailed = result.run.nodes.some(
+      (node) => node.key === "04_extract" && node.status === "failed",
+    );
+    // 导入成功、提取失败时 Run 是 PARTIAL。没有原文轨是失败结果，不是成功但漏轨。
+    resultError.value = extractFailed
+      ? t("task.worker_error")
+      : t("tools.extract.result.noTrack");
   }
 }
 

@@ -150,6 +150,19 @@ test("restores the last run and its execution log after leaving the page", async
   await expect(page.getByText("ASR 完成，生成 2 条字幕")).toBeVisible();
 });
 
+test("shows the worker failure when extraction ends without a transcription track", async ({ page }) => {
+  await openExtract(page);
+  await page.evaluate(() => {
+    const control = (window as Window & { __yaomuMock?: { toolExtractPartialFailure?: boolean } }).__yaomuMock;
+    if (control) control.toolExtractPartialFailure = true;
+  });
+  await createRun(page);
+
+  await expect(page.getByText("The worker failed. Check the execution log, then retry.")).toBeVisible();
+  await expect(page.getByText("The task finished but no transcription track was returned.")).toHaveCount(0);
+  await expect(page.getByText("Extracted line one.")).toHaveCount(0);
+});
+
 test("does not show a result when the tool run fails", async ({ page }) => {
   await openExtract(page);
   await page.evaluate(() => {

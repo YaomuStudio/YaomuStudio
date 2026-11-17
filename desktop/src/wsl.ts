@@ -860,6 +860,12 @@ export function resolveWslRunnerEnv(options: WslRunnerOptions = {}): NodeJS.Proc
   };
 }
 
+// 已准入的分离、克隆、ASR bundle 目前只带 cu130 runtime。yaomu 镜像的默认
+// 探测标签是 cu124；不覆盖时 FlashCLI 在加载前退出（no runtime environment），
+// 提取节点失败，Run 仍可能是 PARTIAL。这是已确认的运行时标签，不是新的 CLI 参数。
+// 宿主显式 FLASHCLI_CUDA_TAG 仍然优先。
+const ADMITTED_FLASHCLI_CUDA_TAG = "cu130";
+
 /** 镜像内工具与显式运行时覆盖；顺序保持既有确认过的 argv。 */
 function runnerEnvPairs(env: NodeJS.ProcessEnv, tools: WslTools | undefined): string[] {
   const envPairs: string[] = [];
@@ -871,8 +877,9 @@ function runnerEnvPairs(env: NodeJS.ProcessEnv, tools: WslTools | undefined): st
   if (tools?.mlstools) {
     envPairs.push(`MLSTOOLS_BIN=${tools.mlstools}`);
   }
-  // 显式环境覆盖：仅接受宿主已设置的镜像内配置，不替用户猜运行时。
-  const cudaTag = env.FLASHCLI_CUDA_TAG?.trim();
+  // 显式环境覆盖：宿主已设置的标签优先；未设置且已探测到 FlashCLI 时使用已准入的 cu130。
+  const cudaTag =
+    env.FLASHCLI_CUDA_TAG?.trim() || (tools?.flashcli ? ADMITTED_FLASHCLI_CUDA_TAG : "");
   if (cudaTag) envPairs.push(`FLASHCLI_CUDA_TAG=${cudaTag}`);
   const checkpoint = env.FLASHCLI_CHECKPOINT?.trim();
   if (checkpoint?.startsWith("/")) {

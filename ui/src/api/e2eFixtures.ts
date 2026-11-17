@@ -118,6 +118,8 @@ interface MockControl {
   voiceCloneNoCandidates?: boolean;
   /** 仅供 e2e 模拟工具 Run 失败。 */
   toolRunFailure?: boolean;
+  /** 仅供 e2e 模拟提取节点失败但导入已完成（Run 为 PARTIAL，且没有原文轨）。 */
+  toolExtractPartialFailure?: boolean;
   /** 仅供 e2e 让接下来 N 次 Run 读取返回可重试的 Core 暂时不可用。 */
   getRunFailures?: number;
   /** 仅供 e2e 模拟 PARTIAL：只完成第一个目标语言。 */
@@ -2596,6 +2598,19 @@ export const fixtureApi: YaoMuApi = {
       appendExecutionLog(task.id, 1, "runner", "启动 FlashCLI ASR");
       // 仅 DEV/E2E mock：模拟 02/04 完成并回写 transcription 轨；真实 Core 由任务驱动。
       setTimeout(() => {
+        if (control?.toolExtractPartialFailure) {
+          task.status = "FAILED";
+          task.updatedAt = now();
+          run.status = "PARTIAL";
+          run.updatedAt = now();
+          run.nodes = [
+            { key: "01_import", status: "done", progress: 100 },
+            { key: "02_analyze", status: "skipped", progress: 100 },
+            { key: "04_extract", status: "failed", progress: 0 },
+          ];
+          emit("run.updated", { projectId: input.projectId, taskId: run.id });
+          return;
+        }
         if (control?.toolRunFailure) {
           task.status = "FAILED";
           task.updatedAt = now();

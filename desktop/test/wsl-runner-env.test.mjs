@@ -50,8 +50,22 @@ test("development WSL auto runner no longer injects implicit mock slots", () => 
   const args = JSON.parse(result.YAOMU_WSL_RUNNER_ARGS);
   assert.ok(args.includes("FLASHCLI_BIN=/usr/local/bin/flashcli"));
   assert.ok(args.includes("YAOMU_CAPABILITY_EXECUTOR=flashcli"));
+  assert.ok(args.includes("FLASHCLI_CUDA_TAG=cu130"));
   assert.ok(!args.includes("YAOMU_MOCK_MODEL_SLOTS=separation,voice-clone"));
   assert.deepEqual(env, {});
+});
+
+test("host FLASHCLI_CUDA_TAG overrides the admitted cu130 default", () => {
+  const result = resolveWslRunnerEnv({
+    platform: "win32",
+    packaged: false,
+    repoRoot,
+    env: { FLASHCLI_CUDA_TAG: "cu124" },
+    tools,
+  });
+  const args = JSON.parse(result.YAOMU_WSL_RUNNER_ARGS);
+  assert.ok(args.includes("FLASHCLI_CUDA_TAG=cu124"));
+  assert.ok(!args.includes("FLASHCLI_CUDA_TAG=cu130"));
 });
 
 test("explicit mock slots are preserved only when the developer sets them", () => {
@@ -116,6 +130,7 @@ test("missing tools stay unknown: resolveWslRunnerEnv never probes implicitly", 
   const args = JSON.parse(result.YAOMU_WSL_RUNNER_ARGS);
   assert.ok(args.some((arg) => arg.startsWith("PYTHONPATH=")));
   assert.ok(!args.some((arg) => arg.startsWith("FLASHCLI_BIN=")));
+  assert.ok(!args.some((arg) => arg.startsWith("FLASHCLI_CUDA_TAG=")));
   assert.ok(!args.some((arg) => arg.startsWith("FFMPEG_BIN=")));
   assert.ok(!args.some((arg) => arg.startsWith("FFPROBE_BIN=")));
   assert.ok(!args.includes("YAOMU_CAPABILITY_EXECUTOR=flashcli"));
@@ -145,6 +160,7 @@ test("packaged bundled source produces -B -P -s module argv with only the verifi
   }
   assert.deepEqual(args.slice(-2), ["-m", "yaomustudio_runner"]);
   assert.ok(args.includes("FLASHCLI_BIN=/usr/local/bin/flashcli"));
+  assert.ok(args.includes("FLASHCLI_CUDA_TAG=cu130"));
   assert.ok(args.includes("FFMPEG_BIN=/usr/bin/ffmpeg"));
   assert.ok(!args.some((arg) => arg.includes("development-checkout")));
   assert.equal(result.YAOMU_MOCK_MODEL_SLOTS, undefined);
