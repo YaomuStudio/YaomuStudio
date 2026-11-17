@@ -12,7 +12,7 @@ const open = ref(props.defaultOpen);
 <template>
   <section class="ym-panel">
     <header class="ym-panel__header" :class="{ 'is-collapsible': collapsible }" @click="collapsible && (open = !open)">
-      <h3 class="ym-panel__title">{{ title }}</h3>
+      <h2 class="ym-panel__title">{{ title }}</h2>
       <YmIcon v-if="collapsible" :name="open ? 'chevron-down' : 'chevron-right'" :size="16" />
     </header>
     <div v-show="open" class="ym-panel__body">

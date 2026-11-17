@@ -62,6 +62,7 @@ onBeforeUnmount(() => document.removeEventListener("mousedown", closeOnOutside))
       role="combobox"
       tabindex="0"
       aria-haspopup="listbox"
+      :aria-label="placeholder ?? t('pipeline.config.languagePlaceholder')"
       :aria-expanded="open"
       @click="open = !open"
       @keydown.enter.prevent="open = !open"

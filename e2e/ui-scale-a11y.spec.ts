@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { AxeBuilder } from "@axe-core/playwright";
 import {
   releaseSaveSubtitle,
   seedHeldSaveSubtitle,
@@ -506,4 +507,21 @@ test("keeps focus and selection on the affected row after merge and split", asyn
   await expect(leftRow).toHaveClass(/is-selected/);
   await expect(leftRow).toBeFocused();
   await expect(leftRow.getByTestId("segment-translation")).toHaveValue("Welcome to YaoMu. This is");
+});
+
+
+test("creation pages expose no serious accessibility violations", async ({ page }) => {
+  await page.goto("/#/tools/translate");
+  await page.waitForTimeout(500);
+  const translate = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  expect(
+    translate.violations.filter((v) => v.impact === "critical" || v.impact === "serious"),
+  ).toEqual([]);
+
+  await page.goto("/#/voice-clone");
+  await page.waitForTimeout(500);
+  const clone = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  expect(
+    clone.violations.filter((v) => v.impact === "critical" || v.impact === "serious"),
+  ).toEqual([]);
 });
