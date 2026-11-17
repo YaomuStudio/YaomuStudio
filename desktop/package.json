@@ -1,6 +1,6 @@
 {
   "name": "@yaomustudio/desktop",
-  "version": "0.1.0-beta.6",
+  "version": "0.1.0-beta.7",
   "private": true,
   "description": "曜幕桌面壳：Electron 主进程 + preload（特权 IPC 代理、Bootstrap / Runtime Supervisor、自动更新）",
   "main": "dist/main.js",
