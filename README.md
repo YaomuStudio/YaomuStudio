@@ -12,7 +12,7 @@ English | [简体中文](README.zh-CN.md)
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-1677ff">
   <img alt="Preview" src="https://img.shields.io/badge/preview-Windows%20%2F%20Linux-3ccffa">
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-beta.5-6b7280">
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-beta.6-6b7280">
   <img alt="Status" src="https://img.shields.io/badge/status-control%20plane-6b7280">
 </p>
 
@@ -47,8 +47,8 @@ Installers are built by GitHub Actions on `v*` tags. Download them from the [off
 
 | Platform | Installer | Notes |
 |---|---|---|
-| Windows x64 | `YaoMuStudio-0.1.0-beta.5-win-x64.exe` | NSIS. SmartScreen may warn. Model execution uses WSL2. |
-| Linux x64 | `YaoMuStudio-0.1.0-beta.5-linux-x64.AppImage` | Preview; requires a GPU driver. Model execution is best-effort. |
+| Windows x64 | `YaoMuStudio-0.1.0-beta.6-win-x64.exe` | NSIS. SmartScreen may warn. Model execution uses WSL2. |
+| Linux x64 | `YaoMuStudio-0.1.0-beta.6-linux-x64.AppImage` | Preview; requires a GPU driver. Model execution is best-effort. |
 | macOS | — | Release builds are temporarily excluded until macOS packaging is fixed and models are ready. |
 
 **Requirements:** model execution on Windows needs a working WSL2 environment. Linux is best-effort. macOS release builds are temporarily unavailable. Windows builds are unsigned; SmartScreen may warn.
