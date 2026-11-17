@@ -140,6 +140,7 @@ jobs:
       - run: npm run test:i18n-guard
       - run: npm run test:runner-manifest
       - run: npm run test:readme
+      - run: npm run test:bump-version
       - run: npm run test:release-workflow
       - run: npm run typecheck
       - run: npm run build

@@ -22,6 +22,8 @@
     "test:runner-manifest": "node --test scripts/generate-runner-manifest.test.mjs",
     "test:release-workflow": "node --test scripts/check-release-tag.test.mjs scripts/check-app-update-yml.test.mjs scripts/collect-release-assets.test.mjs scripts/verify-release-assets.test.mjs scripts/publish-obs.test.mjs scripts/release-workflow.test.mjs",
     "test:readme": "node scripts/check-readme.mjs",
+    "test:bump-version": "node --test scripts/bump-version.test.mjs",
+    "bump:version": "node scripts/bump-version.mjs",
     "build": "npm run build:ui && npm run build -w desktop",
     "pack:dir": "node scripts/pack-dir.mjs",
     "smoke:packaged": "npm run smoke:packaged -w desktop"
