@@ -52,10 +52,18 @@ function parseArgs(argv) {
       options.repairDisposition = true;
       continue;
     }
+    if (arg === "--repair-versions") {
+      const value = argv[i + 1];
+      if (!value) throw new PublishObsError("argument-missing", arg);
+      options.repairVersions = value;
+      i += 1;
+      continue;
+    }
     if (arg === "--help" || arg === "-h") {
       console.log(
         "usage: node scripts/publish-obs.mjs --dir <assets> --version <V> " +
-          "[--stage artifacts|manifests|all] [--platform win,linux] [--dry-run] [--repair-disposition]",
+          "[--stage artifacts|manifests|all] [--platform win,linux] [--dry-run] [--repair-disposition] " +
+        "[--repair-versions v0.1.0-beta.1,v0.1.0-beta.2]",
       );
       process.exit(0);
     }
@@ -514,6 +522,39 @@ async function repairTargets({ config, version, platform, fetchImpl }) {
   return targets;
 }
 
+/**
+ * 按打包命名规则为显式版本列表生成修复目标。
+ *
+ * 只用于历史版本：当前清单指向的版本应走 repairTargets（以线上 latest.json 为准，
+ * 构建侧改名时自动跟随）。这里的命名与 desktop/electron-builder.yml 的 artifactName 一致，
+ * 不包含 latest 别名——别名每次发布都会被新版本覆盖，无需修历史。
+ */
+function repairTargetsForVersions({ config, versions, platform }) {
+  const targets = [];
+  const seen = new Set();
+  for (const raw of String(versions).split(",").map((item) => item.trim()).filter(Boolean)) {
+    const version = raw.replace(/^v/, "");
+    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+      throw new PublishObsError("repair-version-invalid", raw);
+    }
+    const names = [];
+    if (platform.includes("win")) names.push(`YaoMuStudio-${version}-win-x64.exe`, `YaoMuStudio-${version}-win-x64.exe.blockmap`);
+    if (platform.includes("linux")) names.push(`YaoMuStudio-${version}-linux-x64.AppImage`);
+    for (const name of names) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      targets.push({
+        name,
+        key: `${config.prefix}${name}`,
+        cacheControl: IMMUTABLE_CACHE,
+        contentType: contentType(name),
+      });
+    }
+  }
+  if (targets.length === 0) throw new PublishObsError("repair-target-empty", `${versions}/${platform}`);
+  return targets;
+}
+
 async function repairDispositionItem({ client, bucket, item, log }) {
   const existing = await headObject(client, bucket, item.key);
   if (!existing) {
@@ -596,6 +637,7 @@ export async function publishToObs({
   fetchImpl = globalThis.fetch,
   dryRun = false,
   repairDisposition = false,
+  repairVersions = "",
   publishedAt = new Date().toISOString(),
   log = console.log,
 } = {}) {
@@ -605,7 +647,9 @@ export async function publishToObs({
   // 只修复已存在对象的元数据，不上传、不切清单；用于纠正历史版本写错的 Content-Disposition。
   // 目标文件名取自线上 latest.json，因此不需要本地持有安装包。
   if (repairDisposition) {
-    const targets = await repairTargets({ config, version, platform, fetchImpl });
+    const targets = repairVersions
+      ? repairTargetsForVersions({ config, versions: repairVersions, platform })
+      : await repairTargets({ config, version, platform, fetchImpl });
     if (dryRun) {
       log(`[publish-obs] dry run: repair ${targets.length} object(s)`);
       return { dryRun: true, repair: targets };
@@ -693,6 +737,7 @@ async function main() {
       platform: options.platform,
       dryRun: Boolean(options.dryRun),
       repairDisposition: Boolean(options.repairDisposition),
+      repairVersions: options.repairVersions ?? "",
     });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {

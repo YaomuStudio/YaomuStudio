@@ -390,3 +390,49 @@ test("单次 OBS 调用悬死时按超时失败，不会无限挂起", async () 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("--repair-versions 按命名规则生成历史版本目标，不读线上清单", async () => {
+  const dir = makeRelease();
+  try {
+    const obs = fakeObs();
+    const fetchImpl = fakeFetch(obs.objects);
+    const result = await publishToObs(baseOptions(dir, {
+      dir: undefined,
+      client: obs,
+      fetchImpl,
+      repairDisposition: true,
+      repairVersions: "v0.1.0-beta.1,v0.1.0-beta.2",
+    }));
+    const keys = result.repaired.map((entry) => entry.key).sort();
+    assert.deepEqual(keys, [
+      "YaoMuStudio-0.1.0-beta.1-linux-x64.AppImage",
+      "YaoMuStudio-0.1.0-beta.1-win-x64.exe",
+      "YaoMuStudio-0.1.0-beta.1-win-x64.exe.blockmap",
+      "YaoMuStudio-0.1.0-beta.2-linux-x64.AppImage",
+      "YaoMuStudio-0.1.0-beta.2-win-x64.exe",
+      "YaoMuStudio-0.1.0-beta.2-win-x64.exe.blockmap",
+    ]);
+    assert.equal(fetchImpl.calls.length, 0, "历史版本模式不应读线上清单");
+    assert.ok(result.repaired.every((entry) => entry.repaired === false), "对象不存在时跳过");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--repair-versions 拒绝非法版本号", async () => {
+  const dir = makeRelease();
+  try {
+    const obs = fakeObs();
+    await assert.rejects(
+      publishToObs(baseOptions(dir, {
+        dir: undefined,
+        client: obs,
+        repairDisposition: true,
+        repairVersions: "not-a-version",
+      })),
+      (error) => error instanceof PublishObsError && error.code === "repair-version-invalid",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
