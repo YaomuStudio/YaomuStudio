@@ -812,7 +812,7 @@
   "runtime.banner.body": "Tila: {phase}. Sivut pysyvät ennallaan, eikä mitään toisteta automaattisesti.",
   "runtime.banner.reason": "Syy: {reason}",
   "runtime.banner.title": "Paikalliset palvelut eivät ole käytettävissä",
-  "runtime.init.body": "Valmistellaan paikallista moottoriympäristöä. Media ja luonnokset pysyvät tällä laitteella; mitään ei ladata tai lähetetä pilvipalveluun.",
+  "runtime.init.body": "Valmistellaan paikallista moottoria. Windowsin ensimmäisellä käynnistyksellä puuttuva Yaomu-suorituslevykuva ladataan ja tuodaan. Media ja luonnokset pysyvät tällä laitteella.",
   "runtime.init.language": "Käyttöliittymän kieli",
   "runtime.init.status": "Tila",
   "runtime.init.theme": "Teema",

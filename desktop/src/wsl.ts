@@ -2,7 +2,8 @@
  * WSL 镜像（yaomu）唤醒、自检与模型侧 Runner 启动参数。
  *
  * - 默认启动名为 `yaomu` 的发行版；`YAOMU_WSL_DISTRO` 可覆盖（本机联调可用 Ubuntu）。
- * - 不自动安装、不改默认发行版、不调用 wsl --shutdown。
+ * - 探测不安装、不改默认发行版、不调用 wsl --shutdown。
+ * - 缺失的 yaomu 发行版由 wsl-image.ts 在探测前下载并导入。
  * - 镜像自带 ffmpeg/ffprobe/flashcli 等工具；客户端不再探测宿主 FFmpeg。
  * - 开发态把仓库 runner/ 挂到 /mnt/... 后用镜像内 python 拉起协议进程。
  * - 打包态只使用 Main 异步校验后的随包 `resources/core/runner_src` 描述；

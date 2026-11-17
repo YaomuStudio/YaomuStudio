@@ -812,7 +812,7 @@
   "runtime.banner.body": "Stav: {phase}. Stránky zůstávají beze změn a nic se automaticky nepřehrává znovu.",
   "runtime.banner.reason": "Důvod: {reason}",
   "runtime.banner.title": "Místní služby nejsou k dispozici",
-  "runtime.init.body": "Připravuje se prostředí místního enginu. Média a koncepty zůstávají v tomto zařízení; nic se nestahuje ani neposílá do cloudové služby.",
+  "runtime.init.body": "Připravuje se místní engine. Při prvním spuštění ve Windows se chybějící spouštěcí obraz Yaomu stáhne a importuje. Média a koncepty zůstávají v tomto zařízení.",
   "runtime.init.language": "Jazyk rozhraní",
   "runtime.init.status": "Stav",
   "runtime.init.theme": "Motiv",

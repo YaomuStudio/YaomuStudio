@@ -812,7 +812,7 @@
   "runtime.banner.body": "Status: {phase}. Halaman tetap seperti adanya dan tidak ada yang diputar ulang secara otomatis.",
   "runtime.banner.reason": "Alasan: {reason}",
   "runtime.banner.title": "Layanan lokal tidak tersedia",
-  "runtime.init.body": "Menyiapkan lingkungan mesin lokal. Media dan draf tetap di perangkat ini; tidak ada yang diunduh atau dikirim ke layanan awan.",
+  "runtime.init.body": "Menyiapkan mesin lokal. Saat pertama dibuka di Windows, image eksekusi Yaomu yang belum ada akan diunduh dan diimpor. Media dan draf tetap di perangkat ini.",
   "runtime.init.language": "Bahasa antarmuka",
   "runtime.init.status": "Status",
   "runtime.init.theme": "Tema",

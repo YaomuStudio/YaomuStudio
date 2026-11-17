@@ -812,7 +812,7 @@
   "runtime.banner.body": "Trạng thái: {phase}. Các trang giữ nguyên và không có gì được phát lại tự động.",
   "runtime.banner.reason": "Lý do: {reason}",
   "runtime.banner.title": "Dịch vụ cục bộ không khả dụng",
-  "runtime.init.body": "Đang chuẩn bị môi trường engine cục bộ. Phương tiện và bản nháp ở lại trên thiết bị này; không có gì bị tải xuống hay gửi đến dịch vụ đám mây.",
+  "runtime.init.body": "Đang chuẩn bị engine cục bộ. Lần khởi động đầu trên Windows, nếu thiếu ảnh thực thi Yaomu thì ứng dụng sẽ tải xuống và nhập. Phương tiện và bản nháp ở lại trên thiết bị này.",
   "runtime.init.language": "Ngôn ngữ giao diện",
   "runtime.init.status": "Trạng thái",
   "runtime.init.theme": "Chủ đề",

@@ -813,7 +813,7 @@
   "runtime.banner.body": "État : {phase}. Les pages restent en l’état et rien n’est rejoué automatiquement.",
   "runtime.banner.reason": "Raison : {reason}",
   "runtime.banner.title": "Services locaux indisponibles",
-  "runtime.init.body": "Préparation de l’environnement moteur local. Les médias et brouillons restent sur cet appareil ; rien n’est téléchargé ni envoyé à un service cloud.",
+  "runtime.init.body": "Préparation du moteur local. Au premier lancement sous Windows, l’image d’exécution Yaomu est téléchargée et importée si elle est absente. Les médias et brouillons restent sur cet appareil.",
   "runtime.init.language": "Langue de l’interface",
   "runtime.init.status": "État",
   "runtime.init.theme": "Thème",

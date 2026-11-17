@@ -868,7 +868,7 @@
   "runtime.banner.body": "目前狀態：{phase}。頁面保持不變，不會自動重放任何操作。",
   "runtime.banner.reason": "原因：{reason}",
   "runtime.banner.title": "本地服務暫不可用",
-  "runtime.init.body": "正在準備本地引擎環境。媒體與草稿只保留在本機，不會隱式下載或上傳到雲端服務。",
+  "runtime.init.body": "正在準備本地引擎。Windows 首次啟動時，如果本機還沒有 Yaomu 執行映像，會下載並匯入。媒體與草稿只保留在本機。",
   "runtime.init.language": "介面語言",
   "runtime.init.status": "狀態",
   "runtime.init.theme": "主題",

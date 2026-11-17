@@ -813,7 +813,7 @@
   "runtime.banner.body": "Status: {phase}. Die Seiten bleiben, wie sie sind; nichts wird automatisch erneut abgespielt.",
   "runtime.banner.reason": "Grund: {reason}",
   "runtime.banner.title": "Lokale Dienste nicht verfügbar",
-  "runtime.init.body": "Die lokale Engine-Umgebung wird vorbereitet. Medien und Entwürfe bleiben auf diesem Gerät; nichts wird heruntergeladen oder an einen Clouddienst gesendet.",
+  "runtime.init.body": "Die lokale Engine wird vorbereitet. Beim ersten Start unter Windows wird das Yaomu-Ausführungsabbild heruntergeladen und importiert, wenn es fehlt. Medien und Entwürfe bleiben auf diesem Gerät.",
   "runtime.init.language": "Sprache der Oberfläche",
   "runtime.init.status": "Status",
   "runtime.init.theme": "Design",

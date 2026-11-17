@@ -812,7 +812,7 @@
   "runtime.banner.body": "Estado: {phase}. As páginas ficam como estão e nada é reproduzido automaticamente.",
   "runtime.banner.reason": "Motivo: {reason}",
   "runtime.banner.title": "Serviços locais indisponíveis",
-  "runtime.init.body": "A preparar o ambiente do motor local. A média e os rascunhos ficam neste dispositivo; nada é descarregado nem enviado para um serviço na nuvem.",
+  "runtime.init.body": "A preparar o motor local. No primeiro arranque no Windows, a imagem de execução Yaomu é transferida e importada se ainda não existir. A média e os rascunhos ficam neste dispositivo.",
   "runtime.init.language": "Idioma da interface",
   "runtime.init.status": "Estado",
   "runtime.init.theme": "Tema",

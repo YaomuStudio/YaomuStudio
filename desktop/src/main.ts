@@ -44,6 +44,7 @@ import {
 import { selectUpdateFeeds, type UpdateFeed } from "./update-feed";
 import { UpdateScheduler, type UpdateCheckSource } from "./update-scheduler";
 import { selectUpdateReplay } from "./update-state";
+import { ensureYaomuWslImage } from "./wsl-image";
 import {
   explicitWslRunnerCommand,
   prepareWslEnvironment,
@@ -377,7 +378,15 @@ function createRuntimeController(dataDir: string): RuntimeController {
   return new RuntimeController({
     prepare: async (signal) => {
       launch = resolveCoreLaunch();
-      // 方案 2：先启动 yaomu 镜像（失败不阻断 APP_READY），由镜像提供 ffmpeg/flashcli；
+      // 新设备没有 yaomu 发行版时，先下载固定根文件系统并导入。
+      // 下载/导入失败不阻断 Core：编辑和诊断仍可启动。取消或无法确认
+      // 自有 wsl.exe 退出时必须中断，不能继续探测或启动 Core。
+      await ensureYaomuWslImage({
+        signal,
+        userDataDir: app.getPath("userData"),
+        log: (line) => log(line),
+      });
+      // 方案 2：再启动 yaomu 镜像（失败不阻断 APP_READY），由镜像提供 ffmpeg/flashcli；
       // 客户端不再探测宿主 FFmpeg，也不再注入宿主 Runner。
       // 探测全部异步且有界；取消/无法确认清理时不得继续后续探测或启动 Core。
       const wslPreparation: WslPreparation = await prepareWslEnvironment({

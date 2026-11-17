@@ -812,7 +812,7 @@
   "runtime.banner.body": "Keadaan: {phase}. Halaman kekal seperti adanya dan tiada apa yang dimainkan semula secara automatik.",
   "runtime.banner.reason": "Sebab: {reason}",
   "runtime.banner.title": "Perkhidmatan tempatan tidak tersedia",
-  "runtime.init.body": "Menyediakan persekitaran enjin tempatan. Media dan draf kekal pada peranti ini; tiada apa-apa dimuat turun atau dihantar ke perkhidmatan awan.",
+  "runtime.init.body": "Menyediakan enjin tempatan. Pada pelancaran pertama di Windows, imej pelaksanaan Yaomu dimuat turun dan diimport jika tiada. Media dan draf kekal pada peranti ini.",
   "runtime.init.language": "Bahasa antara muka",
   "runtime.init.status": "Status",
   "runtime.init.theme": "Tema",

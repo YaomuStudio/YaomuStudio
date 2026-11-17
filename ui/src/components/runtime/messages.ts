@@ -5,7 +5,7 @@ const messages: AreaMessages = {
   en: {
     "runtime.init.title": "Starting YaomuStudio",
     "runtime.init.body":
-      "Preparing the local engine environment. Media and drafts stay on this device; nothing is downloaded or sent to a cloud service.",
+      "Preparing the local engine. On Windows, the first launch downloads and imports the Yaomu execution image when it is missing. Media and drafts stay on this device.",
     "runtime.init.status": "Status",
     "runtime.init.language": "Interface language",
     "runtime.init.theme": "Theme",
@@ -40,7 +40,7 @@ const messages: AreaMessages = {
   zhCN: {
     "runtime.init.title": "正在启动 YaomuStudio",
     "runtime.init.body":
-      "正在准备本地引擎环境。媒体与草稿只保留在本机，不会隐式下载或上传到云服务。",
+      "正在准备本地引擎。Windows 首次启动时，如果本机还没有 Yaomu 执行镜像，会下载并导入。媒体与草稿只保留在本机。",
     "runtime.init.status": "状态",
     "runtime.init.language": "界面语言",
     "runtime.init.theme": "主题",

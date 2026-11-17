@@ -812,7 +812,7 @@
   "runtime.banner.body": "מצב: {phase}. העמודים נשארים כפי שהם ושום דבר לא מופעל מחדש אוטומטית.",
   "runtime.banner.reason": "סיבה: {reason}",
   "runtime.banner.title": "שירותים מקומיים לא זמינים",
-  "runtime.init.body": "מכין את סביבת המנוע המקומית. מדיה וטיוטות נשארות במכשיר זה; שום דבר לא מורד או נשלח לשירות ענן.",
+  "runtime.init.body": "מכין את המנוע המקומי. בהפעלה הראשונה ב-Windows, אם חסרה תמונת ההרצה של Yaomu היא תורד ותיובא. מדיה וטיוטות נשארות במכשיר זה.",
   "runtime.init.language": "שפת ממשק",
   "runtime.init.status": "מצב",
   "runtime.init.theme": "ערכת נושא",

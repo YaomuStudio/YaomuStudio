@@ -814,7 +814,7 @@
   "runtime.banner.body": "Estado: {phase}. Las páginas se mantienen como están y no se repite nada automáticamente.",
   "runtime.banner.reason": "Motivo: {reason}",
   "runtime.banner.title": "Servicios locales no disponibles",
-  "runtime.init.body": "Preparando el entorno del motor local. Los medios y borradores permanecen en este equipo; no se descarga ni se envía nada a un servicio en la nube.",
+  "runtime.init.body": "Preparando el motor local. En el primer arranque en Windows, la imagen de ejecución de Yaomu se descarga e importa si falta. Los medios y borradores permanecen en este equipo.",
   "runtime.init.language": "Idioma de la interfaz",
   "runtime.init.status": "Estado",
   "runtime.init.theme": "Tema",

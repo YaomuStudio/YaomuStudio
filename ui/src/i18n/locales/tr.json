@@ -812,7 +812,7 @@
   "runtime.banner.body": "Durum: {phase}. Sayfalar oldukları gibi kalır ve hiçbir şey otomatik olarak yeniden oynatılmaz.",
   "runtime.banner.reason": "Neden: {reason}",
   "runtime.banner.title": "Yerel hizmetler kullanılamıyor",
-  "runtime.init.body": "Yerel motor ortamı hazırlanıyor. Medya ve taslaklar bu cihazda kalır; hiçbir şey indirilmez veya bulut hizmetine gönderilmez.",
+  "runtime.init.body": "Yerel motor hazırlanıyor. Windows'ta ilk açılışta Yaomu çalışma görüntüsü yoksa indirilip içe aktarılır. Medya ve taslaklar bu cihazda kalır.",
   "runtime.init.language": "Arayüz dili",
   "runtime.init.status": "Durum",
   "runtime.init.theme": "Tema",

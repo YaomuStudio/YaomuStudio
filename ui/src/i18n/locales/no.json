@@ -812,7 +812,7 @@
   "runtime.banner.body": "Tilstand: {phase}. Sider forblir som de er, og ingenting spilles av automatisk.",
   "runtime.banner.reason": "Årsak: {reason}",
   "runtime.banner.title": "Lokale tjenester utilgjengelige",
-  "runtime.init.body": "Forbereder det lokale motormiljøet. Medier og utkast forblir på denne enheten; ingenting lastes ned eller sendes til en skytjeneste.",
+  "runtime.init.body": "Forbereder den lokale motoren. Ved første oppstart i Windows lastes Yaomu-kjøreavtrykket ned og importeres hvis det mangler. Medier og utkast forblir på denne enheten.",
   "runtime.init.language": "Grensesnittspråk",
   "runtime.init.status": "Status",
   "runtime.init.theme": "Tema",

@@ -647,10 +647,9 @@ function requestGracefulStop(child: ChildProcess): boolean {
 export async function terminateProcessTree(child: ChildProcess, graceMs = 5_000): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) return;
   const askedStdin = requestGracefulStop(child);
-  // 有 stdin 管道时先等 Core 自行退出：Windows 的 TerminateProcess 和 POSIX 的
-  // SIGTERM 都可能抢在 EOF 处理前打断租约释放。没有管道（测试替身、旧启动方式）
-  // 才立即发信号。
-  if (!askedStdin) {
+  // Windows 的 child.kill() 就是 TerminateProcess，不会让 Go 跑到租约释放。
+  // 没有 stdin 管道的子进程（测试替身、旧启动方式）仍走原来的 kill。
+  if (!(process.platform === "win32" && askedStdin)) {
     signalProcessTree(child, "SIGTERM");
   }
   if (await waitForExit(child, graceMs)) return;

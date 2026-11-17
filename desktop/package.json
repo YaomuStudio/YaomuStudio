@@ -14,7 +14,7 @@
     "test:media-scan": "npm run build && node --test test/media-scan.test.mjs",
     "test:outputs": "npm run build && node --test test/outputs.test.mjs",
     "test:preferences": "npm run build && node --test test/preferences.test.mjs",
-    "test:bootstrap": "npm run build && node --test test/bootstrap-env.test.mjs test/wsl-runner-env.test.mjs test/wsl-probes.test.mjs test/startup-lifecycle.test.mjs test/bootstrap-lifecycle.test.mjs test/supervisor.test.mjs test/runtime-controller.test.mjs",
+    "test:bootstrap": "npm run build && node --test test/bootstrap-env.test.mjs test/wsl-runner-env.test.mjs test/wsl-probes.test.mjs test/wsl-image.test.mjs test/startup-lifecycle.test.mjs test/bootstrap-lifecycle.test.mjs test/supervisor.test.mjs test/runtime-controller.test.mjs",
     "test:runner-resources": "npm run build && node --test test/runner-resources.test.mjs test/smoke-evidence.test.mjs test/smoke-packaged-support.test.mjs test/smoke-packaged-suite.test.mjs test/smoke-packaged-cli.test.mjs",
     "test:ipc-authorization": "npm run build && node --test test/ipc-authorization.test.mjs test/runtime-ipc.test.mjs",
     "test:update": "npm run build && node --test test/update-install-controller.test.mjs test/update-install-ipc.test.mjs test/fake-updater.test.mjs test/update-scheduler.test.mjs test/update-state.test.mjs test/update-feed-config.test.mjs",

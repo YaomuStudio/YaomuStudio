@@ -815,7 +815,7 @@
   "runtime.banner.body": "現在の状態：{phase}。ページはそのまま保持され、操作が自動的に再生されることはありません。",
   "runtime.banner.reason": "原因：{reason}",
   "runtime.banner.title": "ローカルサービス利用不可",
-  "runtime.init.body": "ローカルエンジン環境を準備しています。メディアと下書きはこの端末にのみ保存され、暗黙のダウンロードやクラウドへの送信は行われません。",
+  "runtime.init.body": "ローカルエンジンを準備しています。Windows では、Yaomu 実行イメージが無い場合、初回起動時にダウンロードして取り込みます。メディアと下書きはこの端末に残ります。",
   "runtime.init.language": "インターフェース言語",
   "runtime.init.status": "ステータス",
   "runtime.init.theme": "テーマ",

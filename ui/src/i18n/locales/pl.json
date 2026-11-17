@@ -812,7 +812,7 @@
   "runtime.banner.body": "Stan: {phase}. Strony pozostają bez zmian i nic nie jest automatycznie odtwarzane.",
   "runtime.banner.reason": "Powód: {reason}",
   "runtime.banner.title": "Usługi lokalne niedostępne",
-  "runtime.init.body": "Przygotowywanie lokalnego środowiska silnika. Multimedia i szkice pozostają na tym urządzeniu; nic nie jest pobierane ani wysyłane do usługi chmurowej.",
+  "runtime.init.body": "Przygotowywanie lokalnego silnika. Przy pierwszym uruchomieniu w Windows brakujący obraz wykonawczy Yaomu jest pobierany i importowany. Multimedia i szkice pozostają na tym urządzeniu.",
   "runtime.init.language": "Język interfejsu",
   "runtime.init.status": "Stan",
   "runtime.init.theme": "Motyw",
