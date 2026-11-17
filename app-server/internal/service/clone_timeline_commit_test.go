@@ -76,6 +76,22 @@ func commitCloneTask(t *testing.T, env *exportTestEnv, taskID domain.ID) []domai
 	return events
 }
 
+func cloneAssemblyTask(t *testing.T, env *exportTestEnv, runID domain.ID, language string) domain.Task {
+	t.Helper()
+	tasks, err := env.store.ListRunTasks(context.Background(), runID)
+	if err != nil {
+		t.Fatalf("ListRunTasks: %v", err)
+	}
+	for _, task := range tasks {
+		if task.Kind == domain.TaskKindNode && task.NodeKey == domain.NodeKeyClone &&
+			task.Language == language && task.SegmentID == "" && task.Params["op"] == "assemble" {
+			return task
+		}
+	}
+	t.Fatalf("clone assembly task %s not found", language)
+	return domain.Task{}
+}
+
 func cloneSegmentTask(t *testing.T, env *exportTestEnv, runID domain.ID, language, segmentID string) domain.Task {
 	t.Helper()
 	tasks, err := env.store.ListRunTasks(context.Background(), runID)
@@ -445,11 +461,21 @@ func TestCloneTimelineFailureDoesNotBlockOtherLanguages(t *testing.T) {
 	}
 
 	commitCloneTask(t, env, jaTask.ID)
+	commitCloneTask(t, env, cloneAssemblyTask(t, env, run.ID, "ja").ID)
 	final, err = env.store.GetWorkflowRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("GetWorkflowRun: %v", err)
 	}
 	if final.Status != domain.RunStatusPartial {
+		for _, node := range final.Nodes {
+			t.Logf("node %s=%s", node.Key, node.Status)
+		}
+		if tasks, listErr := env.store.ListRunTasks(ctx, run.ID); listErr == nil {
+			for _, task := range tasks {
+				op, _ := task.Params["op"].(string)
+				t.Logf("task node=%s lang=%s seg=%s status=%s op=%s", task.NodeKey, task.Language, task.SegmentID, task.Status, op)
+			}
+		}
 		t.Fatalf("run status = %s, want partial", final.Status)
 	}
 	if nodeStatusOf(final, domain.NodeKeyClone) != domain.NodeStatusFailed {

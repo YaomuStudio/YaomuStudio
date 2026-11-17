@@ -100,32 +100,47 @@ func (s *Service) freezeCloneAudioPlan(
 	selectionIDs := make([]domain.ID, 0, len(revision.Segments))
 	audio := make([]exportAudioInput, 0, len(revision.Segments))
 	for _, segment := range revision.Segments {
-		selection, err := tx.GetCandidateSelection(ctx, segment.ID, language)
-		if err != nil {
-			if errors.Is(err, domain.ErrNotFound) {
-				return frozenCloneAudioPlan{}, fmt.Errorf(
-					"%w: segment %s has no selected voice candidate", errCloneAudioPlanNotReady, segment.ID)
-			}
-			return frozenCloneAudioPlan{}, mapReference(err, "current sentence selection")
+		selection, selErr := tx.GetCandidateSelection(ctx, segment.ID, language)
+		if selErr != nil && !errors.Is(selErr, domain.ErrNotFound) {
+			return frozenCloneAudioPlan{}, mapReference(selErr, "current sentence selection")
 		}
-		if selection.Revision != segment.ContentRevision {
-			return frozenCloneAudioPlan{}, invalidRequestf(
-				"sentence selection does not match its content revision for language %s", language)
-		}
-		candidates, err := tx.ListAudioCandidates(ctx, segment.ID, language, &selection.Revision)
+		candidates, err := tx.ListAudioCandidates(ctx, segment.ID, language, &segment.ContentRevision)
 		if err != nil {
 			return frozenCloneAudioPlan{}, err
 		}
 		var chosen *domain.AudioCandidate
-		for i := range candidates {
-			if candidates[i].ID == selection.CandidateID {
-				chosen = &candidates[i]
-				break
+		if selErr == nil && selection.Revision == segment.ContentRevision {
+			for i := range candidates {
+				if candidates[i].ID == selection.CandidateID {
+					chosen = &candidates[i]
+					break
+				}
 			}
-		}
-		if chosen == nil || !candidateMatchesWork(snap.tasks, *chosen, work[segment.ID].CacheKey) {
-			return frozenCloneAudioPlan{}, invalidRequestf(
-				"sentence selection does not match frozen generation dependencies for language %s", language)
+			if chosen == nil || !candidateMatchesWork(snap.tasks, *chosen, work[segment.ID].CacheKey) {
+				return frozenCloneAudioPlan{}, invalidRequestf(
+					"sentence selection does not match frozen generation dependencies for language %s", language)
+			}
+		} else {
+			// 当前选择已推进到新 revision 时，旧 Run 仍用自己冻结 revision 的候选
+			// 合成完整音轨；这里只读取候选，不改写当前选择。
+			for i := range candidates {
+				if candidates[i].IsRecommended && candidateMatchesWork(snap.tasks, candidates[i], work[segment.ID].CacheKey) {
+					chosen = &candidates[i]
+					break
+				}
+			}
+			if chosen == nil {
+				for i := range candidates {
+					if candidateMatchesWork(snap.tasks, candidates[i], work[segment.ID].CacheKey) {
+						chosen = &candidates[i]
+						break
+					}
+				}
+			}
+			if chosen == nil {
+				return frozenCloneAudioPlan{}, fmt.Errorf(
+					"%w: segment %s has no voice candidate for its frozen revision", errCloneAudioPlanNotReady, segment.ID)
+			}
 		}
 		asset, err := pipelineAsset(ctx, tx, snap.run.ProjectID, chosen.AudioAssetID)
 		if err != nil {

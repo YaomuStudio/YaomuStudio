@@ -490,6 +490,9 @@ func (e *env) waitRunStatus(runID domain.ID, want domain.RunStatus, timeout time
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	for _, node := range last.Nodes {
+		e.t.Logf("node key=%s status=%s progress=%d", node.Key, node.Status, node.Progress)
+	}
 	if tasks, err := e.st.ListRunTasks(context.Background(), runID); err == nil {
 		for _, task := range tasks {
 			attempts, attemptErr := e.st.ListAttempts(context.Background(), task.ID)
