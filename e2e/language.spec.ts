@@ -101,11 +101,9 @@ test("lists all 26 languages and applies the zh-TW high-coverage pack", async ({
     i18n.setLocale("zh-TW");
     const en = i18n.getEnglishMessages();
     const staleKeys = [
-      "voiceClone.result.emptyDesc",
       "settings.privacy.consentTitle",
       "settings.privacy.consentBody",
       // 逐文件选语言已由“目标语言多选 + 文件名识别”替代，旧译文不得带入。
-      "voiceClone.sub.translatedHint",
       "voiceClone.sub.translatedAuto",
     ];
     return {
