@@ -234,6 +234,10 @@ func run() error {
 
 	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// Windows 上 Shell 的 child.kill(SIGTERM) 等于 TerminateProcess，Core 收不到
+	// 信号，defer 里的租约释放不会执行。Shell 在持有 stdin 管道时设置
+	// YAOMU_SHUTDOWN_ON_STDIN=1，关闭管道即请求与信号相同的退出。
+	watchStdinShutdown(stop)
 	// Runner 进程树生命周期上下文只随 Core 退出结束；bootstrap 的握手使用
 	// rootCtx 派生的可取消上下文，避免握手超时或关闭误杀已就绪的 Runner。
 	runnerCtx, runnerCancel := context.WithCancel(context.Background())
@@ -391,6 +395,24 @@ func shutdownRunnerResources(
 	cancelProcess()
 }
 
+// watchStdinShutdown 在 Shell 显式要求时把 stdin EOF 当作退出请求。
+// 未设置该变量时不读 stdin，避免控制台运行或测试里的立即 EOF 把 Core 关掉。
+func watchStdinShutdown(stop context.CancelFunc) {
+	if strings.TrimSpace(os.Getenv("YAOMU_SHUTDOWN_ON_STDIN")) != "1" {
+		return
+	}
+	go func() {
+		buf := make([]byte, 512)
+		for {
+			_, err := os.Stdin.Read(buf)
+			if err != nil {
+				stop()
+				return
+			}
+		}
+	}()
+}
+
 // loadIdentity 读取/初始化工作区 ID，并递增 server epoch。
 func loadIdentity(ctx context.Context, st *store.Store, instanceID string) (string, int64, error) {
 	var workspaceID string
@@ -487,7 +509,8 @@ func resolveMLSToolsPath(getenv func(string) string) string {
 	return getenv("MLSTOOLS_BIN")
 }
 
-func newMediaProber(getenv func(string) string) service.MediaProber {	if explicit := strings.TrimSpace(getenv("FFPROBE_BIN")); explicit != "" {
+func newMediaProber(getenv func(string) string) service.MediaProber {
+	if explicit := strings.TrimSpace(getenv("FFPROBE_BIN")); explicit != "" {
 		return system.NewFFprobeProber(explicit)
 	}
 	wslFFprobe := strings.TrimSpace(getenv("YAOMU_WSL_FFPROBE_BIN"))

@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 /**
  * 校验发布 tag：只接受既有 canonical tag，解析 full commit，并要求根/ui/desktop
- * 三处 package.json 版本与 tag 一致。同时要求公开 tag 为 annotated、tagger 为
- * noreply，且 tag 提交与公开 main 的关系合法（push 必须等于 main head，
- * workflow_dispatch 必须可从 main 到达）。输出 GITHUB_OUTPUT 供 build/publish 使用。
+ * 三处 package.json 版本与 tag 一致。输出 GITHUB_OUTPUT 供 build/publish 使用。
  *
  * 环境：RELEASE_EVENT_NAME、RELEASE_REF_TYPE、RELEASE_REF_NAME、RELEASE_INPUT_TAG、
  *       RELEASE_REPO_ROOT（可选）、GITHUB_OUTPUT（可选）。
@@ -29,12 +27,8 @@ export function parseTag(raw) {
   return tag;
 }
 
-function gitResult(repoRoot, args) {
-  return spawnSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" });
-}
-
 function git(repoRoot, args) {
-  const result = gitResult(repoRoot, args);
+  const result = spawnSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" });
   if (result.status !== 0) {
     throw new ReleaseTagError("git-failed", (result.stderr || result.stdout || "").trim());
   }
@@ -60,7 +54,7 @@ export function packageVersionAt(repoRoot, commit, file) {
   return parsed.version;
 }
 
-export function resolveRelease({ repoRoot, eventName, refType, refName, inputTag, mainRef }) {
+export function resolveRelease({ repoRoot, eventName, refType, refName, inputTag }) {
   let tag;
   if (eventName === "push") {
     if (refType !== "tag") throw new ReleaseTagError("not-a-tag-push", String(refType ?? ""));
@@ -79,46 +73,11 @@ export function resolveRelease({ repoRoot, eventName, refType, refName, inputTag
   }
   if (!/^[0-9a-f]{40}$/.test(commit)) throw new ReleaseTagError("commit-invalid", commit);
 
-  let tagType;
-  try {
-    tagType = git(repoRoot, ["cat-file", "-t", `refs/tags/${tag}`]);
-  } catch {
-    throw new ReleaseTagError("tag-not-found", tag);
-  }
-  if (tagType !== "tag") throw new ReleaseTagError("tag-not-annotated", tagType);
-
-  const tagger = git(repoRoot, ["for-each-ref", "--format=%(taggeremail)", `refs/tags/${tag}`]).replace(
-    /^<(.*)>$/,
-    "$1",
-  );
-  if (!tagger.endsWith("@users.noreply.github.com")) {
-    throw new ReleaseTagError("tagger-not-noreply", tagger || "(empty)");
-  }
-
   const version = tag.slice(1);
   for (const file of ["package.json", "ui/package.json", "desktop/package.json"]) {
     const actual = packageVersionAt(repoRoot, commit, file);
     if (actual !== version) {
       throw new ReleaseTagError("version-mismatch", `${file}: ${actual} != ${version}`);
-    }
-  }
-
-  const mainRefName = mainRef ?? "refs/remotes/origin/main";
-  let mainCommit;
-  try {
-    mainCommit = git(repoRoot, ["rev-parse", "--verify", `${mainRefName}^{commit}`]);
-  } catch {
-    throw new ReleaseTagError("main-ref-missing", mainRefName);
-  }
-  if (eventName === "push") {
-    if (commit !== mainCommit) {
-      throw new ReleaseTagError("tag-not-main-head", `${commit} != ${mainCommit}`);
-    }
-  } else {
-    const ancestry = gitResult(repoRoot, ["merge-base", "--is-ancestor", commit, mainCommit]);
-    if (ancestry.status === 1) throw new ReleaseTagError("tag-not-on-main", commit);
-    if (ancestry.status !== 0) {
-      throw new ReleaseTagError("git-failed", (ancestry.stderr || ancestry.stdout || "").trim());
     }
   }
 

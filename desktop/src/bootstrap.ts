@@ -248,6 +248,7 @@ export function buildCoreSpawnEnv(input: CoreSpawnEnvInput): NodeJS.ProcessEnv {
  * - YAOMU_RELEASE_CATALOG：覆盖内嵌产品 interim 目录的 JSON 路径，或 none 关闭
  * - YAOMU_WSL_RUNNER_COMMAND / YAOMU_WSL_RUNNER_ARGS：模型侧 WSL Runner（JSON 数组 args）
  * - YAOMU_WSL_DISTRO：可选发行版名（与探测默认发行版一致时可省略）
+ * - YAOMU_SHUTDOWN_ON_STDIN=1：Shell 关闭 stdin 管道时 Core 走正常退出并释放 Runner 租约
  * - 打包态从最终 env 副本删除 YAOMU_MOCK_MODEL_SLOTS（含大小写变体）；开发态只沿用显式设置，不生成隐式默认值。
  */
 export async function startCore(options: BootstrapOptions): Promise<CoreProcessInfo> {
@@ -262,20 +263,25 @@ export async function startCore(options: BootstrapOptions): Promise<CoreProcessI
   // 异步端口/目录准备完成后、spawn 前再次检查取消，避免为已取消的启动创建 child。
   throwIfAborted(signal);
 
+  const env = buildCoreSpawnEnv({
+    dataDir: options.dataDir,
+    port,
+    token,
+    packaged: options.packaged,
+    overrideEnv: options.env,
+  });
+  // 与下面的 stdin 管道成对出现。Windows 不能用 SIGTERM 通知 Core。
+  env.YAOMU_SHUTDOWN_ON_STDIN = "1";
   const child = spawn(options.launch.command, options.launch.args, {
     cwd: options.launch.cwd,
-    env: buildCoreSpawnEnv({
-      dataDir: options.dataDir,
-      port,
-      token,
-      packaged: options.packaged,
-      overrideEnv: options.env,
-    }),
+    env,
     // POSIX 下建立独立进程组，退出时只清理本应用拉起的进程树。
     detached: process.platform !== "win32",
     windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
   });
+  // 子进程先退出时 end() 可能触发 EPIPE；这不是启动失败。
+  child.stdin?.on("error", () => undefined);
 
   const pipeLines = (stream: NodeJS.ReadableStream | null, prefix: string): void => {
     if (!stream) return;
@@ -622,12 +628,30 @@ export function isProcessAlive(pid: number): boolean {
 }
 
 /**
+ * 请求 Core 自行退出。有可写 stdin 时先关闭管道（配合 YAOMU_SHUTDOWN_ON_STDIN）。
+ * 返回 true 表示已经走了这条管道，调用方在 Windows 上不得立刻 TerminateProcess，
+ * 否则 Core 来不及释放 Runner 租约，下次启动会被当成“未配置执行器”。
+ */
+function requestGracefulStop(child: ChildProcess): boolean {
+  const stdin = child.stdin;
+  if (!stdin || stdin.destroyed || !stdin.writable) return false;
+  stdin.on("error", () => undefined);
+  stdin.end();
+  return true;
+}
+
+/**
  * 先优雅停止，超时后只终止本应用拉起的进程树；确认退出后才返回。
  * 未确认退出时抛错，由调用方决定是否释放资源。
  */
 export async function terminateProcessTree(child: ChildProcess, graceMs = 5_000): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) return;
-  signalProcessTree(child, "SIGTERM");
+  const askedStdin = requestGracefulStop(child);
+  // Windows 的 child.kill() 就是 TerminateProcess，不会让 Go 跑到租约释放。
+  // 没有 stdin 管道的子进程（测试替身、旧启动方式）仍走原来的 kill。
+  if (!(process.platform === "win32" && askedStdin)) {
+    signalProcessTree(child, "SIGTERM");
+  }
   if (await waitForExit(child, graceMs)) return;
   signalProcessTree(child, "SIGKILL");
   if (await waitForExit(child, 5_000)) return;

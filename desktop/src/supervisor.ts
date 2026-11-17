@@ -25,6 +25,8 @@ import {
   type CoreProcessInfo,
 } from "./bootstrap";
 
+const DEFAULT_STOP_TIMEOUT_MS = 15_000;
+
 export type CoreRuntimeState =
   | "stopped"
   | "starting"
@@ -37,7 +39,10 @@ export interface SupervisorOptions {
   launcher: (signal: AbortSignal) => Promise<CoreProcessInfo>;
   /** 崩溃后的自动重启次数，默认 1。 */
   maxRestarts?: number;
-  /** 停止 Core 的优雅等待时间。 */
+  /**
+   * 停止 Core 的优雅等待时间。默认 15s，要盖过 Core 自己的 10s 关闭预算，
+   * 让 Windows 上的 stdin 退出能先释放 Runner 租约，再考虑强制结束。
+   */
   stopTimeoutMs?: number;
   /**
    * stop 等待进行中启动完成 cleanup 的上限；默认 stopTimeoutMs + 5s
@@ -166,7 +171,7 @@ export class RuntimeSupervisor {
   }
 
   private async performStop(): Promise<void> {
-    const stopTimeoutMs = this.options.stopTimeoutMs ?? 5_000;
+    const stopTimeoutMs = this.options.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS;
     this.stopping = true;
     // 先断开连接再通知状态：onState 回调里看到的已经是不可用连接。
     this.generation += 1;
@@ -237,7 +242,7 @@ export class RuntimeSupervisor {
   }
 
   private settleTimeoutMs(): number {
-    return this.options.settleTimeoutMs ?? (this.options.stopTimeoutMs ?? 5_000) + 5_000;
+    return this.options.settleTimeoutMs ?? (this.options.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS) + 5_000;
   }
 
   private launch(
@@ -299,7 +304,7 @@ export class RuntimeSupervisor {
         // stop 已取得所有权：这次迟到返回的 child 仍由本模块终止并确认。
         this.ownedChild = info.child;
         try {
-          await terminateProcessTree(info.child, this.options.stopTimeoutMs ?? 5_000);
+          await terminateProcessTree(info.child, this.options.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS);
           if (this.ownedChild === info.child) this.ownedChild = null;
           attempt.cleanup = "confirmed";
         } catch (error) {

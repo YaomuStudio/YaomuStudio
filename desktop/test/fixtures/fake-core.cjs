@@ -24,6 +24,7 @@ fs.writeFileSync(
     port: process.env.YAOMU_CORE_PORT ?? null,
     token: process.env.YAOMU_INSTANCE_TOKEN ?? null,
     parentOnly: process.env.YAOMU_TEST_PARENT_ONLY ?? null,
+    shutdownOnStdin: process.env.YAOMU_SHUTDOWN_ON_STDIN ?? null,
   }),
 );
 
@@ -38,3 +39,9 @@ const server = http.createServer((request, response) => {
   response.end();
 });
 server.listen(port, "127.0.0.1");
+// 测试用假 Core 跟随 Shell 的 stdin 关闭退出，避免 Windows 上只能靠 TerminateProcess。
+process.stdin.on("end", () => {
+  server.close();
+  process.exit(0);
+});
+process.stdin.resume();

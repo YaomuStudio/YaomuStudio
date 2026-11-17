@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
@@ -151,6 +152,7 @@ test("packaged startCore strips mock slots from the environment the core process
   assert.equal(result.captured.dataDir, result.coreDataDir);
   assert.equal(result.captured.port, result.expectedPort);
   assert.equal(result.captured.token, token);
+  assert.equal(result.captured.shutdownOnStdin, "1");
 });
 
 test("development startCore passes an explicitly set mock slot through to the core process", async () => {
@@ -172,4 +174,19 @@ test("packaged startCore strips case variants from the environment the core proc
   });
 
   assert.deepEqual(result.captured.mockSlotKeys, []);
+});
+
+test("graceful stop lets a stdin-aware child exit before it is killed", async () => {
+  const child = spawn(
+    process.execPath,
+    [
+      "-e",
+      "process.stdin.resume(); process.stdin.on('end', () => process.exit(0)); process.on('SIGTERM', () => {}); setTimeout(() => process.exit(2), 20000);",
+    ],
+    { stdio: ["pipe", "ignore", "ignore"], windowsHide: true },
+  );
+  const started = Date.now();
+  await terminateProcessTree(child, 5_000);
+  assert.equal(child.exitCode, 0);
+  assert.ok(Date.now() - started < 4_000);
 });
