@@ -459,6 +459,7 @@ async function exportSrt(): Promise<void> {
       projectId: resultProject.value.id,
       kind: "subtitle",
       format: "srt",
+      language: selectedCode.value,
       inputRevisionId: revision.id,
       outputDir: exportDir.value.trim(),
       namingTemplate: namingTemplate.value.trim(),

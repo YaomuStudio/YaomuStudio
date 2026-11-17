@@ -87,7 +87,7 @@ const messages: AreaMessages = {
     "workbench.tool.clone.title": "高情感克隆配音",
     "workbench.tool.clone.desc": "上传原文与译文字幕，AI 音色克隆生成多语配音。",
     "workbench.tool.translate.title": "字幕智能翻译",
-    "workbench.tool.translate.desc": "将标准 SRT 字幕翻译为多种语言。",
+    "workbench.tool.translate.desc": "将 SRT 字幕翻译为多种语言。",
     "workbench.tool.extract.title": "字幕提取",
     "workbench.tool.extract.desc": "ASR、OCR 或双通道识别，精准提取字幕。",
     "workbench.tool.hot": "HOT",

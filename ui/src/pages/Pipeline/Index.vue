@@ -1186,7 +1186,7 @@ watch([() => currentRun.value?.id ?? "", deliveryLanguage, step, resultTab], () 
 // ---------------------------------------------------------------------------
 function formatStamp(date: Date): string {
   const pad = (value: number): string => String(value).padStart(2, "0");
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}-${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`;
 }
 
 const exportFormat = computed<ExportFormat>(() => {

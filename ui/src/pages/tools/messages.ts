@@ -250,7 +250,7 @@ const messages: AreaMessages = {
     "tools.custom.languages.err": "Select at least one target language.",
     "tools.custom.subtitle.original": "Original subtitles (optional)",
     "tools.custom.subtitle.originalUpload": "Upload original subtitles (SRT)",
-    "tools.custom.subtitle.originalHint": "Optional standard SRT aligned with the main media timeline.",
+    "tools.custom.subtitle.originalHint": "Optional SRT aligned with the main media timeline.",
     "tools.custom.subtitle.translated": "Translated subtitles (optional)",
     "tools.custom.subtitle.translatedUpload": "Batch upload translated subtitles (SRT)",
     "tools.custom.subtitle.translatedHint":
@@ -471,8 +471,8 @@ const messages: AreaMessages = {
     "tools.translate.step.source": "2 · 源语言",
     "tools.translate.step.languages": "2 · 目标语种",
     "tools.translate.source.label": "原文字幕",
-    "tools.translate.source.upload": "上传原文字幕（标准 SRT）",
-    "tools.translate.source.hint": "选择需要翻译的标准 SRT 文件。",
+    "tools.translate.source.upload": "上传原文字幕（SRT）",
+    "tools.translate.source.hint": "选择需要翻译的 SRT 文件。",
     "tools.translate.source.err": "请上传原文字幕 SRT 文件。",
     "tools.translate.sourceLanguage.label": "源语言",
     "tools.translate.sourceLanguage.hint": "导入 SRT 的语言；用于定位原文轨。",
@@ -533,7 +533,7 @@ const messages: AreaMessages = {
     "tools.extract.language.err": "请选择源语言。",
     "tools.extract.language.bothNote":
       "ASR + OCR 的 OCR 校正环节使用 ISO 码，后端接受性待定。",
-    "tools.extract.outputHint": "输出带时间戳的标准 SRT，可直接用于翻译或校对。",
+    "tools.extract.outputHint": "输出带时间戳的 SRT，可直接用于翻译或校对。",
     "tools.extract.result.desc": "提取进度与带时间戳的 SRT 在此显示。",
     "tools.extract.result.emptyDesc": "导入素材并选择提取方式与源语言后，点击「创建」。",
     "tools.extract.summary.method": "提取方式",
@@ -584,7 +584,7 @@ const messages: AreaMessages = {
     "tools.custom.languages.err": "请至少选择一个目标语种。",
     "tools.custom.subtitle.original": "原文字幕（选填）",
     "tools.custom.subtitle.originalUpload": "上传原文字幕（SRT）",
-    "tools.custom.subtitle.originalHint": "选填；请上传与主素材时间轴一致的标准 SRT。",
+    "tools.custom.subtitle.originalHint": "选填；请上传与主素材时间轴一致的 SRT。",
     "tools.custom.subtitle.translated": "译文字幕（选填）",
     "tools.custom.subtitle.translatedUpload": "批量上传译文字幕（SRT）",
     "tools.custom.subtitle.translatedHint":
