@@ -21,7 +21,7 @@ const result = computed(() => props.access ?? evaluateAccess(caps.slots, props.a
 const setupLabels = computed(() =>
   result.value.setup.map(slotLabelKey).map((key) => t(key)).join(" · "),
 );
-/** FFmpeg 由运行环境（Windows 上为 WSL 镜像）提供，模型下载无法修复；不暗示宿主已支持。 */
+/** FFmpeg 随应用打包，模型下载无法修复；未就绪时提示重装，不宣称已可用。 */
 const includesRuntimeComponent = computed(() => result.value.setup.includes("ffmpeg"));
 
 /**

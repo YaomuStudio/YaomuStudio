@@ -154,9 +154,6 @@ func run() error {
 				).WithEngines(engines),
 				Slots: service.ParseMockModelSlots(os.Getenv("YAOMU_MOCK_MODEL_SLOTS")),
 			},
-			// 媒体工具由 yaomu WSL 镜像提供；镜像自检通过即视为 ffmpeg 槽位就绪，
-			// 客户端不再检查宿主 FFmpeg。
-			ImageRuntime: wslRuntimeReady != nil && *wslRuntimeReady,
 			// 翻译是工具能力：WSL 镜像探测到 mlstools 时注入绝对路径；Linux 宿主
 			// 由 Main 注入 MLSTOOLS_BIN，二者都只读环境，不要求模型安装记录。
 			MLSToolsPath: func() string { return resolveMLSToolsPath(os.Getenv) },
@@ -495,8 +492,8 @@ func maintainEventRetention(ctx context.Context, st *store.Store, logger *loggin
 
 // newMediaProber 按顺序选择导入/重定位的媒体探测器：
 //
-//  1. FFPROBE_BIN 非空 → 宿主显式工具（既有行为完全不变）；
-//  2. YAOMU_WSL_FFPROBE_BIN 非空且 distro/工具路径合法 → 镜像内 WSL 探测器；
+//  1. FFPROBE_BIN 非空 → 随包或显式宿主工具，不启动 WSL；
+//  2. YAOMU_WSL_FFPROBE_BIN 非空且 distro/工具路径合法 → 仅显式配置时的镜像探测器；
 //  3. 否则现有宿主 PATH 回退（开发机兼容，不作为 Windows 生产依赖）。
 //
 // WSL 配置非法或构造失败只安全回退，不阻塞 Core 就绪；错误信息不回显路径。

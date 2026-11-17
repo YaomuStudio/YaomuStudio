@@ -1,16 +1,16 @@
 /**
- * 非 Windows 打包态的宿主运行时投影。
+ * 打包态的宿主运行时投影。
  *
- * 只读取应用自有 resources/core 下的随包 Runner/媒体工具；不探测仓库、
- * 不下载、不修改 PATH。Linux 额外 best-effort 探测宿主 FlashCLI/mlstools，
- * macOS 只启用媒体链路。
+ * 只读取应用自有 resources/core 下的随包文件；不探测仓库、不下载、不修改 PATH。
+ * Windows 只把随包 ffmpeg/ffprobe 注入 Core，供就绪判断和元数据解析，不启动 WSL。
+ * 非 Windows 额外注入随包 Runner；Linux 再 best-effort 探测宿主 FlashCLI/mlstools。
  */
 import fs from "node:fs";
 import path from "node:path";
 
 export type HostRuntimeReason =
   | "not-packaged"
-  | "windows"
+  | "windows-media"
   | "runner-invalid"
   | "python-missing"
   | "ffmpeg-missing"
@@ -81,7 +81,7 @@ function resolveTool(env: NodeJS.ProcessEnv, envKey: string, name: string): stri
 export function resolveHostRuntimeEnv(input: HostRuntimeInput): HostRuntimeResult {
   const env = input.env ?? process.env;
   if (!input.packaged) return { env: {}, reason: "not-packaged" };
-  if (input.platform === "win32") return { env: {}, reason: "windows" };
+  if (input.platform === "win32") return resolveWindowsBundledMedia(input.coreDir, env);
   if (!input.runnerValidated) return { env: {}, reason: "runner-invalid" };
 
   const launcher = path.join(input.coreDir, "yaomu-runner");
@@ -121,4 +121,19 @@ export function resolveHostRuntimeEnv(input: HostRuntimeInput): HostRuntimeResul
   }
 
   return { env: injected, reason: "ok" };
+}
+
+/** Windows 随包媒体工具：只注入 Core 用于就绪与元数据，不注入 Runner、不启动 WSL。 */
+function resolveWindowsBundledMedia(
+  coreDir: string,
+  env: NodeJS.ProcessEnv,
+): HostRuntimeResult {
+  const ffmpeg = path.join(coreDir, "ffmpeg.exe");
+  const ffprobe = path.join(coreDir, "ffprobe.exe");
+  if (!isExecutableInside(ffmpeg, coreDir)) return { env: {}, reason: "ffmpeg-missing" };
+  if (!isExecutableInside(ffprobe, coreDir)) return { env: {}, reason: "ffprobe-missing" };
+  const injected: NodeJS.ProcessEnv = {};
+  if (!existingEnv(env, "FFMPEG_BIN")) injected.FFMPEG_BIN = ffmpeg;
+  if (!existingEnv(env, "FFPROBE_BIN")) injected.FFPROBE_BIN = ffprobe;
+  return { env: injected, reason: "windows-media" };
 }

@@ -247,7 +247,7 @@ func TestFreezeExecutionFFmpegUsesMediaReadiness(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := CreateWorkflowRunInput{Template: templateCustomPipeline, Features: []string{featureMix}}
-	env.svc.opts.Capabilities = HostMediaCapabilities{Inner: NewInstallationCapabilities(), ImageRuntime: true}
+	env.svc.opts.Capabilities = bundledFFmpegCapabilities(t)
 	frozen, err := env.svc.freezeExecutionConfig(ctx, env.store, in, tpl)
 	if err != nil {
 		t.Fatalf("freeze with ready media tools: %v", err)
@@ -279,7 +279,7 @@ func TestFreezeExecutionFFmpegUsesMediaReadiness(t *testing.T) {
 	}
 
 	env.svc.opts.Capabilities = HostMediaCapabilities{
-		Inner: NewInstallationCapabilities(), ImageRuntime: false,
+		Inner:      NewInstallationCapabilities(),
 		FFmpegPath: func() string { return "" },
 	}
 	if err := env.svc.CheckTaskDispatchable(ctx, env.store, task); err == nil {
@@ -398,7 +398,7 @@ func TestTaskDispatchRejectsTamperedFrozenConfiguration(t *testing.T) {
 	ctx := context.Background()
 	release := testRelease("translate")
 	env := newExportTestEnv(t)
-	env.svc.opts.Capabilities = HostMediaCapabilities{Inner: NewInstallationCapabilities(), ImageRuntime: true}
+	env.svc.opts.Capabilities = bundledFFmpegCapabilities(t)
 	seedInstallation(t, env, "translate", domain.CapabilitySlotTranslate, domain.InstallationPhaseDone, 2, false, &release, env.svc.Now())
 	run := domain.WorkflowRun{Config: domain.RunConfig{Execution: map[domain.CapabilitySlotKey]domain.ExecutionConfig{
 		domain.CapabilitySlotTranslate: {ModelLock: release, DeviceID: "cpu", Params: map[string]any{}},
@@ -471,7 +471,7 @@ func TestTaskDispatchRejectsMockReadyWithoutInstallEvidence(t *testing.T) {
 func TestTaskDispatchFFmpegLockForms(t *testing.T) {
 	ctx := context.Background()
 	env := newExportTestEnv(t)
-	env.svc.opts.Capabilities = HostMediaCapabilities{Inner: NewInstallationCapabilities(), ImageRuntime: true}
+	env.svc.opts.Capabilities = bundledFFmpegCapabilities(t)
 	emptyRun := domain.WorkflowRun{Config: domain.RunConfig{Execution: map[domain.CapabilitySlotKey]domain.ExecutionConfig{
 		domain.CapabilitySlotFFmpeg: {DeviceID: "cpu", Params: map[string]any{}},
 	}}}
@@ -521,7 +521,7 @@ func TestTaskDispatchFFmpegLockForms(t *testing.T) {
 func TestTaskDispatchFFmpegRequiresFrozenDependencies(t *testing.T) {
 	ctx := context.Background()
 	env := newExportTestEnv(t)
-	env.svc.opts.Capabilities = HostMediaCapabilities{Inner: NewInstallationCapabilities(), ImageRuntime: true}
+	env.svc.opts.Capabilities = bundledFFmpegCapabilities(t)
 	cases := []struct {
 		name   string
 		params map[string]any
@@ -547,7 +547,7 @@ func TestTaskDispatchFFmpegRequiresFrozenDependencies(t *testing.T) {
 func TestTaskDispatchFFmpegDependencyModelLocks(t *testing.T) {
 	ctx := context.Background()
 	env := newExportTestEnv(t)
-	env.svc.opts.Capabilities = HostMediaCapabilities{Inner: NewInstallationCapabilities(), ImageRuntime: true}
+	env.svc.opts.Capabilities = bundledFFmpegCapabilities(t)
 	cases := []struct {
 		name string
 		lock domain.ReleaseRef
@@ -576,7 +576,7 @@ func TestFFmpegTaskStillChecksModelDependencies(t *testing.T) {
 	ctx := context.Background()
 	release := testRelease("translate")
 	env := newExportTestEnv(t)
-	env.svc.opts.Capabilities = HostMediaCapabilities{Inner: NewInstallationCapabilities(), ImageRuntime: true}
+	env.svc.opts.Capabilities = bundledFFmpegCapabilities(t)
 	seedInstallation(t, env, "translate", domain.CapabilitySlotTranslate, domain.InstallationPhaseDone, 2, false, &release, env.svc.Now())
 	run := domain.WorkflowRun{Config: domain.RunConfig{Execution: map[domain.CapabilitySlotKey]domain.ExecutionConfig{
 		domain.CapabilitySlotFFmpeg:    {DeviceID: "cpu", Params: map[string]any{}},
@@ -693,7 +693,7 @@ func TestProductionProviderAdmitsToolSeparateWithoutProbe(t *testing.T) {
 	ctx := context.Background()
 	env := newExportTestEnv(t)
 	env.svc.opts.PipelineOrchestration = true
-	env.svc.opts.Capabilities = HostMediaCapabilities{Inner: NewInstallationCapabilities(), ImageRuntime: true}
+	env.svc.opts.Capabilities = bundledFFmpegCapabilities(t)
 	project := env.seedProject("production admission")
 	path := env.tempFile("source.wav", "fixture-audio")
 	asset := env.seedMediaAsset(project.ID, "source.wav", domain.AssetTypeAudio, path, nil)
@@ -766,7 +766,7 @@ func TestProductionProviderAdmitsToolSeparateWithoutProbe(t *testing.T) {
 	}
 
 	env.svc.opts.Capabilities = HostMediaCapabilities{
-		Inner: NewInstallationCapabilities(), ImageRuntime: false,
+		Inner:      NewInstallationCapabilities(),
 		FFmpegPath: func() string { return "" },
 	}
 	if err := env.svc.CheckTaskDispatchable(ctx, env.store, separate); err == nil {
@@ -839,7 +839,8 @@ func TestFreezeExecutionTranslateUsesToolReadiness(t *testing.T) {
 		Template: templateToolTranslate, SourceLanguage: "en", TargetLanguages: []string{"zh"},
 	}
 	env.svc.opts.Capabilities = HostMediaCapabilities{
-		Inner: NewInstallationCapabilities(), ImageRuntime: true,
+		Inner:        NewInstallationCapabilities(),
+		FFmpegPath:   func() string { return testBundledFFmpeg(t) },
 		MLSToolsPath: func() string { return "/usr/local/bin/mlstools" },
 	}
 	frozen, err := env.svc.freezeExecutionConfig(ctx, env.store, in, tpl)
@@ -873,7 +874,8 @@ func TestFreezeExecutionTranslateUsesToolReadiness(t *testing.T) {
 	}
 
 	env.svc.opts.Capabilities = HostMediaCapabilities{
-		Inner: NewInstallationCapabilities(), ImageRuntime: true,
+		Inner:        NewInstallationCapabilities(),
+		FFmpegPath:   func() string { return testBundledFFmpeg(t) },
 		MLSToolsPath: func() string { return "" },
 	}
 	if err := env.svc.CheckTaskDispatchable(ctx, env.store, task); err == nil {

@@ -386,8 +386,8 @@ function createRuntimeController(dataDir: string): RuntimeController {
         userDataDir: app.getPath("userData"),
         log: (line) => log(line),
       });
-      // 方案 2：再启动 yaomu 镜像（失败不阻断 APP_READY），由镜像提供 ffmpeg/flashcli；
-      // 客户端不再探测宿主 FFmpeg，也不再注入宿主 Runner。
+      // 方案 2：再启动 yaomu 镜像（失败不阻断 APP_READY），模型执行仍用镜像内工具。
+      // FFmpeg 就绪和元数据解析使用随包 ffmpeg/ffprobe，不为此启动 WSL。
       // 探测全部异步且有界；取消/无法确认清理时不得继续后续探测或启动 Core。
       const wslPreparation: WslPreparation = await prepareWslEnvironment({
         signal,
@@ -433,7 +433,9 @@ function createRuntimeController(dataDir: string): RuntimeController {
         runnerValidated: bundledRunnerValidated,
         env: process.env,
       });
-      if (hostRuntime.reason === "ok") {
+      if (hostRuntime.reason === "windows-media") {
+        log("[bootstrap] bundled ffmpeg/ffprobe injected for readiness and metadata");
+      } else if (hostRuntime.reason === "ok") {
         log("[bootstrap] host runner configured (bundled source)");
         if (hostRuntime.env.FLASHCLI_BIN) {
           log("[bootstrap] host FLASHCLI_BIN injected (separate/voice_clone → flashcli)");

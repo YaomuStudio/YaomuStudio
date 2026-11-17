@@ -57,11 +57,9 @@ func TestHostMediaCapabilitiesFFmpegReady(t *testing.T) {
 	}
 }
 
-func TestHostMediaCapabilitiesFFmpegImageRuntime(t *testing.T) {
+func TestHostMediaCapabilitiesFFmpegIgnoresImageWithoutBinary(t *testing.T) {
 	provider := HostMediaCapabilities{
-		Inner:        NewInstallationCapabilities(),
-		ImageRuntime: true,
-		// ImageRuntime 下不检查宿主路径。
+		Inner:      NewInstallationCapabilities(),
 		FFmpegPath: func() string { return "" },
 	}
 	caps, err := provider.Catalog(context.Background(), emptyInstallQuerier{})
@@ -72,11 +70,8 @@ func TestHostMediaCapabilitiesFFmpegImageRuntime(t *testing.T) {
 		if cap.Slot != domain.CapabilitySlotFFmpeg {
 			continue
 		}
-		if cap.State != domain.SlotStateReady {
-			t.Fatalf("state = %s, want READY", cap.State)
-		}
-		if cap.EngineName != "yaomu-image" {
-			t.Fatalf("engine = %q", cap.EngineName)
+		if cap.State != domain.SlotStateNeedsSetup {
+			t.Fatalf("state = %s, want NEEDS_SETUP", cap.State)
 		}
 		return
 	}

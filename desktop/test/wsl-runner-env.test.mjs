@@ -240,7 +240,7 @@ test("windowsPathToWslMount preserves drive identity, spaces and non-ASCII", () 
   assert.equal(windowsPathToWslMount("D:/data/runner/src"), "/mnt/d/data/runner/src");
 });
 
-test("WSL media probe env injects the probed image ffprobe for Core", () => {
+test("Core metadata probe does not receive the image ffprobe", () => {
   const result = resolveWslRunnerEnv({
     platform: "win32",
     packaged: false,
@@ -249,7 +249,7 @@ test("WSL media probe env injects the probed image ffprobe for Core", () => {
     tools,
   });
 
-  assert.equal(result.YAOMU_WSL_FFPROBE_BIN, "/usr/bin/ffprobe");
+  assert.equal(result.YAOMU_WSL_FFPROBE_BIN, undefined);
   assert.equal(result.YAOMU_WSL_MLSTOOLS_BIN, "/usr/local/bin/mlstools");
   assert.equal(result.YAOMU_WSL_DISTRO, "yaomu");
   // 镜像内工具同时仍按既有约定传给 Runner 进程；Core 只读专用变量。
@@ -260,7 +260,7 @@ test("WSL media probe env injects the probed image ffprobe for Core", () => {
   const carrying = Object.keys(result)
     .filter((key) => String(result[key]).includes("/usr/bin/ffprobe"))
     .sort();
-  assert.deepEqual(carrying, ["YAOMU_WSL_FFPROBE_BIN", "YAOMU_WSL_RUNNER_ARGS"]);
+  assert.deepEqual(carrying, ["YAOMU_WSL_RUNNER_ARGS"]);
   const carryingMl = Object.keys(result)
     .filter((key) => String(result[key]).includes("/usr/local/bin/mlstools"))
     .sort();
@@ -276,7 +276,8 @@ test("media probe env survives packaged-missing-runner and external-runner early
     bundledRunner: null,
   });
   assert.equal(packagedMissing.YAOMU_WSL_RUNNER_COMMAND, undefined);
-  assert.equal(packagedMissing.YAOMU_WSL_FFPROBE_BIN, "/usr/bin/ffprobe");
+  assert.equal(packagedMissing.YAOMU_WSL_FFPROBE_BIN, undefined);
+  assert.equal(packagedMissing.YAOMU_WSL_MLSTOOLS_BIN, "/usr/local/bin/mlstools");
 
   const external = resolveWslRunnerEnv({
     platform: "win32",
@@ -289,7 +290,7 @@ test("media probe env survives packaged-missing-runner and external-runner early
     bundledRunner,
   });
   assert.equal(external.YAOMU_WSL_RUNNER_COMMAND, undefined);
-  assert.equal(external.YAOMU_WSL_FFPROBE_BIN, "/usr/bin/ffprobe");
+  assert.equal(external.YAOMU_WSL_FFPROBE_BIN, undefined);
 });
 
 test("media probe env survives a development checkout without runner source", () => {
@@ -301,7 +302,7 @@ test("media probe env survives a development checkout without runner source", ()
     tools,
   });
   assert.equal(result.YAOMU_WSL_RUNNER_COMMAND, undefined);
-  assert.equal(result.YAOMU_WSL_FFPROBE_BIN, "/usr/bin/ffprobe");
+  assert.equal(result.YAOMU_WSL_FFPROBE_BIN, undefined);
 });
 
 test("missing or unsafe ffprobe paths are never injected", () => {
@@ -348,7 +349,8 @@ test("unsafe distro names suppress media probe injection", () => {
     tools,
   });
   assert.equal(blank.YAOMU_WSL_DISTRO, "yaomu");
-  assert.equal(blank.YAOMU_WSL_FFPROBE_BIN, "/usr/bin/ffprobe");
+  assert.equal(blank.YAOMU_WSL_FFPROBE_BIN, undefined);
+  assert.equal(blank.YAOMU_WSL_MLSTOOLS_BIN, "/usr/local/bin/mlstools");
 });
 
 test("YAOMU_WSL_EXE is projected only when the parent environment sets it", () => {

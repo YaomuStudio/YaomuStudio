@@ -124,8 +124,8 @@ test("setup notice offers a keyboard-reachable models entry without installing",
     .filter({ hasText: "some required engines are not ready" });
   await expect(notice).toBeVisible();
   await expect(notice).toContainText("Not ready: FFmpeg");
-  // FFmpeg 来自运行环境而非模型包；不承诺模型下载能修复它。
-  await expect(notice).toContainText("FFmpeg is provided by the runtime environment");
+  // FFmpeg 随应用打包，元数据解析不启动 WSL；不承诺模型下载能修复它。
+  await expect(notice).toContainText("FFmpeg ships with the app");
   await expect(notice).toContainText("downloading a model cannot repair it");
 
   const entry = notice.getByRole("button", { name: "View models and environment" });

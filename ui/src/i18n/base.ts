@@ -38,7 +38,7 @@ const base: AreaMessages = {
     "access.setupSlots": "Not ready: {slots}",
     "access.viewModels": "View models and environment",
     "access.runtimeComponentHint":
-      "FFmpeg is provided by the runtime environment (the WSL image on Windows), not by a model package; check the runtime environment — downloading a model cannot repair it.",
+      "FFmpeg ships with the app and is not a model package. Metadata probing uses this copy and does not start WSL. If it is missing, reinstall the app — downloading a model cannot repair it.",
     "access.notAdmitted": "Not available in this release",
     "access.install": "Open Models to check engine and environment status.",
     "access.unavailable": "This feature is not available on this machine.",
@@ -437,7 +437,7 @@ const base: AreaMessages = {
     "access.setupSlots": "未就绪：{slots}",
     "access.viewModels": "查看模型与环境",
     "access.runtimeComponentHint":
-      "FFmpeg 由运行环境提供（Windows 上为 WSL 镜像），不属于模型包；请检查运行环境，下载模型无法修复。",
+      "FFmpeg 随应用打包，不属于模型包。解析媒体信息使用这份程序，不会为此启动 WSL。若未就绪，请重新安装应用，下载模型无法修复。",
     "access.notAdmitted": "当前版本暂不支持",
     "access.install": "请到模型管理查看引擎与环境状态。",
     "access.unavailable": "此功能在当前设备上不可用。",

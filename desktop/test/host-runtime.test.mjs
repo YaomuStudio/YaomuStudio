@@ -50,7 +50,28 @@ test("non-packaged app does not inject host runtime", async () => {
   }
 });
 
-test("Windows keeps the WSL path and injects no host runtime", async () => {
+test("packaged Windows injects bundled ffmpeg and ffprobe without a host runner", async () => {
+  const { root, coreDir } = await makeCoreDir();
+  try {
+    await writeFile(path.join(coreDir, "ffmpeg.exe"), "ffmpeg");
+    await writeFile(path.join(coreDir, "ffprobe.exe"), "ffprobe");
+    const result = resolveHostRuntimeEnv({
+      platform: "win32",
+      packaged: true,
+      coreDir,
+      runnerValidated: false,
+      env: {},
+    });
+    assert.equal(result.reason, "windows-media");
+    assert.equal(result.env.FFMPEG_BIN, path.join(coreDir, "ffmpeg.exe"));
+    assert.equal(result.env.FFPROBE_BIN, path.join(coreDir, "ffprobe.exe"));
+    assert.equal(result.env.YAOMU_RUNNER_BIN, undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("packaged Windows without bundled ffmpeg does not invent a runtime", async () => {
   const { root, coreDir } = await makeCoreDir();
   try {
     const result = resolveHostRuntimeEnv({
@@ -61,7 +82,7 @@ test("Windows keeps the WSL path and injects no host runtime", async () => {
       env: {},
     });
     assert.deepEqual(result.env, {});
-    assert.equal(result.reason, "windows");
+    assert.equal(result.reason, "ffmpeg-missing");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

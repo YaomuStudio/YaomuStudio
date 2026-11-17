@@ -397,14 +397,10 @@ func ParseMockModelSlots(raw string) []domain.CapabilitySlotKey {
 
 // HostMediaCapabilities 覆盖 `ffmpeg` 槽位状态。
 //
-// FFmpeg 不走模型安装记录（docs/product-scope.md：媒体工具能力，不占模型槽）；
-// Windows 执行侧由 yaomu WSL 镜像提供 ffmpeg/flashcli，桌面壳执行镜像自检后
-// 注入 YAOMU_WSL_RUNTIME_READY，此时不再检查宿主路径。其它平台/显式宿主模式
-// 仍可通过 FFMPEG_BIN 注入随包二进制；本实现只做路径存在性检查，不启子进程。
+// FFmpeg 不走模型安装记录，也不看 WSL 镜像自检。桌面壳把随包 ffmpeg 的绝对
+// 路径注入 FFMPEG_BIN；这里只检查该文件存在，不启子进程，也不为此启动 WSL。
 type HostMediaCapabilities struct {
 	Inner CapabilityProvider
-	// ImageRuntime 为 true 时表示媒体工具由 yaomu 镜像提供且镜像自检通过。
-	ImageRuntime bool
 	// FFmpegPath 默认读 FFMPEG_BIN；测试可注入。
 	FFmpegPath func() string
 	// MLSToolsPath 默认读 YAOMU_WSL_MLSTOOLS_BIN；translate 是工具能力，
@@ -461,11 +457,6 @@ func (h HostMediaCapabilities) ffmpegCapability() domain.Capability {
 	cap := domain.Capability{
 		Slot:   domain.CapabilitySlotFFmpeg,
 		Params: paramCatalog(domain.CapabilitySlotFFmpeg),
-	}
-	if h.ImageRuntime {
-		cap.State = domain.SlotStateReady
-		cap.EngineName = "yaomu-image"
-		return cap
 	}
 	pathFn := h.FFmpegPath
 	if pathFn == nil {

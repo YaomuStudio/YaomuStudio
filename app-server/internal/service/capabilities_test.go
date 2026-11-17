@@ -13,6 +13,33 @@ import (
 	"github.com/YaomuStudio/YaomuStudio/app-server/internal/domain"
 )
 
+func testBundledFFmpeg(t *testing.T) string {
+	t.Helper()
+	name := "ffmpeg"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	bin := filepath.Join(t.TempDir(), name)
+	mode := os.FileMode(0o755)
+	if runtime.GOOS == "windows" {
+		mode = 0o666
+	}
+	if err := os.WriteFile(bin, []byte("ffmpeg"), mode); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
+func bundledFFmpegCapabilities(t *testing.T) HostMediaCapabilities {
+	t.Helper()
+	bin := testBundledFFmpeg(t)
+	return HostMediaCapabilities{
+		Inner:      NewInstallationCapabilities(),
+		FFmpegPath: func() string { return bin },
+		Platform:   runtime.GOOS,
+	}
+}
+
 type fakeCatalogQuerier struct {
 	installs []domain.Installation
 }
@@ -207,7 +234,7 @@ func TestHostMediaCapabilitiesTranslateUsesInjectedToolPath(t *testing.T) {
 	}
 
 	ready, err := HostMediaCapabilities{
-		Inner: NewInstallationCapabilities(), ImageRuntime: true,
+		Inner:        NewInstallationCapabilities(),
 		MLSToolsPath: func() string { return "/usr/local/bin/mlstools" },
 	}.Catalog(context.Background(), q)
 	if err != nil {
@@ -226,7 +253,7 @@ func TestHostMediaCapabilitiesTranslateUsesInjectedToolPath(t *testing.T) {
 		"overlong": "/" + string(make([]byte, 5000)),
 	} {
 		caps, err := HostMediaCapabilities{
-			Inner: NewInstallationCapabilities(), ImageRuntime: true,
+			Inner:        NewInstallationCapabilities(),
 			MLSToolsPath: func() string { return path },
 		}.Catalog(context.Background(), q)
 		if err != nil {

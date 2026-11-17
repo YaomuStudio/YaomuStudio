@@ -214,17 +214,13 @@ function isSafeWslDistroName(value: string): boolean {
 }
 
 /**
- * Core 媒体探测所需的环境投影：镜像内固定 ffprobe（绝对 POSIX 路径）。
- * 只在工具来自固定探测且 distro 安全时注入；宿主 PATH 查到的 Windows 路径
- * 绝不进入该变量。YAOMU_WSL_EXE 仅在父环境显式设置时透传，Core 缺省 wsl.exe。
+ * Core 的环境投影。元数据解析使用随包 ffprobe，不把镜像 ffprobe 交给 Core，
+ * 因此导入/重定位不会为了读媒体信息启动 WSL。翻译仍使用镜像内 mlstools。
+ * YAOMU_WSL_EXE 仅在父环境显式设置时透传。
  */
 function wslMediaProbeEnv(env: NodeJS.ProcessEnv, tools: WslTools | undefined): NodeJS.ProcessEnv {
   const probeEnv: NodeJS.ProcessEnv = {};
   const safeDistro = isSafeWslDistroName(wslDistro(env));
-  const ffprobe = tools?.ffprobe;
-  if (ffprobe && isWslToolPath(ffprobe) && safeDistro) {
-    probeEnv.YAOMU_WSL_FFPROBE_BIN = ffprobe;
-  }
   // 翻译是工具能力：Core 只按桌面探测到的镜像路径标记 translate READY。
   const mlstools = tools?.mlstools;
   if (mlstools && isWslToolPath(mlstools) && safeDistro) {
@@ -789,8 +785,8 @@ export function resolveWslRunnerEnv(options: WslRunnerOptions = {}): NodeJS.Proc
     YAOMU_WSL_DISTRO: wslDistro(env),
     // provider 凭据只经 WSLENV 桥接，不进 argv；所有返回路径都带上。
     ...translationEnvForWsl(env),
-    // 显式外部 Runner/打包缺 Runner 的早返回路径也保留媒体探测注入：
-    // Core 需要用它把导入/重定位的 ffprobe 路由到实际执行环境。
+    // 显式外部 Runner/打包缺 Runner 的早返回路径也保留翻译工具注入。
+    // 元数据 ffprobe 由随包二进制提供，不从镜像投影。
     ...wslMediaProbeEnv(env, options.tools),
   };
   if (options.runtimeReady) base.YAOMU_WSL_RUNTIME_READY = "1";

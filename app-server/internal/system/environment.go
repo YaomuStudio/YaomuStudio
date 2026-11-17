@@ -44,7 +44,7 @@ type ProbeOptions struct {
 	// WSLDistro 是执行侧镜像发行版；为空时使用 WSL 默认发行版。
 	WSLDistro string
 	// WSLRuntimeReady 由桌面壳执行镜像自带 check-runtime 后传入；nil 表示未探测。
-	// 客户端不再检查宿主 FFmpeg，媒体工具由镜像提供。
+	// 它只反映模型执行环境，不决定 FFmpeg 槽位；FFmpeg 就绪看 FFMPEG_BIN。
 	WSLRuntimeReady *bool
 }
 
