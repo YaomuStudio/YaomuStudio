@@ -394,7 +394,7 @@ async function create(): Promise<void> {
       const originalImport = await api.importAssets({
         projectId,
         paths: [originalPath],
-        copyMode: false,
+        copyMode: true,
       });
       if (!originalImport.assetIds[0]) throw new Error("voiceClone.importFailed");
       await api.importSubtitleTrack({
@@ -407,7 +407,7 @@ async function create(): Promise<void> {
         const imported = await api.importAssets({
           projectId,
           paths: [item.path],
-          copyMode: false,
+          copyMode: true,
         });
         if (!imported.assetIds[0]) throw new Error("voiceClone.importFailed");
         await api.importSubtitleTrack({

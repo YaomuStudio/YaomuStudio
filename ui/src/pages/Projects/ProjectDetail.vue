@@ -375,6 +375,17 @@ async function relocateAsset(asset: Asset): Promise<void> {
   }
 }
 
+/** 只有状态就绪、大小有效且命名可用的素材才允许下载。 */
+function isDownloadableAsset(asset: Asset): boolean {
+  return asset.status === "ready" && asset.sizeBytes > 0 && downloadNames.value.has(asset.id);
+}
+
+/** 只有当前 revision 有实际句段的字幕轨才允许下载。 */
+function isDownloadableTrack(track: SubtitleTrack): boolean {
+  const revision = trackRevision(track);
+  return Boolean(revision && revision.segments.length > 0);
+}
+
 async function downloadAsset(asset: Asset): Promise<void> {
   const name = downloadNames.value.get(asset.id);
   if (!name) return;
@@ -412,17 +423,39 @@ function srtTime(ms: number): string {
 }
 
 /** 字幕轨道不在资产列表里；直接按当前 revision 导出 SRT，所有项目类型一致。 */
-function downloadTrack(track: SubtitleTrack): void {
+async function downloadTrack(track: SubtitleTrack): Promise<void> {
   const current = project.value;
   const revision = trackRevision(track);
   if (!current || !revision || revision.segments.length === 0) return;
   const body = revision.segments
     .map((segment, index) => `${index + 1}\n${srtTime(segment.startMs)} --> ${srtTime(segment.endMs)}\n${segment.text}\n`)
     .join("\n");
+  const projectName = current.name.replace(
+    /\.(mp4|mov|mkv|m4v|webm|wav|mp3|aac|flac|m4a|ogg)$/i,
+    "",
+  );
   const base = fileSafe(
-    `${current.name}_${langName(track.language)}_${t(`projectDetail.trackType.${track.type}`)}`,
+    `${projectName}_${langName(track.language)}_${t(`projectDetail.trackType.${track.type}`)}`,
   );
   const filename = `${base || "subtitles"}.srt`;
+  // 客户端必须走系统保存对话框；浏览器预览才回退到浏览器下载。
+  if (desktopApi?.saveTextFile) {
+    try {
+      const saved = await desktopApi.saveTextFile({
+        suggestedName: filename,
+        text: body,
+        filters: [{ name: "SRT", extensions: ["srt"] }],
+      });
+      if (saved) {
+        notice.value = messageNotice("workbench.card.downloaded", { name: filename });
+        flashNotice();
+      }
+    } catch {
+      notice.value = messageNotice("workbench.card.downloadFailed");
+      flashNotice();
+    }
+    return;
+  }
   const url = URL.createObjectURL(new Blob([body], { type: "application/x-subrip;charset=utf-8" }));
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -644,6 +677,12 @@ function assetStatusTone(status: AssetStatus): Tone {
             <div class="asset-row__main">
               <span class="asset-row__name truncate"><bdi dir="auto">{{ asset.name }}</bdi></span>
               <span class="muted">{{ t(`projectDetail.assetType.${asset.type}`) }}</span>
+              <span v-if="asset.status === 'missing' && runActive" class="asset-row__hint">
+                {{ t("projectDetail.assetStatus.relocateAfterRun") }}
+              </span>
+              <span v-else-if="asset.status === 'corrupt'" class="asset-row__hint">
+                {{ t("projectDetail.assetStatus.reimportCorrupt") }}
+              </span>
             </div>
             <YmBadge :tone="assetStatusTone(asset.status)">
               {{ t(`projectDetail.assetStatus.${asset.status}`) }}
@@ -653,7 +692,7 @@ function assetStatusTone(status: AssetStatus): Tone {
             </span>
             <span class="asset-row__meta mono"><bdi dir="ltr">{{ formatBytes(asset.sizeBytes) }}</bdi></span>
             <YmButton
-              v-if="asset.status === 'missing' || asset.status === 'corrupt'"
+              v-if="asset.status === 'missing' && !runActive"
               size="sm"
               variant="ghost"
               icon="folder-open"
@@ -664,7 +703,7 @@ function assetStatusTone(status: AssetStatus): Tone {
               {{ t("pipeline.import.relocate") }}
             </YmButton>
             <YmButton
-              v-if="downloadNames.has(asset.id)"
+              v-if="isDownloadableAsset(asset)"
               size="sm"
               variant="ghost"
               icon="download"
@@ -703,7 +742,7 @@ function assetStatusTone(status: AssetStatus): Tone {
               <bdi>{{ tCount("projectDetail.tracks.revisions", track.revisions.length) }}</bdi>
             </YmBadge>
             <YmButton
-              v-if="(trackRevision(track)?.segments.length ?? 0) > 0"
+              v-if="isDownloadableTrack(track)"
               size="sm"
               variant="ghost"
               icon="download"
@@ -828,6 +867,10 @@ function assetStatusTone(status: AssetStatus): Tone {
 .task-row__name {
   font-weight: 500;
 }
+.asset-row__hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
 .asset-row__meta {
   flex: none;
   min-width: 64px;
@@ -859,7 +902,7 @@ function assetStatusTone(status: AssetStatus): Tone {
   font-size: var(--font-size-sm);
 }
 @media (max-width: 640px) {
-      .asset-row,
+  .asset-row,
   .track-row,
   .task-row {
     flex-wrap: wrap;

@@ -242,6 +242,13 @@ interface YaomuBridgeApi {
     suggestedName?: string;
     title?: string;
   }): Promise<{ path: string } | null>;
+  /** 字幕等文本由系统保存对话框落盘；Renderer 不传任意目标路径。 */
+  saveTextFile(input: {
+    suggestedName?: string;
+    text: string;
+    title?: string;
+    filters?: { name: string; extensions: string[] }[];
+  }): Promise<{ path: string } | null>;
   notify(title: string, body: string, category?: string): Promise<void>;
   /** 将关闭行为同步给主进程（主进程据此决定拦截 close 与托盘生命周期）。 */
   setCloseBehavior(value: "quit" | "minimize"): Promise<void>;

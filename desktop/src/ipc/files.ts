@@ -6,6 +6,7 @@
  */
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import fs from "node:fs";
+import path from "node:path";
 import { DesktopAuthorization } from "./authorization";
 import {
   MAX_MEDIA_SCAN_FILES,
@@ -77,6 +78,20 @@ export function defaultOutputDir(): string {
     appPath: app.getAppPath(),
     execPath: process.execPath,
   });
+}
+
+export interface SaveTextOptions {
+  suggestedName?: string;
+  text: string;
+  title?: string;
+  filters?: { name: string; extensions: string[] }[];
+}
+
+function cleanSaveTextName(value: unknown): string {
+  const raw = typeof value === "string" ? path.basename(value.trim()) : "";
+  const safe = raw.replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").replace(/[. ]+$/g, "");
+  const name = safe.slice(0, 120) || "subtitles.srt";
+  return /\.[a-z0-9]+$/i.test(name) ? name : `${name}.srt`;
 }
 
 export function registerFileIpc(authorization: DesktopAuthorization): void {
@@ -161,6 +176,32 @@ export function registerFileIpc(authorization: DesktopAuthorization): void {
     } catch {
       event.returnValue = "";
     }
+  });
+
+  // 字幕等文本由主进程打开系统保存对话框；Renderer 只传文件名和内容，不传任意目标路径。
+  ipcMain.handle("yaomu:files:save-text", async (event, raw: unknown) => {
+    const authority = authorization.requireSender(event);
+    const input = (raw ?? {}) as Partial<SaveTextOptions>;
+    if (typeof input.text !== "string" || input.text.length === 0) {
+      throw new Error("empty text");
+    }
+    if (Buffer.byteLength(input.text, "utf8") > 16 * 1024 * 1024) {
+      throw new Error("text too large");
+    }
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) throw new Error("SAVE_TEXT_NO_WINDOW");
+    const suggestedName = cleanSaveTextName(input.suggestedName);
+    const result = await dialog.showSaveDialog(win, {
+      title: cleanTitle(input.title) ?? "保存字幕",
+      defaultPath: path.join(defaultOutputDir(), suggestedName),
+      filters: cleanFilters(input.filters) ?? [{ name: "SRT", extensions: ["srt"] }],
+      properties: ["showOverwriteConfirmation", "createDirectory"],
+    });
+    authorization.assertCurrent(event, authority);
+    if (result.canceled || !result.filePath) return null;
+    await fs.promises.writeFile(result.filePath, input.text, { encoding: "utf8" });
+    authority.paths.grantOpenPath(result.filePath);
+    return { path: result.filePath };
   });
 
   ipcMain.handle("yaomu:files:open-path", async (event, target: unknown) => {

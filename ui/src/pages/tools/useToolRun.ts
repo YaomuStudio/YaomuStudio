@@ -221,7 +221,7 @@ export function useToolRun() {
       const imported = await api.importAssets({
         projectId: project.id,
         paths: [opts.filePath],
-        copyMode: false,
+        copyMode: true,
       });
       if (imported.assetIds.length === 0) {
         error.value = { messageKey: "tools.flow.importEmpty" };

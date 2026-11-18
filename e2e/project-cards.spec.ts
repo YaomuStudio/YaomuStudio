@@ -435,6 +435,74 @@ test("downloads a subtitle track as SRT from project detail", async ({ page }) =
   expect(download.suggestedFilename()).toMatch(/\.srt$/);
 });
 
+test("active production defers relocation and corrupt assets require re-import", async ({ page }) => {
+  await page.addInitScript(() => {
+    const scope = window as Window & { __yaomuMock?: Record<string, unknown> };
+    const control = (scope.__yaomuMock ??= {});
+    control.runStatusOverride = "RUNNING";
+    control.assetFixtures = {
+      "proj-demo": [
+        {
+          id: "asset-missing-source",
+          projectId: "proj-demo",
+          type: "video",
+          name: "missing-source.mp4",
+          sizeBytes: 0,
+          status: "missing",
+          importedAt: "2026-11-06T00:00:00.000Z",
+        },
+        {
+          id: "asset-corrupt-source",
+          projectId: "proj-demo",
+          type: "video",
+          name: "corrupt-source.mp4",
+          sizeBytes: 1024,
+          status: "corrupt",
+          importedAt: "2026-11-06T00:00:00.000Z",
+        },
+      ],
+    };
+  });
+  await page.goto("/#/projects/proj-demo");
+
+  const missing = page.locator(".asset-row").filter({ hasText: "missing-source.mp4" });
+  await expect(missing.getByText("Relocate after production finishes")).toBeVisible();
+  await expect(missing.getByRole("button", { name: "Relocate", exact: true })).toHaveCount(0);
+  await expect(missing.getByRole("button", { name: "Download", exact: true })).toHaveCount(0);
+
+  const corrupt = page.locator(".asset-row").filter({ hasText: "corrupt-source.mp4" });
+  await expect(
+    corrupt.getByText("File changed since import; re-import it instead"),
+  ).toBeVisible();
+  await expect(corrupt.getByRole("button", { name: "Relocate", exact: true })).toHaveCount(0);
+  await expect(corrupt.getByRole("button", { name: "Download", exact: true })).toHaveCount(0);
+});
+
+test("terminal project offers relocation for a missing external source", async ({ page }) => {
+  await page.addInitScript(() => {
+    const scope = window as Window & { __yaomuMock?: Record<string, unknown> };
+    const control = (scope.__yaomuMock ??= {});
+    control.runStatusOverride = "FAILED";
+    control.assetFixtures = {
+      "proj-demo": [
+        {
+          id: "asset-missing-source",
+          projectId: "proj-demo",
+          type: "video",
+          name: "missing-source.mp4",
+          sizeBytes: 0,
+          status: "missing",
+          importedAt: "2026-11-06T00:00:00.000Z",
+        },
+      ],
+    };
+  });
+  await page.goto("/#/projects/proj-demo");
+
+  const missing = page.locator(".asset-row").filter({ hasText: "missing-source.mp4" });
+  await expect(missing.getByRole("button", { name: "Relocate", exact: true })).toBeVisible();
+});
+
 test("failed run offers recreate and shows production failed", async ({ page }) => {
   await page.addInitScript(() => {
     const scope = window as Window & { __yaomuMock?: Record<string, unknown> };

@@ -130,7 +130,7 @@ const activeRunId = ref<string | null>(null);
 const sourceLanguage = ref("zh");
 const extractMode = ref<ExtractMode>("asr");
 const ocrLanguage = ref("chinese");
-const copyToProject = ref(false);
+const copyToProject = ref(true);
 
 // ---- 步骤二：译制配置 ----
 const projectName = ref("");

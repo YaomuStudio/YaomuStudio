@@ -223,6 +223,7 @@ const api = {
   // 媒体播放入口：非法资产 ID 返回空串；不暴露令牌或 Core 地址。
   assetUrl: (assetId: unknown) => assetUrl(assetId),
   openPath: (target: string) => ipcRenderer.invoke("yaomu:files:open-path", target),
+  saveTextFile: (input: unknown) => ipcRenderer.invoke("yaomu:files:save-text", input),
   saveAsset: (input: unknown) => ipcRenderer.invoke("yaomu:assets:save", input),
   notify: (title: string, body: string, category?: string) =>
     ipcRenderer.invoke("yaomu:notify", { title, body, category }),

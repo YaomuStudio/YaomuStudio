@@ -695,7 +695,7 @@ function validate(): boolean {
 async function importSubtitle(projectId: string, file: File, language: string, type: "transcription" | "translation"): Promise<string> {
   const path = resolveFilePath(file);
   if (!path) throw new Error(t("tools.custom.subtitle.pathUnavailable"));
-  const imported = await api.importAssets({ projectId, paths: [path], copyMode: false });
+  const imported = await api.importAssets({ projectId, paths: [path], copyMode: true });
   const assetId = imported.assetIds[0];
   if (!assetId) throw new Error(t("tools.flow.importEmpty"));
   const track = await api.importSubtitleTrack({ projectId, assetId, language, type });

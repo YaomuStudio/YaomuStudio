@@ -179,7 +179,7 @@ async function create(): Promise<void> {
     await api.importAssets({
       projectId: project.id,
       paths: [videoFile.value.path],
-      copyMode: false,
+      copyMode: true,
     });
     await router.push({
       path: `/projects/${project.id}/pipeline`,
