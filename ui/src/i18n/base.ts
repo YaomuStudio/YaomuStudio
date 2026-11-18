@@ -196,10 +196,6 @@ const base: AreaMessages = {
     "api.fileSaveFailed": "Saving the file failed.",
 
     // 安装/回滚竞态（Core messageKey）
-    "installation.reuse_raced":
-      "The installation state changed. Try again.",
-    "installation.rollback_raced":
-      "The installation state changed. Try the rollback again.",
 
     // 无桥提示（产品不提供演示模式）
     "shell.browserPreview.title": "Browser preview",
@@ -591,8 +587,6 @@ const base: AreaMessages = {
     "api.fileSaveFailed": "保存文件失败。",
 
     // 安装/回滚竞态（Core messageKey）
-    "installation.reuse_raced": "安装状态已变化，请重试。",
-    "installation.rollback_raced": "安装状态已变化，请重试回滚。",
 
     // 无桥提示（产品不提供演示模式）
     "shell.browserPreview.title": "浏览器预览",

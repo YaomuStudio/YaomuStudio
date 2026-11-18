@@ -44,6 +44,7 @@ async function openClone(page: Page): Promise<void> {
 }
 
 async function createRun(page: Page): Promise<void> {
+  await page.getByPlaceholder("Project name").fill("E2E clone project");
   await page.getByRole("button", { name: "Create" }).click();
 }
 
@@ -64,6 +65,19 @@ async function setMockValue(page: Page, key: string, value: unknown): Promise<vo
 test.beforeEach(async ({ page }) => {
   await seedOnboardedSettings(page);
   await seedMockControl(page);
+});
+
+test("requires a project name before creating a clone run", async ({ page }) => {
+  await page.goto("/#/voice-clone");
+  await expect(page.getByRole("heading", { level: 1, name: "High-emotion clone dubbing" })).toBeVisible();
+  await page.locator('input[accept^=".mp3"]').setInputFiles(SAMPLE_AUDIO);
+  await page.locator('input[accept=".srt"]:not([multiple])').setInputFiles(SAMPLE_SRT);
+  await chooseTargets(page, ["简体中文"]);
+  await page.locator('input[accept=".srt"][multiple]').setInputFiles(SAMPLE_TRANSLATED_SRT);
+
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Enter a project name.")).toBeVisible();
+  expect(await probe<RunInputProbe>(page, "lastRunInput")).toBeNull();
 });
 
 test("rejects duplicate translated-file languages before creating a run", async ({ page }) => {

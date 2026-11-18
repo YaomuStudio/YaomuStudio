@@ -757,6 +757,13 @@ export interface StorageUsage {
   exports: Bytes;
 }
 
+export type StorageCleanupCategory = "models" | "cache";
+
+export interface StorageCleanupResult {
+  category: StorageCleanupCategory;
+  freedBytes: Bytes;
+}
+
 /** 实例握手与启动阶段。 */
 export interface SystemInfo {
   appId: string;

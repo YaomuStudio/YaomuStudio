@@ -45,6 +45,7 @@ import YmIcon from "@/components/ui/YmIcon.vue";
 import YmIconButton from "@/components/ui/YmIconButton.vue";
 import YmPanel from "@/components/ui/YmPanel.vue";
 import YmSwitch from "@/components/ui/YmSwitch.vue";
+import YmTextInput from "@/components/ui/YmTextInput.vue";
 import { useToolRun } from "../tools/useToolRun";
 import { useRunTask } from "../tools/useRunTask";
 
@@ -73,6 +74,7 @@ const { blocked: createBlocked, blockedText: createBlockedText } = useCreateGuar
 
 /** 连续创建：清空表单、结果与当前 Run 视图，保留本工具的配置项。 */
 function resetForm(): void {
+  projectName.value = "";
   sourceAudio.value = null;
   originalSubtitle.value = null;
   translatedSubtitles.value = [];
@@ -93,6 +95,7 @@ const { hasProject, canOpenProject, primaryLabel, onPrimary, openProject, startN
   reset: resetForm,
 });
 
+const projectName = ref("");
 const sourceAudio = ref<PickedFile | null>(null);
 const originalSubtitle = ref<PickedFile | null>(null);
 const translatedSubtitles = ref<TranslatedFile[]>([]);
@@ -169,6 +172,9 @@ const cloneTask = useRunTask(
   () => runBusy.value,
 );
 
+const projectError = computed(() =>
+  showErrors.value && !projectName.value.trim() ? t("tools.common.projectNameErr") : "",
+);
 const sourceError = computed(() =>
   showErrors.value && !sourceAudio.value ? t("voiceClone.source.err") : "",
 );
@@ -185,6 +191,7 @@ const footerStatus = computed(() => {
   if (runBusy.value) return t("creation.footer.running");
   if (createBlocked.value) return createBlockedText.value;
   const missing: string[] = [];
+  if (!projectName.value.trim()) missing.push(t("tools.common.projectName"));
   if (!sourceAudio.value) missing.push(t("voiceClone.source.label"));
   if (!originalSubtitle.value) missing.push(t("voiceClone.sub.original"));
   if (targetLanguages.value.length === 0) missing.push(t("voiceClone.sub.target"));
@@ -353,6 +360,7 @@ async function create(): Promise<void> {
   saveMessage.value = null;
   saveError.value = null;
   if (
+    !projectName.value.trim() ||
     !sourceAudio.value ||
     !originalSubtitle.value ||
     !sourceLanguage.value ||
@@ -381,7 +389,7 @@ async function create(): Promise<void> {
   }
   showErrors.value = false;
   const result = await startRun({
-    projectName: sourceAudio.value.name.slice(0, 30),
+    projectName: projectName.value.trim(),
     filePath: sourcePath,
     payload: {
       template: "tool_voice_clone",
@@ -528,6 +536,17 @@ onMounted(() => {
 
         <YmPanel :title="t('voiceClone.step.source')">
           <div class="panel-stack">
+            <YmField
+              :label="t('tools.common.projectName')"
+              :hint="t('tools.common.projectNameHint')"
+              :error="projectError"
+              required
+            >
+              <YmTextInput
+                v-model="projectName"
+                :placeholder="t('tools.common.projectName')"
+              />
+            </YmField>
             <YmField
               :label="t('voiceClone.source.label')"
               :hint="t('voiceClone.source.hint')"

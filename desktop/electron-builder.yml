@@ -66,7 +66,7 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  # 卸载时删除 userData 下的 Runner 租约。项目、模型与 WSL 镜像仍保留。
+  # 交互卸载默认保留项目/模型/WSL；用户二次确认删除时才清理 userData 与 outputs。
   include: nsis/uninstall-lease.nsh
 
 # 首发矩阵：Windows x64、macOS arm64/x64、Linux x64；签名仍按各平台注释处理。

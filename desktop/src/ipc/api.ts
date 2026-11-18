@@ -129,6 +129,12 @@ const ROUTES: Record<string, ApiRoute> = {
     query: (args) => ({ refresh: args[0] === true ? "true" : undefined }),
   },
   getStorageUsage: { method: "GET", path: () => "/api/v1/storage/usage" },
+  cleanupStorage: {
+    method: "POST",
+    path: () => "/api/v1/storage/cleanup",
+    body: (args) => objectArg(args, 0, "cleanup"),
+    idempotent: true,
+  },
   getLocalApiStats: { method: "GET", path: () => "/api/v1/local-api/stats" },
   getLocalApiSettings: { method: "GET", path: () => "/api/v1/local-api/settings" },
   updateLocalApiSettings: {

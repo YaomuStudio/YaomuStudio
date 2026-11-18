@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { formatBytes, t } from "@/i18n";
-import { errorNotice, messageNotice, noticeKey, renderNotice, type NoticeMessageParam, type SafeNotice } from "@/i18n/notice";
+import { formatBytes, t, tCount } from "@/i18n";
+import { countNotice, errorNotice, messageNotice, noticeKey, renderNotice, type NoticeMessageParam, type SafeNotice } from "@/i18n/notice";
 import { api } from "@/api";
 import {
   CAPABILITY_SLOTS,
@@ -24,12 +24,14 @@ import { slotStateLabelKey, slotStateTone } from "@/domain/status";
 import type {
   Capability,
   CapabilitySlotKey,
+  EnvironmentInfo,
   Installation,
   InstallationPlan,
   ModelSlotKey,
   ParamField,
   SlotState,
 } from "@/domain/types";
+import EnvironmentQueueDialog from "@/components/EnvironmentQueueDialog.vue";
 import InstallPlanDialog from "@/components/InstallPlanDialog.vue";
 import YmBadge from "@/components/ui/YmBadge.vue";
 import YmButton from "@/components/ui/YmButton.vue";
@@ -43,6 +45,7 @@ import YmSelect from "@/components/ui/YmSelect.vue";
 import YmTextInput from "@/components/ui/YmTextInput.vue";
 import { useCapabilitiesStore } from "@/stores/capabilities";
 import { useInstallationsStore } from "@/stores/installations";
+import { useModelDownloadQueue } from "@/composables/useModelDownloadQueue";
 
 interface SlotRow {
   meta: SlotMeta;
@@ -84,6 +87,30 @@ const caps = useCapabilitiesStore();
 const installs = useInstallationsStore();
 const route = useRoute();
 const loading = ref(false);
+const environment = ref<EnvironmentInfo | null>(null);
+const environmentLoading = ref(false);
+const environmentError = ref<SafeNotice | null>(null);
+const environmentErrorText = computed(() => renderNotice(environmentError.value));
+const environmentBlockingCheck = computed(() =>
+  environment.value?.checks.find((check) => check.severity === "blocker"),
+);
+/** Windows 模型安装依赖 WSL 运行环境；环境未就绪时禁止启动新安装。 */
+const environmentReady = computed(() => {
+  if (!environment.value) return false;
+  if (environment.value.platform !== "windows") return true;
+  return Boolean(environment.value.wsl?.available) && !environmentBlockingCheck.value;
+});
+const environmentBlockedReason = computed(() => {
+  if (environmentReady.value) return "";
+  if (environmentError.value) return environmentErrorText.value;
+  if (environmentLoading.value || !environment.value) return t("onboarding.environment.loading");
+  if (environmentBlockingCheck.value) return t(environmentBlockingCheck.value.messageKey);
+  return t("onboarding.environment.wslMissing");
+});
+const queueOpen = ref(false);
+const queueTargets = ref<CapabilitySlotKey[]>([]);
+const downloadQueue = useModelDownloadQueue();
+const queuedSlots = downloadQueue.queued;
 const busySlot = ref<CapabilitySlotKey | null>(null);
 const paramSaving = ref<CapabilitySlotKey | null>(null);
 const engineBusy = ref<string | null>(null);
@@ -381,12 +408,24 @@ async function saveParams(cap: Capability): Promise<void> {
   }
 }
 
+async function loadEnvironment(force = false): Promise<void> {
+  environmentLoading.value = true;
+  environmentError.value = null;
+  try {
+    environment.value = await api.getEnvironment({ refresh: force });
+  } catch (err) {
+    environment.value = null;
+    environmentError.value = errorNotice(err, "onboarding.environment.error");
+  } finally {
+    environmentLoading.value = false;
+  }
+}
+
 async function refresh(): Promise<void> {
   loading.value = true;
   actionError.value = null;
   try {
-    await caps.load();
-    await installs.load();
+    await Promise.all([caps.load(), installs.load(), loadEnvironment()]);
     await Promise.all(caps.slots.map((cap) => hydrateEngineConfig(cap)));
   } catch (err) {
     actionError.value = errorNotice(err, "models.error");
@@ -395,7 +434,83 @@ async function refresh(): Promise<void> {
   }
 }
 
+function openQueue(slots: CapabilitySlotKey[]): void {
+  const targets = slots.filter(
+    (slot) => !activeInstallation(slot) && hasDownloadableRelease(caps.slotState(slot)),
+  );
+  if (!targets.length) return;
+  queueTargets.value = [...new Set(targets)];
+  queueOpen.value = true;
+}
+
+function confirmQueue(): void {
+  if (!queueTargets.value.length) return;
+  downloadQueue.add(queueTargets.value);
+  const count = queueTargets.value.length;
+  for (const slot of queueTargets.value) {
+    setSlotNotice(slot, countNotice("onboarding.models.queuedCount", count));
+  }
+  queueTargets.value = [];
+  queueOpen.value = false;
+}
+
+function cancelQueued(slot: CapabilitySlotKey): void {
+  downloadQueue.remove(slot);
+}
+
+async function startQueuedDownloads(): Promise<void> {
+  if (!environmentReady.value || !queuedSlots.value.length) return;
+  const targets = queuedSlots.value.filter((slot) => {
+    const state = caps.slotState(slot)?.state;
+    return (
+      !activeInstallation(slot) &&
+      hasDownloadableRelease(caps.slotState(slot)) &&
+      state !== "READY" &&
+      state !== "INSTALLING" &&
+      state !== "VERIFYING"
+    );
+  });
+  if (!targets.length) {
+    downloadQueue.clear();
+    return;
+  }
+  busySlot.value = targets[0] ?? null;
+  actionError.value = null;
+  try {
+    const plans: InstallationPlan[] = [];
+    const seen = new Set<string>();
+    for (const slot of targets) {
+      const plan = await api.planInstallation(slot);
+      if (!planCoverage(plan).valid) throw new Error(t("install.plan.invalidRange"));
+      const key = [
+        plan.release.releaseId,
+        plan.release.version,
+        plan.release.digest,
+        plan.release.channel ?? "",
+      ].join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      plans.push(plan);
+    }
+    for (const plan of plans) {
+      const created = await api.install({ planId: plan.planId, planHash: plan.planHash });
+      installs.track(created.id, plan.slot);
+      setSlotNotice(plan.slot, messageNotice("models.installStarted", {
+        name: slotNoticeName(plan.slot),
+      }));
+    }
+    downloadQueue.clear();
+    await refresh();
+  } catch (err) {
+    actionError.value = errorNotice(err, "models.error");
+    await refresh();
+  } finally {
+    busySlot.value = null;
+  }
+}
+
 async function startInstall(slot: CapabilitySlotKey): Promise<void> {
+  if (downloadQueue.has(slot)) return;
   // 未支持/未准入的槽位没有可解析的发布，禁用入口且不发无效计划请求。
   // 权重预拉进行中槽位已是 INSTALLING，不能再打开下载确认。
   const state = caps.slotState(slot)?.state;
@@ -405,6 +520,10 @@ async function startInstall(slot: CapabilitySlotKey): Promise<void> {
     state === "VERIFYING" ||
     !hasDownloadableRelease(caps.slotState(slot))
   ) {
+    return;
+  }
+  if (!environmentReady.value) {
+    openQueue([slot]);
     return;
   }
   busySlot.value = slot;
@@ -421,7 +540,7 @@ async function startInstall(slot: CapabilitySlotKey): Promise<void> {
 
 async function confirmInstall(): Promise<void> {
   const plan = planTarget.value;
-  if (!plan) return;
+  if (!environmentReady.value || !plan) return;
   const coverage = planCoverage(plan);
   // 覆盖范围异常时不允许提交；对话框已禁用确认，这里再 fail closed 一次。
   if (!coverage.valid) return;
@@ -541,8 +660,33 @@ watch(
   { immediate: true },
 );
 
+let queuePoll: number | undefined;
+function syncQueuePoll(): void {
+  const waiting = queuedSlots.value.length > 0 && !environmentReady.value;
+  if (waiting && queuePoll === undefined) {
+    queuePoll = window.setInterval(() => {
+      if (!environmentLoading.value) void loadEnvironment(true);
+    }, 5000);
+  } else if (!waiting && queuePoll !== undefined) {
+    window.clearInterval(queuePoll);
+    queuePoll = undefined;
+  }
+}
+watch([queuedSlots, environmentReady], syncQueuePoll, { immediate: true });
+watch(environmentReady, (ready) => {
+  if (!ready) return;
+  queueOpen.value = false;
+  void startQueuedDownloads();
+});
+
 onMounted(() => {
   void refresh();
+});
+onBeforeUnmount(() => {
+  if (queuePoll !== undefined) {
+    window.clearInterval(queuePoll);
+    queuePoll = undefined;
+  }
 });
 </script>
 
@@ -566,6 +710,28 @@ onMounted(() => {
 
     <YmNotice v-if="actionErrorText" tone="error">
       <bdi>{{ actionErrorText }}</bdi>
+    </YmNotice>
+    <YmNotice v-if="!environmentReady" tone="warning">
+      <div class="env-block">
+        <bdi>{{ environmentBlockedReason }}</bdi>
+        <YmButton
+          size="sm"
+          icon="refresh"
+          :loading="environmentLoading"
+          @click="loadEnvironment(true)"
+        >
+          {{ t("models.refresh") }}
+        </YmButton>
+      </div>
+    </YmNotice>
+
+    <YmNotice v-if="queuedSlots.length" tone="info">
+      <div class="env-block">
+        <bdi>{{ tCount("onboarding.models.queuedCount", queuedSlots.length) }}</bdi>
+        <YmButton size="sm" @click="downloadQueue.clear()">
+          {{ t("onboarding.models.cancelQueued") }}
+        </YmButton>
+      </div>
     </YmNotice>
 
     <YmNotice tone="warning" :title="t('models.budget')">
@@ -722,7 +888,15 @@ onMounted(() => {
           </div>
 
           <footer class="slot__actions">
-            <template v-if="activeInstallation(row.cap.slot)">
+            <template v-if="downloadQueue.has(row.cap.slot) && !activeInstallation(row.cap.slot)">
+              <YmButton size="sm" disabled>
+                {{ t("onboarding.models.queued") }}
+              </YmButton>
+              <YmButton size="sm" @click="cancelQueued(row.cap.slot)">
+                {{ t("onboarding.models.cancelQueued") }}
+              </YmButton>
+            </template>
+            <template v-else-if="activeInstallation(row.cap.slot)">
               <YmButton
                 variant="secondary"
                 size="sm"
@@ -767,6 +941,7 @@ onMounted(() => {
                 variant="primary"
                 size="sm"
                 icon="download"
+
                 :loading="busySlot === row.cap.slot"
                 @click="startInstall(row.cap.slot)"
               >
@@ -887,7 +1062,15 @@ onMounted(() => {
             <p class="progress__phase">{{ t(STATE_HINTS[row.cap.state]) }}</p>
           </div>
           <footer class="slot__actions">
-            <template v-if="activeInstallation(row.cap.slot)">
+            <template v-if="downloadQueue.has(row.cap.slot) && !activeInstallation(row.cap.slot)">
+              <YmButton size="sm" disabled>
+                {{ t("onboarding.models.queued") }}
+              </YmButton>
+              <YmButton size="sm" @click="cancelQueued(row.cap.slot)">
+                {{ t("onboarding.models.cancelQueued") }}
+              </YmButton>
+            </template>
+            <template v-else-if="activeInstallation(row.cap.slot)">
               <YmButton
                 variant="secondary"
                 size="sm"
@@ -928,6 +1111,7 @@ onMounted(() => {
                 variant="primary"
                 size="sm"
                 icon="download"
+
                 :loading="busySlot === row.cap.slot"
                 @click="startInstall(row.cap.slot)"
               >
@@ -989,6 +1173,15 @@ onMounted(() => {
       @confirm="confirmInstall"
     />
 
+    <EnvironmentQueueDialog
+      v-model="queueOpen"
+      :reason="environmentBlockedReason"
+      :count="queueTargets.length || 1"
+      :refreshing="environmentLoading"
+      @queue="confirmQueue"
+      @refresh="loadEnvironment(true)"
+    />
+
     <YmDialog
       :model-value="deleteTarget !== null"
       :title="t('models.deleteTitle')"
@@ -1022,6 +1215,13 @@ onMounted(() => {
   flex-direction: column;
   gap: var(--space-4);
   max-width: 1080px;
+}
+.env-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 .page__head {
   display: flex;

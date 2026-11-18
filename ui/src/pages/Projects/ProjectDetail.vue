@@ -31,6 +31,7 @@ import PageHeader from "@/components/layout/PageHeader.vue";
 import YmBadge from "@/components/ui/YmBadge.vue";
 import YmButton from "@/components/ui/YmButton.vue";
 import YmCard from "@/components/ui/YmCard.vue";
+import YmDialog from "@/components/ui/YmDialog.vue";
 import YmEmpty from "@/components/ui/YmEmpty.vue";
 import YmNotice from "@/components/ui/YmNotice.vue";
 import YmIcon from "@/components/ui/YmIcon.vue";
@@ -375,6 +376,66 @@ async function relocateAsset(asset: Asset): Promise<void> {
   }
 }
 
+const PREVIEW_TYPES = new Set<AssetType>(["video", "audio", "audio_track", "subtitle", "image"]);
+
+/** 只有就绪的媒体、字幕后图片可以预览；缺失/损坏素材不提供无效预览。 */
+function canPreviewAsset(asset: Asset): boolean {
+  return asset.status === "ready" && asset.sizeBytes > 0 && PREVIEW_TYPES.has(asset.type);
+}
+
+function assetContentUrl(id: string): string {
+  return `yaomu-asset://asset/${encodeURIComponent(id)}`;
+}
+
+const previewOpen = ref(false);
+const previewAsset = ref<Asset | null>(null);
+const previewText = ref("");
+const previewError = ref<SafeNotice | null>(null);
+const previewErrorText = computed(() => renderNotice(previewError.value));
+function previewTitleForAsset(asset: Asset): string {
+  if (asset.type === "subtitle") return t("workbench.card.previewSubtitle");
+  if (asset.type === "audio" || asset.type === "audio_track") return t("workbench.card.previewAudio");
+  if (asset.type === "video") return t("workbench.card.previewVideo");
+  return t("workbench.card.preview");
+}
+const previewTitle = computed(() =>
+  previewAsset.value ? previewTitleForAsset(previewAsset.value) : t("workbench.card.preview"),
+);
+
+function previewIcon(asset: Asset): string {
+  return asset.type === "subtitle" ? "subtitles" : "play";
+}
+
+async function openAssetPreview(asset: Asset): Promise<void> {
+  if (!canPreviewAsset(asset)) return;
+  previewOpen.value = true;
+  previewAsset.value = asset;
+  previewText.value = "";
+  previewError.value = null;
+  if (asset.type !== "subtitle") return;
+  try {
+    const response = await fetch(assetContentUrl(asset.id));
+    if (!response.ok) throw new Error(String(response.status));
+    const text = await response.text();
+    if (previewAsset.value?.id === asset.id) previewText.value = text;
+  } catch {
+    if (previewAsset.value?.id === asset.id) {
+      previewError.value = messageNotice("workbench.card.previewFailed");
+    }
+  }
+}
+
+function closeAssetPreview(): void {
+  previewOpen.value = false;
+  previewAsset.value = null;
+  previewText.value = "";
+  previewError.value = null;
+}
+
+function previewFailed(): void {
+  previewError.value = messageNotice("workbench.card.previewFailed");
+}
+
 /** 只有状态就绪、大小有效且命名可用的素材才允许下载。 */
 function isDownloadableAsset(asset: Asset): boolean {
   return asset.status === "ready" && asset.sizeBytes > 0 && downloadNames.value.has(asset.id);
@@ -675,7 +736,16 @@ function assetStatusTone(status: AssetStatus): Tone {
           <li v-for="asset in project.assets" :key="asset.id" class="asset-row">
             <span class="row-icon"><YmIcon :name="assetIcon(asset.type)" :size="18" /></span>
             <div class="asset-row__main">
-              <span class="asset-row__name truncate"><bdi dir="auto">{{ asset.name }}</bdi></span>
+              <button
+                v-if="canPreviewAsset(asset)"
+                type="button"
+                class="asset-row__name asset-row__name--action truncate"
+                :title="t('workbench.card.preview')"
+                @click="openAssetPreview(asset)"
+              >
+                <bdi dir="auto">{{ asset.name }}</bdi>
+              </button>
+              <span v-else class="asset-row__name truncate"><bdi dir="auto">{{ asset.name }}</bdi></span>
               <span class="muted">{{ t(`projectDetail.assetType.${asset.type}`) }}</span>
               <span v-if="asset.status === 'missing' && runActive" class="asset-row__hint">
                 {{ t("projectDetail.assetStatus.relocateAfterRun") }}
@@ -701,6 +771,17 @@ function assetStatusTone(status: AssetStatus): Tone {
               @click="relocateAsset(asset)"
             >
               {{ t("pipeline.import.relocate") }}
+            </YmButton>
+            <YmButton
+              v-if="canPreviewAsset(asset)"
+              size="sm"
+              variant="ghost"
+              :icon="previewIcon(asset)"
+              :title="previewTitleForAsset(asset)"
+              :data-testid="`project-detail-preview-${asset.id}`"
+              @click="openAssetPreview(asset)"
+            >
+              {{ t("workbench.card.preview") }}
             </YmButton>
             <YmButton
               v-if="isDownloadableAsset(asset)"
@@ -755,6 +836,42 @@ function assetStatusTone(status: AssetStatus): Tone {
         </ul>
       </YmCard>
 
+      <YmDialog
+        size="lg"
+        :model-value="previewOpen"
+        :title="previewTitle"
+        @update:model-value="closeAssetPreview"
+      >
+        <div v-if="previewAsset" class="asset-preview">
+          <video
+            v-if="previewAsset.type === 'video'"
+            :src="assetContentUrl(previewAsset.id)"
+            controls
+            autoplay
+            @error="previewFailed"
+          ></video>
+          <audio
+            v-else-if="previewAsset.type === 'audio' || previewAsset.type === 'audio_track'"
+            :src="assetContentUrl(previewAsset.id)"
+            controls
+            autoplay
+            @error="previewFailed"
+          ></audio>
+          <img
+            v-else-if="previewAsset.type === 'image'"
+            :src="assetContentUrl(previewAsset.id)"
+            alt=""
+            @error="previewFailed"
+          />
+          <pre v-else-if="previewAsset.type === 'subtitle'">
+            {{ previewText || t("common.loading") }}
+          </pre>
+          <p v-if="previewErrorText" class="asset-preview__error"><bdi>{{ previewErrorText }}</bdi></p>
+        </div>
+        <template #footer="{ close }">
+          <YmButton variant="secondary" @click="close">{{ t("common.close") }}</YmButton>
+        </template>
+      </YmDialog>
 
     </template>
 
@@ -866,6 +983,50 @@ function assetStatusTone(status: AssetStatus): Tone {
 .track-row__name,
 .task-row__name {
   font-weight: 500;
+}
+.asset-row__name--action {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.asset-row__name--action:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+.asset-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: min(640px, 80vw);
+}
+.asset-preview video,
+.asset-preview img {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-sunken);
+}
+.asset-preview audio {
+  width: 100%;
+}
+.asset-preview pre {
+  max-height: 55vh;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+.asset-preview__error {
+  margin: 0;
+  color: var(--color-error-strong);
 }
 .asset-row__hint {
   color: var(--color-text-muted);

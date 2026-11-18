@@ -22,7 +22,7 @@ test("shows local environment checks before model setup", async ({ page }) => {
   // mock 按宿主 UA 推断平台，不再写死 macOS。
   await expect(page.getByText(/^(Windows|macOS|Linux)$/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Check again" }).click();
+  await page.getByTestId("onboarding-step-panel").getByRole("button", { name: "Check again" }).click();
   await expect(page.getByText("FFmpeg is available.")).toBeVisible();
 });
 
@@ -245,6 +245,160 @@ test("shows manual WSL and driver guidance when checks request it", async ({ pag
   await expect(
     page.getByText(/does not download or install drivers automatically/i),
   ).toBeVisible();
+});
+
+test("queues model downloads until the Windows environment is ready", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("yaomu.settings", JSON.stringify({ onboarded: false, locale: "en" }));
+    localStorage.setItem("yaomu.onboarding.step", "models");
+    const control = ((window as Window & { __yaomuMock?: Record<string, unknown> }).__yaomuMock ??= {});
+    control.capabilityStates = {
+      asr: "NEEDS_SETUP",
+      translate: "NEEDS_SETUP",
+      ocr: "NEEDS_SETUP",
+      "voice-clone": "NEEDS_SETUP",
+      "subtitle-erase": "NEEDS_SETUP",
+      separation: "NEEDS_SETUP",
+    };
+    control.environment = {
+      platform: "windows",
+      wsl: { available: false },
+      devices: [
+        {
+          id: "cpu",
+          name: "CPU",
+          kind: "cpu",
+          recommended: true,
+          selected: true,
+          inUse: false,
+        },
+      ],
+      checks: [
+        {
+          code: "WSL2_AVAILABLE",
+          severity: "blocker",
+          messageKey: "environment.wsl_unavailable",
+          actionIds: ["install_wsl"],
+        },
+      ],
+    };
+  });
+
+  await page.goto("/");
+  await expect(
+    page.getByText("WSL2 was not detected. Model execution is unavailable until WSL2 is installed."),
+  ).toBeVisible();
+  const bulk = page.getByRole("button", { name: /Download all missing models/ });
+  await expect(bulk).toBeEnabled();
+  await expect(
+    page
+      .locator(".model")
+      .filter({ hasText: "Speech recognition" })
+      .getByRole("button", { name: "Download", exact: true }),
+  ).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Check again" })).toBeVisible();
+
+  await bulk.click();
+  const queueDialog = page.getByRole("dialog").filter({ hasText: "Prepare the runtime first" });
+  await expect(queueDialog).toBeVisible();
+  await queueDialog.getByRole("button", { name: "Queue download" }).click();
+  await expect(queueDialog).toBeHidden();
+  await expect(page.getByText(/model downloads queued/).first()).toBeVisible();
+  expect(
+    await page.evaluate(() => {
+      const control = (window as Window & { __yaomuMock?: Record<string, number> }).__yaomuMock;
+      return { plans: control?.planRequests ?? 0, installs: control?.installRequests ?? 0 };
+    }),
+  ).toEqual({ plans: 0, installs: 0 });
+
+  // 环境就绪后，队列应自动开始，不需要用户再次点击下载。
+  await page.evaluate(() => {
+    const control = (window as Window & { __yaomuMock?: { environment?: Record<string, unknown> } }).__yaomuMock;
+    if (control?.environment) {
+      control.environment.wsl = { available: true, version: 2 };
+      control.environment.checks = [];
+    }
+  });
+  await page.getByTestId("onboarding-step-panel").getByRole("button", { name: "Check again" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const control = (window as Window & { __yaomuMock?: Record<string, number> }).__yaomuMock;
+        return { plans: control?.planRequests ?? 0, installs: control?.installRequests ?? 0 };
+      }),
+    )
+    .toMatchObject({ plans: 5, installs: 5 });
+});
+
+test("models page queues downloads until the Windows environment is ready", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("yaomu.settings", JSON.stringify({ onboarded: true, locale: "en" }));
+    const control = ((window as Window & { __yaomuMock?: Record<string, unknown> }).__yaomuMock ??= {});
+    control.capabilityStates = {
+      asr: "NEEDS_SETUP",
+      translate: "NEEDS_SETUP",
+      ocr: "NEEDS_SETUP",
+      "voice-clone": "NEEDS_SETUP",
+      "subtitle-erase": "NEEDS_SETUP",
+      separation: "NEEDS_SETUP",
+    };
+    control.environment = {
+      platform: "windows",
+      wsl: { available: true, version: 2 },
+      devices: [
+        {
+          id: "cpu",
+          name: "CPU",
+          kind: "cpu",
+          recommended: true,
+          selected: true,
+          inUse: false,
+        },
+      ],
+      checks: [
+        {
+          code: "WSL_RUNTIME_READY",
+          severity: "blocker",
+          messageKey: "environment.wsl_runtime_unavailable",
+          actionIds: ["install_wsl"],
+        },
+      ],
+    };
+  });
+
+  await page.goto("/#/settings/models");
+  await expect(
+    page.getByText("The WSL runtime environment check failed; media and model tools may be unavailable."),
+  ).toBeVisible();
+  const install = page
+    .locator(".slot")
+    .filter({ hasText: "Speech recognition" })
+    .getByRole("button", { name: "Download model", exact: true });
+  await expect(install).toBeEnabled();
+  await install.click();
+  const queueDialog = page.getByRole("dialog").filter({ hasText: "Prepare the runtime first" });
+  await expect(queueDialog).toBeVisible();
+  await queueDialog.getByRole("button", { name: "Queue download" }).click();
+  await expect(page.getByText(/model download queued/).first()).toBeVisible();
+
+  await page.evaluate(() => {
+    const control = (window as Window & { __yaomuMock?: { environment?: Record<string, unknown> } }).__yaomuMock;
+    if (control?.environment) {
+      control.environment.wsl = { available: true, version: 2 };
+      control.environment.checks = [];
+    }
+  });
+  await page.getByRole("button", { name: "Refresh" }).first().click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const control = (window as Window & { __yaomuMock?: Record<string, number> }).__yaomuMock;
+        return control?.installRequests ?? 0;
+      }),
+    )
+    .toBeGreaterThan(0);
 });
 
 test("downloads all missing models in one confirmation and dedupes shared packages", async ({ page }) => {

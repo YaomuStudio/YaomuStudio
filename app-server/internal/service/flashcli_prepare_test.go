@@ -295,6 +295,74 @@ func TestInstallationProgressUsesWeightBytes(t *testing.T) {
 	}
 }
 
+func TestInstallationWeightProgressNeverMovesBackwards(t *testing.T) {
+	content := []byte("bundle-bytes")
+	server := staticSource(t, map[string][]byte{"/rel-weight-reset/model.bin": content})
+	plan := releasePlanFor(server, "rel-weight-reset", "1.0.10", map[string][]byte{"model.bin": content})
+	plan.FlashCLIRef = "xym/melband-roformer:1.0.10"
+	env := newInstallTestEnv(t, StaticReleases{Releases: map[domain.CapabilitySlotKey]ReleasePlan{
+		domain.CapabilitySlotSeparation: plan,
+	}}, newTestDownloader(server.URL))
+	releasePrepare := make(chan struct{})
+	env.svc.opts.PrepareModel = func(ctx context.Context, _ string) error {
+		select {
+		case <-releasePrepare:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	var calls atomic.Int32
+	secondCall := make(chan struct{})
+	env.svc.opts.WeightProgress = func(context.Context, string) (int64, int64, error) {
+		switch calls.Add(1) {
+		case 1:
+			return 400, 1000, nil
+		case 2:
+			close(secondCall)
+			return 0, 1000, nil
+		default:
+			return 500, 1000, nil
+		}
+	}
+	env.svc.opts.WeightProgressInterval = 15 * time.Millisecond
+	created := env.create(domain.CapabilitySlotSeparation)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		current, err := env.svc.GetInstallation(context.Background(), string(created.ID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if current.Phase == domain.InstallationPhaseInstalling && current.Progress == 40 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("never reached 40: phase=%s progress=%d", current.Phase, current.Progress)
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+	select {
+	case <-secondCall:
+	case <-time.After(2 * time.Second):
+		t.Fatal("weight progress was not sampled twice")
+	}
+	// The second sample dropped to 0 (simulating a stale/partial weight directory).
+	// The visible installation progress must not move backwards.
+	time.Sleep(30 * time.Millisecond)
+	current, err := env.svc.GetInstallation(context.Background(), string(created.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Phase != domain.InstallationPhaseInstalling || current.Progress < 40 {
+		t.Fatalf("progress moved backwards: phase=%s progress=%d", current.Phase, current.Progress)
+	}
+	close(releasePrepare)
+	done := env.waitTerminal(created.ID)
+	if done.Phase != domain.InstallationPhaseDone || done.Progress != 100 {
+		t.Fatalf("finished phase=%s progress=%d", done.Phase, done.Progress)
+	}
+}
+
 func TestInstallationPullUsesStoredPlanWhenMemoryIsEmpty(t *testing.T) {
 	content := []byte("bundle-bytes")
 	server := staticSource(t, map[string][]byte{"/rel-stored/model.bin": content})

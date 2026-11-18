@@ -14,6 +14,7 @@ import { createApiInvoker, registerApiProxy } from "./ipc/api";
 import { ASSET_SCHEME, createAssetStreamHandler } from "./ipc/asset-stream";
 import { registerAssetSaveIpc } from "./ipc/assets";
 import { registerFileIpc } from "./ipc/files";
+import { registerRuntimeCleanupIpc } from "./ipc/runtime-cleanup";
 import { registerNotificationIpc } from "./ipc/notify";
 import { RuntimeBridge, registerRuntimeIpc } from "./ipc/runtime";
 import { registerDesktopSettingsIpc } from "./ipc/settings";
@@ -516,6 +517,7 @@ function registerIpc(controller: RuntimeController, installController: UpdateIns
   // 播放只走主进程自定义协议：handler 用实例令牌取 Core 内容，Renderer 拿不到令牌/路径。
   protocol.handle(ASSET_SCHEME, createAssetStreamHandler(getConnection));
   registerFileIpc(authorization);
+  registerRuntimeCleanupIpc(authorization, controller, invoke);
   registerNotificationIpc(authorization);
   registerEventIpc(events, authorization);
   registerDesktopSettingsIpc(ipcMain, authorization, {

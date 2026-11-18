@@ -195,8 +195,8 @@ function openItem(item: AppNotification): void {
   z-index: 60;
   display: flex;
   flex-direction: column;
-  width: 360px;
-  max-height: 480px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(480px, calc(100vh - 96px));
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -266,8 +266,10 @@ function openItem(item: AppNotification): void {
 }
 .notif-center__list {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
   padding: 0 var(--space-2);
   overflow-y: auto;
 }

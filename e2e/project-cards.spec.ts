@@ -426,6 +426,19 @@ test("downloads an asset directly from project detail", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("previews previewable assets from project detail", async ({ page }) => {
+  await page.goto("/#/projects/proj-demo");
+
+  const row = page.locator(".asset-row").filter({ hasText: "episode01.mp4" });
+  await expect(row.getByTestId("project-detail-preview-asset-video-1")).toBeVisible();
+  await row.getByTestId("project-detail-preview-asset-video-1").click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("video")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible();
+});
+
 test("downloads a subtitle track as SRT from project detail", async ({ page }) => {
   await page.goto("/#/projects/proj-demo");
 

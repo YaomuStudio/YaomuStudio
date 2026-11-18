@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { formatBytes, formatPercent, t } from "@/i18n";
+import { api } from "@/api";
 import PageHeader from "@/components/layout/PageHeader.vue";
 import YmButton from "@/components/ui/YmButton.vue";
 import YmCard from "@/components/ui/YmCard.vue";
 import YmDialog from "@/components/ui/YmDialog.vue";
 import YmIcon from "@/components/ui/YmIcon.vue";
 import YmProgress from "@/components/ui/YmProgress.vue";
+import YmNotice from "@/components/ui/YmNotice.vue";
 import type { Tone } from "@/domain/status";
 import { useCapabilitiesStore } from "@/stores/capabilities";
 
@@ -19,8 +21,17 @@ interface StorageCategory {
 }
 
 const caps = useCapabilitiesStore();
+const desktopApi = typeof window !== "undefined" ? window.yaomu?.api : undefined;
+const isWindows = typeof window !== "undefined" && window.yaomu?.platform === "win32";
 const loading = ref(false);
 const cleanTarget = ref<StorageCategory | null>(null);
+const runtimeCleanOpen = ref(false);
+const runtimeCleaning = ref(false);
+const runtimeNotice = ref("");
+const runtimeError = ref("");
+const cleanBusy = ref(false);
+const cleanNotice = ref("");
+const cleanError = ref("");
 
 const categories = computed<StorageCategory[]>(() => {
   const usage = caps.storage;
@@ -62,6 +73,49 @@ function share(bytes: number): number {
   return total.value > 0 ? (bytes / total.value) * 100 : 0;
 }
 
+async function cleanRuntime(): Promise<void> {
+  if (!desktopApi?.removeWslRuntime || runtimeCleaning.value) return;
+  runtimeCleaning.value = true;
+  runtimeError.value = "";
+  runtimeNotice.value = "";
+  try {
+    const result = await desktopApi.removeWslRuntime();
+    if (!result.ok) {
+      runtimeError.value = t(result.error?.messageKey ?? "settings.storage.runtimeCleanupFailed");
+      return;
+    }
+    runtimeCleanOpen.value = false;
+    runtimeNotice.value = t(
+      result.removed ? "settings.storage.runtimeRemoved" : "settings.storage.runtimeNotInstalled",
+    );
+  } catch {
+    runtimeError.value = t("settings.storage.runtimeCleanupFailed");
+  } finally {
+    runtimeCleaning.value = false;
+  }
+}
+
+async function cleanCategory(): Promise<void> {
+  if (!cleanTarget.value || cleanBusy.value) return;
+  const category = cleanTarget.value.key;
+  if (category !== "cache" && category !== "models") return;
+  cleanBusy.value = true;
+  cleanNotice.value = "";
+  cleanError.value = "";
+  try {
+    const result = await api.cleanupStorage("cache");
+    cleanNotice.value = t("settings.storage.cleanDone", {
+      bytes: formatBytes(result.freedBytes),
+    });
+    cleanTarget.value = null;
+    await refresh();
+  } catch {
+    cleanError.value = t("settings.storage.cleanFailed");
+  } finally {
+    cleanBusy.value = false;
+  }
+}
+
 async function refresh(): Promise<void> {
   loading.value = true;
   try {
@@ -83,6 +137,11 @@ onMounted(() => {
       :description="t('settings.storage.desc')"
       icon="disk"
     />
+
+    <YmNotice v-if="cleanNotice" tone="success">{{ cleanNotice }}</YmNotice>
+    <YmNotice v-if="cleanError" tone="error">{{ cleanError }}</YmNotice>
+    <YmNotice v-if="runtimeNotice" tone="success">{{ runtimeNotice }}</YmNotice>
+    <YmNotice v-if="runtimeError" tone="error">{{ runtimeError }}</YmNotice>
 
     <YmCard>
       <div class="usage">
@@ -115,6 +174,7 @@ onMounted(() => {
               <div class="usage__row-end">
                 <span class="usage__bytes mono"><bdi dir="ltr">{{ formatBytes(c.bytes) }}</bdi></span>
                 <YmButton
+                  v-if="c.key === 'cache' || c.key === 'models'"
                   size="sm"
                   variant="ghost"
                   icon="trash"
@@ -132,6 +192,49 @@ onMounted(() => {
       </div>
     </YmCard>
 
+    <YmCard v-if="isWindows && desktopApi?.removeWslRuntime">
+      <template #header>
+        <div class="usage__head">
+          <div>
+            <p class="usage__label">{{ t("settings.storage.advancedTitle") }}</p>
+            <p class="hint">{{ t("settings.storage.advancedDesc") }}</p>
+          </div>
+        </div>
+      </template>
+      <div class="usage__row">
+        <div class="usage__row-head">
+          <div class="usage__name">
+            <YmIcon name="layers" :size="16" />
+            <span>{{ t("settings.storage.runtimeTitle") }}</span>
+          </div>
+          <div class="usage__row-end">
+            <YmButton size="sm" variant="secondary" icon="trash" @click="runtimeCleanOpen = true">
+              {{ t("settings.storage.runtimeClean") }}
+            </YmButton>
+          </div>
+        </div>
+        <p class="hint">{{ t("settings.storage.runtimeDesc") }}</p>
+      </div>
+    </YmCard>
+
+    <YmDialog
+      :model-value="runtimeCleanOpen"
+      :title="t('settings.storage.runtimeConfirmTitle')"
+      @update:model-value="runtimeCleanOpen = $event"
+    >
+      <p>{{ t("settings.storage.runtimeConfirmBody") }}</p>
+      <template #footer="{ close }">
+        <YmButton variant="secondary" @click="close">{{ t("common.cancel") }}</YmButton>
+        <YmButton
+          variant="danger"
+          :loading="runtimeCleaning"
+          @click="cleanRuntime"
+        >
+          {{ t("settings.storage.runtimeConfirm") }}
+        </YmButton>
+      </template>
+    </YmDialog>
+
     <YmDialog
       :model-value="cleanTarget !== null"
       :title="
@@ -139,7 +242,6 @@ onMounted(() => {
           ? t('settings.storage.cleanTitle', { category: t(cleanTarget.labelKey) })
           : ''
       "
-      :confirm-text="t('common.close')"
       @update:model-value="cleanTarget = null"
     >
       <p>{{ t("settings.storage.cleanBody") }}</p>
@@ -147,7 +249,14 @@ onMounted(() => {
         {{ t(cleanTarget.labelKey) }} · <bdi dir="ltr">{{ formatBytes(cleanTarget.bytes) }}</bdi>
       </p>
       <template #footer="{ close }">
-        <YmButton variant="secondary" @click="close">{{ t("common.close") }}</YmButton>
+        <YmButton variant="secondary" @click="close">{{ t("common.cancel") }}</YmButton>
+        <YmButton
+          variant="danger"
+          :loading="cleanBusy"
+          @click="cleanCategory"
+        >
+          {{ t("settings.storage.clean") }}
+        </YmButton>
       </template>
     </YmDialog>
   </div>

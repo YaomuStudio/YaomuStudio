@@ -51,6 +51,8 @@ import type {
   Segment,
   SegmentCandidateJob,
   SlotState,
+  StorageCleanupCategory,
+  StorageCleanupResult,
   StorageUsage,
   SubtitleRevision,
   SubtitleStyle,
@@ -431,6 +433,14 @@ function mapStorageUsage(value: unknown): StorageUsage {
     media: num(raw.media_bytes),
     cache: num(raw.cache_bytes),
     exports: num(raw.exports_bytes),
+  };
+}
+
+function mapStorageCleanupResult(value: unknown): StorageCleanupResult {
+  const raw = asRecord(value);
+  return {
+    category: str(raw.category) as StorageCleanupCategory,
+    freedBytes: num(raw.freed_bytes),
   };
 }
 
@@ -1199,6 +1209,10 @@ export function createBridgeApi(bridge: YaomuBridgeApi): YaoMuApi {
     },
     async getStorageUsage() {
       return mapStorageUsage(await call(bridge.getStorageUsage()));
+    },
+    async cleanupStorage(category) {
+      const raw = await call(bridge.cleanupStorage({ category }));
+      return mapStorageCleanupResult(raw);
     },
     async getLocalApiStats() {
       return mapLocalApiStats(await call(bridge.getLocalApiStats()));

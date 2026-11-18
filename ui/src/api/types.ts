@@ -37,6 +37,8 @@ import type {
   ReviewType,
   Segment,
   SegmentCandidateJob,
+  StorageCleanupCategory,
+  StorageCleanupResult,
   StorageUsage,
   SubtitleRevision,
   SubtitleStyle,
@@ -258,6 +260,7 @@ export interface YaoMuApi {
   getDevices(): Promise<DeviceInfo[]>;
   getEnvironment(options?: { refresh?: boolean }): Promise<EnvironmentInfo>;
   getStorageUsage(): Promise<StorageUsage>;
+  cleanupStorage(category: StorageCleanupCategory): Promise<StorageCleanupResult>;
   getLocalApiStats(): Promise<LocalApiStats>;
   getLocalApiSettings(): Promise<LocalApiSettings>;
   updateLocalApiSettings(input: LocalApiSettingsUpdate): Promise<LocalApiSettings>;

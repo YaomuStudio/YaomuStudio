@@ -750,6 +750,7 @@ async function downloadAsset(asset: Asset, filename?: string): Promise<void> {
     </YmDialog>
 
     <YmDialog
+      size="lg"
       :model-value="productPreviewOpen"
       :title="productPreviewTitle"
       @update:model-value="closeProductPreview"

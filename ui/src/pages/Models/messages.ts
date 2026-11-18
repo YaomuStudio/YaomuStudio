@@ -74,8 +74,6 @@ const messages: AreaMessages = {
     "installation.verify_failed": "The model package did not pass verification. Download it again.",
     "installation.install_failed": "Installation failed. The previous version was kept.",
     "installation.interrupted_on_restart": "The download was interrupted when the app restarted. Try again.",
-    "installation.release_not_configured":
-      "No downloadable version is available for this model yet.",
     "installation.release_incomplete": "The download information is incomplete. Try again later.",
     "installation.rollback_unavailable": "No previous installed version is available for rollback.",
     "installation.reuse_unverified":
@@ -172,8 +170,6 @@ const messages: AreaMessages = {
     "installation.verify_failed": "模型包校验未通过，请重新下载。",
     "installation.install_failed": "安装失败，已保留原有版本。",
     "installation.interrupted_on_restart": "下载因应用重启而中断，请重试。",
-    "installation.release_not_configured":
-      "该模型暂未提供可下载的版本。",
     "installation.release_incomplete": "下载信息不完整，请稍后重试。",
     "installation.rollback_unavailable": "没有可回滚的历史安装版本。",
     "installation.reuse_unverified":

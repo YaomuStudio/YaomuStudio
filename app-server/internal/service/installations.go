@@ -1269,7 +1269,9 @@ func (s *Service) pollFlashCLIWeightProgress(ctx context.Context, id domain.ID, 
 			pct = 99
 		}
 		current, err := s.GetInstallation(ctx, string(id))
-		if err != nil || current.Phase != domain.InstallationPhaseInstalling || current.Progress == pct {
+		// 权重目录可能在环境准备/重试过程中短暂回退；安装进度只允许前进，
+		// 不能把已经展示的真实进度退回 0 或更低值。
+		if err != nil || current.Phase != domain.InstallationPhaseInstalling || pct <= current.Progress {
 			return
 		}
 		_ = s.reportInstallingProgress(ctx, id, pct, current.VerifiedFiles)

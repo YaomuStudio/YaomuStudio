@@ -64,6 +64,7 @@ function confirm(): void {
 
 <template>
   <YmDialog
+    size="lg"
     :model-value="modelValue"
     :title="t('install.plan.title')"
     @update:model-value="emit('update:modelValue', $event)"

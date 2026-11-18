@@ -108,6 +108,7 @@ const api = {
   getDevices: () => invoke<unknown>("getDevices"),
   getEnvironment: (refresh?: boolean) => invoke<unknown>("getEnvironment", refresh),
   getStorageUsage: () => invoke<unknown>("getStorageUsage"),
+  cleanupStorage: (input: unknown) => invoke<unknown>("cleanupStorage", input),
   getLocalApiStats: () => invoke<unknown>("getLocalApiStats"),
   getLocalApiSettings: () => invoke<unknown>("getLocalApiSettings"),
   updateLocalApiSettings: (input: unknown) => invoke<unknown>("updateLocalApiSettings", input),
@@ -225,6 +226,7 @@ const api = {
   openPath: (target: string) => ipcRenderer.invoke("yaomu:files:open-path", target),
   saveTextFile: (input: unknown) => ipcRenderer.invoke("yaomu:files:save-text", input),
   saveAsset: (input: unknown) => ipcRenderer.invoke("yaomu:assets:save", input),
+  removeWslRuntime: () => ipcRenderer.invoke("yaomu:runtime:clean-wsl"),
   notify: (title: string, body: string, category?: string) =>
     ipcRenderer.invoke("yaomu:notify", { title, body, category }),
   // 关闭行为同步给主进程（唯一权威）；主进程负责持久化与托盘生命周期。

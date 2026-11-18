@@ -63,7 +63,9 @@ const messages: AreaMessages = {
     "settings.storage.clean": "Clean",
     "settings.storage.cleanTitle": "Clean {category}",
     "settings.storage.cleanBody":
-      "Cleanup for this category is not available yet, so no files are deleted here.",
+      "Removes execution logs, temporary caches, and unreferenced model packages. Project data, exports, and active/current models are kept.",
+    "settings.storage.cleanDone": "Freed {bytes}.",
+    "settings.storage.cleanFailed": "Cleanup failed. Check active tasks and try again.",
     "settings.storage.refresh": "Refresh usage",
     "settings.storage.locationTitle": "Model package location",
     "settings.storage.locationHint":
@@ -75,6 +77,24 @@ const messages: AreaMessages = {
       "Choosing a directory and migrating model packages are not available in this version.",
     "settings.storage.diskHint":
       "Keep at least 30 GB free on the application data partition for all model packages plus working cache.",
+    "settings.storage.advancedTitle": "Advanced cleanup",
+    "settings.storage.advancedDesc":
+      "Remove app-owned runtime and caches only. Project data and other WSL distributions are never touched here.",
+    "settings.storage.runtimeTitle": "WSL runtime environment",
+    "settings.storage.runtimeDesc":
+      "The app-owned WSL distribution and its model cache. Cleaning stops the local engine; restart the app afterwards. This can be several GB and will require rebuilding the runtime later.",
+    "settings.storage.runtimeClean": "Clean runtime",
+    "settings.storage.runtimeConfirmTitle": "Clean WSL runtime?",
+    "settings.storage.runtimeConfirmBody":
+      "This unregisters the app-owned yaomu WSL distribution and removes its cache. The local engine will stop, and you must restart the app. Project data, exported files, and other WSL distributions are not touched.",
+    "settings.storage.runtimeConfirm": "Clean and stop engine",
+    "settings.storage.runtimeBusy":
+      "Active tasks are still running. Stop them before cleaning the runtime.",
+    "settings.storage.runtimeCleanupFailed":
+      "Could not clean the runtime. The local engine has stopped; restart the app and try again.",
+    "settings.storage.runtimeRemoved": "WSL runtime cleaned. Restart the app to continue.",
+    "settings.storage.runtimeNotInstalled": "The app WSL runtime is not installed.",
+    "settings.storage.runtimeUnsupported": "Runtime cleanup is available on Windows only.",
     "settings.storage.share": "{percent} of total",
 
     // Devices
@@ -318,7 +338,9 @@ const messages: AreaMessages = {
     "settings.storage.exports": "导出",
     "settings.storage.clean": "清理",
     "settings.storage.cleanTitle": "清理{category}",
-    "settings.storage.cleanBody": "该类别清理暂未开放，当前版本不会删除任何文件。",
+    "settings.storage.cleanBody": "清理执行日志、临时缓存和未被引用的模型包，不删除项目数据、导出或当前模型。",
+    "settings.storage.cleanDone": "已释放 {bytes}。",
+    "settings.storage.cleanFailed": "清理失败，请检查是否有运行中的任务后重试。",
     "settings.storage.refresh": "刷新用量",
     "settings.storage.locationTitle": "模型包存储位置",
     "settings.storage.locationHint":
@@ -330,6 +352,22 @@ const messages: AreaMessages = {
       "当前版本暂不支持选择目录或迁移模型包。",
     "settings.storage.diskHint":
       "建议应用数据所在分区至少保留 30 GB，用于全部模型包与工作缓存。",
+    "settings.storage.advancedTitle": "高级清理",
+    "settings.storage.advancedDesc":
+      "仅清理应用自有的运行环境与缓存，不触碰项目数据和其他 WSL 发行版。",
+    "settings.storage.runtimeTitle": "WSL 运行环境",
+    "settings.storage.runtimeDesc":
+      "应用自有的 WSL 发行版及其模型缓存。清理会停止本地引擎，完成后需重启应用；可能释放数 GB，但下次使用需重新准备运行环境。",
+    "settings.storage.runtimeClean": "清理运行环境",
+    "settings.storage.runtimeConfirmTitle": "清理 WSL 运行环境？",
+    "settings.storage.runtimeConfirmBody":
+      "将注销应用自有的 yaomu WSL 发行版并删除其缓存；本地引擎会停止，需要重启应用。项目数据、导出文件和其他 WSL 发行版不会被删除。",
+    "settings.storage.runtimeConfirm": "清理并停止引擎",
+    "settings.storage.runtimeBusy": "仍有活动任务，请先停止任务再清理运行环境。",
+    "settings.storage.runtimeCleanupFailed": "运行环境清理失败，本地引擎已停止；请重启应用后重试。",
+    "settings.storage.runtimeRemoved": "WSL 运行环境已清理，请重启应用。",
+    "settings.storage.runtimeNotInstalled": "应用 WSL 运行环境未安装。",
+    "settings.storage.runtimeUnsupported": "运行环境清理仅支持 Windows。",
     "settings.storage.share": "占总占用 {percent}",
 
     // Devices

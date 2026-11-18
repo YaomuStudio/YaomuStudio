@@ -224,20 +224,18 @@ test("zh-TW keeps its measured high-coverage copy and English fallback", async (
     "該語言僅完成部分翻譯，缺失文案回退英文。",
   );
 
-  // 已知缺失键回退英文；被省略的旧授权键也不得出现授权文案。
-  const fallback = await page.evaluate(async () => {
+  // 当前完整包不得出现被移除步骤的旧授权文案；缺键回退由缺包/缺键用例覆盖。
+  const copy = await page.evaluate(async () => {
     const i18n = await import("/src/i18n/index.ts");
     await i18n.ensureLocalePack("zh-TW");
     i18n.setLocale("zh-TW");
     return {
-      text: i18n.t("pipeline.editor.saving"),
-      english: i18n.getEnglishMessages()["pipeline.editor.saving"],
+      saving: i18n.t("pipeline.editor.saving"),
       emptyDesc: i18n.t("voiceClone.result.emptyDesc"),
     };
   });
-  expect(fallback.text).toBe(fallback.english);
-  expect(fallback.text).not.toBe("pipeline.editor.saving");
-  expect(fallback.emptyDesc).not.toMatch(/授權|授权/);
+  expect(copy.saving).not.toBe("pipeline.editor.saving");
+  expect(copy.emptyDesc).not.toMatch(/授權|授权/);
 
   await page.goto("/#/projects");
   await expect(page.getByText("共 3 個專案", { exact: false })).toBeVisible();

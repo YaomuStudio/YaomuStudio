@@ -137,7 +137,7 @@ test("storage usage and clean dialog reflect the current category", async ({ pag
   const dialog = page.getByRole("dialog").filter({ hasText: "Clean" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Model packages");
-  await dialog.getByRole("button", { name: "Close" }).last().click();
+  await dialog.getByRole("button", { name: "Cancel" }).last().click();
   await expect(dialog).toBeHidden();
 });
 

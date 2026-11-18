@@ -58,6 +58,7 @@ const sharedNote = computed(() =>
 
 <template>
   <YmDialog
+    size="lg"
     :model-value="modelValue"
     :title="t('onboarding.models.bulkTitle')"
     @update:model-value="emit('update:modelValue', $event)"

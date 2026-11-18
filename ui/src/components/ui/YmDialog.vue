@@ -9,8 +9,9 @@ const props = withDefaults(
     confirmText?: string;
     cancelText?: string;
     danger?: boolean;
+    size?: "sm" | "md" | "lg";
   }>(),
-  { danger: false, confirmText: "", cancelText: "" },
+  { danger: false, confirmText: "", cancelText: "", size: "md" },
 );
 const emit = defineEmits<{
   (e: "update:modelValue", v: boolean): void;
@@ -87,8 +88,10 @@ function cancel(): void {
         <div
           ref="dialogEl"
           class="ym-dialog"
+          :class="`ym-dialog--${size}`"
           role="dialog"
           aria-modal="true"
+          :aria-label="title || undefined"
           tabindex="-1"
           @keydown="onDialogKeydown"
         >
@@ -117,13 +120,22 @@ function cancel(): void {
   z-index: 1000;
 }
 .ym-dialog {
+  display: flex;
+  flex-direction: column;
   width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-popover);
   overflow: hidden;
   transform-origin: center;
+}
+.ym-dialog--sm {
+  width: min(360px, calc(100vw - 32px));
+}
+.ym-dialog--lg {
+  width: min(720px, calc(100vw - 32px));
 }
 .ym-dialog-enter-active {
   transition: opacity var(--motion-duration-base) var(--motion-ease-out);
@@ -162,16 +174,26 @@ function cancel(): void {
   }
 }
 .ym-dialog__title {
+  flex: none;
   padding: var(--space-4) var(--space-4) 0;
   font-size: var(--font-size-lg);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 .ym-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: var(--space-3) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--color-text-muted);
   font-size: var(--font-size-md);
+  overflow-wrap: anywhere;
 }
 .ym-dialog__footer {
   display: flex;
+  flex: none;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);

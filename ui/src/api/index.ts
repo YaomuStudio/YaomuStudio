@@ -19,6 +19,7 @@ const BRIDGE_METHODS = {
   getDevices: true,
   getEnvironment: true,
   getStorageUsage: true,
+  cleanupStorage: true,
   getLocalApiStats: true,
   getLocalApiSettings: true,
   updateLocalApiSettings: true,

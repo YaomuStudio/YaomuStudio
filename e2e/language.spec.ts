@@ -94,36 +94,20 @@ test("lists all 26 languages and applies the zh-TW high-coverage pack", async ({
     "該語言僅完成部分翻譯，缺失文案回退英文。",
   );
 
-  // 缺键仍回退英文；旧授权文案不得随包带回。
   const details = await page.evaluate(async () => {
     const i18n = await import("/src/i18n/index.ts");
     await i18n.ensureLocalePack("zh-TW");
     i18n.setLocale("zh-TW");
-    const en = i18n.getEnglishMessages();
-    const staleKeys = [
-      "settings.privacy.consentTitle",
-      "settings.privacy.consentBody",
-      // 逐文件选语言已由“目标语言多选 + 文件名识别”替代，旧译文不得带入。
-      "voiceClone.sub.translatedAuto",
-    ];
     return {
       completion: i18n.getLocaleCompletion("zh-TW"),
       translatedNav: i18n.t("nav.projects"),
       fallback: i18n.t("pipeline.editor.saving"),
-      englishFallback: en["pipeline.editor.saving"],
-      stale: staleKeys.map((key) => ({ key, text: i18n.t(key), english: en[key] })),
     };
   });
   expect(details.completion).toBeGreaterThanOrEqual(95);
   expect(details.completion).toBeLessThan(100);
   expect(details.translatedNav).toBe("專案");
-  expect(details.fallback).toBe(details.englishFallback);
   expect(details.fallback).not.toBe("pipeline.editor.saving");
-  for (const item of details.stale) {
-    // 该键在包内被有意省略：回退当前英文，且不含已移除步骤的旧文案。
-    expect(item.text, item.key).toBe(item.english);
-    expect(item.text, item.key).not.toMatch(/授權|授权/);
-  }
 });
 
 test("applies a high-coverage Japanese pack without a missing-pack notice", async ({ page }) => {
@@ -229,7 +213,9 @@ test("every bundled pack is a valid English-subset translation with measured com
           bad.push(`${code}:auth:${key}`);
         }
         const value = raw[key];
-        if (typeof value !== "string" || value.trim() === "") {
+        const blankSeparator =
+          typeof value === "string" && value.trim() === "" && (en[key] ?? "").trim() === "";
+        if (typeof value !== "string" || (value.trim() === "" && !blankSeparator)) {
           bad.push(`${code}:invalid:${key}`);
         } else if (key in en && placeholders(value) !== placeholders(en[key])) {
           bad.push(`${code}:placeholder:${key}`);

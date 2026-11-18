@@ -596,6 +596,76 @@ export function runGuard({ repoRoot = defaultRepoRoot } = {}) {
   };
 }
 
+/**
+ * 24 个懒加载语言包（ui/src/i18n/locales/*.json）的 parity 守护：
+ * 键集合、键序（register.ts 注册序）与 {placeholder} 必须与当时的英文词典完全一致。
+ * 词典并行增删键后，语言包必须重新同步——这里防止漂移静默发生。
+ */
+function checkLocalePacks(en, repoRoot, uiRoot) {
+  const localesDir = path.join(uiRoot, "i18n", "locales");
+  const issues = [];
+  const enPlaceholders = (value) =>
+    new Set([...value.matchAll(/\{([A-Za-z0-9_]+)\}/g)].map((m) => m[1]));
+
+  // 英文键序 = register.ts 注册序（与运行时 registerMessages 赋值语义一致：
+  // 首次出现定位置，重复注册覆盖值）。
+  const registeredFiles = registeredAreaFiles(uiRoot);
+  const orderedEn = [];
+  const seen = new Set();
+  for (const name of collectRegisteredIdentifiers(parseTs(path.join(uiRoot, "i18n", "register.ts")))) {
+    const file = importBindings(path.join(uiRoot, "i18n", "register.ts"), uiRoot).get(name);
+    if (!file || !registeredFiles.has(file)) continue;
+    const parsed = parseAreaFile(file, repoRoot);
+    for (const key of parsed.en.keys()) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        orderedEn.push(key);
+      }
+    }
+  }
+
+  const packs = fs
+    .readdirSync(localesDir)
+    .filter((file) => file.endsWith(".json"))
+    .sort();
+  if (packs.length === 0) issues.push("locales/ 目录为空：语言包缺失或未生成");
+  for (const file of packs) {
+    const code = file.replace(/\.json$/, "");
+    let dict;
+    try {
+      dict = JSON.parse(fs.readFileSync(path.join(localesDir, file), "utf8"));
+    } catch (err) {
+      issues.push(`${code}: JSON 解析失败 (${err.message})`);
+      continue;
+    }
+    const keys = Object.keys(dict);
+    const missing = orderedEn.filter((key) => !(key in dict));
+    const extra = keys.filter((key) => !seen.has(key));
+    if (missing.length) issues.push(`${code}: 缺 ${missing.length} 键（如 ${missing.slice(0, 3).join(", ")}）`);
+    if (extra.length) issues.push(`${code}: 多 ${extra.length} 键（如 ${extra.slice(0, 3).join(", ")}）`);
+    // 键序：只比较两边都存在的键的相对顺序。
+    let cursor = -1;
+    for (const key of keys) {
+      const idx = orderedEn.indexOf(key);
+      if (idx === -1) continue;
+      if (idx < cursor) {
+        issues.push(`${code}: 键序与英文词典不一致（首个乱序键 ${key}）`);
+        break;
+      }
+      cursor = idx;
+    }
+    for (const [key, value] of Object.entries(dict)) {
+      if (typeof value !== "string" || !en.has(key)) continue;
+      const expected = enPlaceholders(String(en.get(key)));
+      const actual = enPlaceholders(value);
+      if (expected.size !== actual.size || [...expected].some((p) => !actual.has(p))) {
+        issues.push(`${code}.${key}: 占位参数不一致（应为 {${[...expected]}}）`);
+      }
+    }
+  }
+  return issues;
+}
+
 function main() {
   const result = runGuard();
   let failed = false;
@@ -631,6 +701,14 @@ function main() {
     for (const line of result.dynamicKeys) console.error(`  - ${line}`);
   }
   if (failed) {
+    process.exit(1);
+  }
+  // 24 语言包 parity（键集合 / 键序 / 占位参数），漂移即失败。
+  const { en } = collectRegisteredMessages(defaultRepoRoot, path.join(defaultRepoRoot, "ui", "src"));
+  const packIssues = checkLocalePacks(en, defaultRepoRoot, path.join(defaultRepoRoot, "ui", "src"));
+  if (packIssues.length) {
+    console.error(`[i18n] 语言包与英文词典不一致 ${packIssues.length} 处:`);
+    for (const line of packIssues) console.error(`  - ${line}`);
     process.exit(1);
   }
   console.log(

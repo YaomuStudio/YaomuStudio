@@ -2,9 +2,10 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import brandMark from "@/assets/brand/yaomu-mark.svg";
-import { formatBytes, t } from "@/i18n";
+import { formatBytes, t, tCount } from "@/i18n";
 import { api } from "@/api";
 import {
+  countNotice,
   errorNotice,
   messageNotice,
   renderNotice,
@@ -30,6 +31,7 @@ import type {
   InstallationPlan,
 } from "@/domain/types";
 import BulkInstallPlanDialog from "@/components/BulkInstallPlanDialog.vue";
+import EnvironmentQueueDialog from "@/components/EnvironmentQueueDialog.vue";
 import InstallPlanDialog from "@/components/InstallPlanDialog.vue";
 import YmBadge from "@/components/ui/YmBadge.vue";
 import YmButton from "@/components/ui/YmButton.vue";
@@ -41,6 +43,7 @@ import YmSwitch from "@/components/ui/YmSwitch.vue";
 import { useCapabilitiesStore } from "@/stores/capabilities";
 import { useInstallationsStore } from "@/stores/installations";
 import { useSettingsStore } from "@/stores/settings";
+import { useModelDownloadQueue } from "@/composables/useModelDownloadQueue";
 
 const STEPS = [
   { key: "welcome", labelKey: "onboarding.step.welcome" },
@@ -109,6 +112,10 @@ onBeforeUnmount(() => {
 });
 
 const bulkOpen = ref(false);
+const queueOpen = ref(false);
+const queueTargets = ref<CapabilitySlotKey[]>([]);
+const downloadQueue = useModelDownloadQueue();
+const queuedSlots = downloadQueue.queued;
 const bulkPreparing = ref(false);
 const bulkInstalling = ref(false);
 const error = ref<SafeNotice | null>(null);
@@ -120,11 +127,29 @@ const environmentLoading = ref(false);
 const environmentError = ref<SafeNotice | null>(null);
 const environmentErrorText = computed(() => renderNotice(environmentError.value));
 
+/** Windows 模型安装依赖 WSL 运行环境；环境未就绪时不能启动下载，避免出现无效进度。 */
+const environmentBlockingCheck = computed(() =>
+  environment.value?.checks.find((check) => check.severity === "blocker"),
+);
+const environmentReady = computed(() => {
+  if (!environment.value) return false;
+  if (environment.value.platform !== "windows") return true;
+  return Boolean(environment.value.wsl?.available) && !environmentBlockingCheck.value;
+});
+const environmentBlockedReason = computed(() => {
+  if (environmentReady.value) return "";
+  if (environmentError.value) return environmentErrorText.value;
+  if (environmentLoading.value || !environment.value) return t("onboarding.environment.loading");
+  if (environmentBlockingCheck.value) return t(environmentBlockingCheck.value.messageKey);
+  return t("onboarding.environment.wslMissing");
+});
+
 watch(step, async (value) => {
   localStorage.setItem(STEP_STORAGE_KEY, value);
   error.value = null;
   notice.value = null;
   if (value === "environment") void loadEnvironment();
+  if (value === "models" && !environment.value) void loadEnvironment();
   // 步骤切换后把阅读位置和焦点交给新步骤，避免焦点留在已消失的按钮上。
   await nextTick();
   panelRef.value?.scrollTo({ top: 0 });
@@ -290,9 +315,83 @@ async function loadCapabilities(): Promise<void> {
   }
 }
 
+function openQueue(slots: CapabilitySlotKey[]): void {
+  const targets = slots.filter((slot) => isDownloadable(slot) && !activeInstallation(slot));
+  if (!targets.length) return;
+  queueTargets.value = [...new Set(targets)];
+  queueOpen.value = true;
+}
+
+function confirmQueue(): void {
+  if (!queueTargets.value.length) return;
+  downloadQueue.add(queueTargets.value);
+  const count = queueTargets.value.length;
+  queueTargets.value = [];
+  queueOpen.value = false;
+  notice.value = countNotice("onboarding.models.queuedCount", count);
+}
+
+function removeQueued(slot: CapabilitySlotKey): void {
+  downloadQueue.remove(slot);
+}
+
+async function startQueuedDownloads(): Promise<void> {
+  if (!environmentReady.value || !queuedSlots.value.length) return;
+  const targets = queuedSlots.value.filter((slot) => {
+    const state = caps.slotState(slot)?.state;
+    return (
+      isDownloadable(slot) &&
+      !activeInstallation(slot) &&
+      state !== "READY" &&
+      state !== "INSTALLING" &&
+      state !== "VERIFYING"
+    );
+  });
+  if (!targets.length) {
+    downloadQueue.clear();
+    return;
+  }
+  bulkInstalling.value = true;
+  error.value = null;
+  notice.value = null;
+  try {
+    const plans: InstallationPlan[] = [];
+    const seen = new Set<string>();
+    for (const slot of targets) {
+      const plan = await api.planInstallation(slot);
+      if (!planCoverage(plan).valid) throw new Error(t("install.plan.invalidRange"));
+      const key = [
+        plan.release.releaseId,
+        plan.release.version,
+        plan.release.digest,
+        plan.release.channel ?? "",
+      ].join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      plans.push(plan);
+    }
+    for (const plan of plans) {
+      const created = await api.install({ planId: plan.planId, planHash: plan.planHash });
+      installs.track(created.id, plan.slot);
+    }
+    downloadQueue.clear();
+    notice.value = messageNotice("onboarding.models.queueReady");
+    await refreshInstallations();
+    await loadCapabilities();
+  } catch (err) {
+    error.value = errorNotice(err, "onboarding.error");
+    await refreshInstallations();
+  } finally {
+    bulkInstalling.value = false;
+  }
+}
+
 async function installModel(slot: CapabilitySlotKey): Promise<void> {
-  // 未支持的模型没有可解析的发布，直接禁用入口，不发无效计划请求。
-  if (activeInstallation(slot) || !isDownloadable(slot)) return;
+  if (downloadQueue.has(slot) || activeInstallation(slot) || !isDownloadable(slot)) return;
+  if (!environmentReady.value) {
+    openQueue([slot]);
+    return;
+  }
   busy.value = slot;
   error.value = null;
   notice.value = null;
@@ -308,6 +407,10 @@ async function installModel(slot: CapabilitySlotKey): Promise<void> {
 
 async function planAllModels(): Promise<void> {
   if (bulkPreparing.value || bulkInstalling.value || !missingModelSlots.value.length) return;
+  if (!environmentReady.value) {
+    openQueue(missingModelSlots.value.map((meta) => meta.key));
+    return;
+  }
   bulkPreparing.value = true;
   error.value = null;
   notice.value = null;
@@ -341,7 +444,7 @@ async function planAllModels(): Promise<void> {
 }
 
 async function confirmBulkInstall(): Promise<void> {
-  if (!bulkPlans.value.length || bulkInstalling.value) return;
+  if (!environmentReady.value || !bulkPlans.value.length || bulkInstalling.value) return;
   bulkInstalling.value = true;
   error.value = null;
   notice.value = null;
@@ -370,7 +473,7 @@ async function confirmBulkInstall(): Promise<void> {
 
 async function confirmInstall(): Promise<void> {
   const plan = planTarget.value;
-  if (!plan) return;
+  if (!environmentReady.value || !plan) return;
   const coverage = planCoverage(plan);
   // 覆盖范围异常时不允许提交；不把未知范围猜成单槽。
   if (!coverage.valid) return;
@@ -438,6 +541,26 @@ function finish(): void {
   void router.push("/");
 }
 
+/** 环境就绪后自动启动排队下载；排队期间定时重新检查环境。 */
+let queuePoll: number | undefined;
+function syncQueuePoll(): void {
+  const waiting = queuedSlots.value.length > 0 && !environmentReady.value;
+  if (waiting && queuePoll === undefined) {
+    queuePoll = window.setInterval(() => {
+      if (!environmentLoading.value) void loadEnvironment(true);
+    }, 5000);
+  } else if (!waiting && queuePoll !== undefined) {
+    window.clearInterval(queuePoll);
+    queuePoll = undefined;
+  }
+}
+watch([queuedSlots, environmentReady], syncQueuePoll, { immediate: true });
+watch(environmentReady, (ready) => {
+  if (!ready) return;
+  queueOpen.value = false;
+  void startQueuedDownloads();
+});
+
 const mainRef = ref<HTMLElement | null>(null);
 /** 高度不足时压缩固定内容，把空间留给步骤内滚动列表（zoom 缩放下同样生效）。 */
 const compactLayout = ref(false);
@@ -447,6 +570,7 @@ onMounted(() => {
   void refreshInstallations();
   if (!caps.slots.length) void loadCapabilities();
   if (step.value === "environment") void loadEnvironment();
+  if (step.value === "models" && !environment.value) void loadEnvironment();
 
   const main = mainRef.value;
   if (main && typeof ResizeObserver !== "undefined") {
@@ -462,6 +586,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   mainResizeObserver?.disconnect();
   mainResizeObserver = null;
+  if (queuePoll !== undefined) {
+    window.clearInterval(queuePoll);
+    queuePoll = undefined;
+  }
 });
 </script>
 
@@ -655,6 +783,27 @@ onBeforeUnmount(() => {
           <!-- 错误放列表顶部：失败时原先只在页脚上方，长列表下容易看成“没反应”。 -->
           <YmNotice v-if="errorText" tone="error"><bdi>{{ errorText }}</bdi></YmNotice>
           <YmNotice v-if="noticeText" tone="success"><bdi>{{ noticeText }}</bdi></YmNotice>
+          <YmNotice v-if="queuedSlots.length" tone="info">
+            <div class="env-block">
+              <bdi>{{ tCount("onboarding.models.queuedCount", queuedSlots.length) }}</bdi>
+              <YmButton size="sm" @click="downloadQueue.clear()">
+                {{ t("onboarding.models.cancelQueued") }}
+              </YmButton>
+            </div>
+          </YmNotice>
+          <YmNotice v-if="!environmentReady" tone="warning">
+            <div class="env-block">
+              <bdi>{{ environmentBlockedReason }}</bdi>
+              <YmButton
+                size="sm"
+                icon="refresh"
+                :loading="environmentLoading"
+                @click="loadEnvironment(true)"
+              >
+                {{ t("onboarding.environment.refresh") }}
+              </YmButton>
+            </div>
+          </YmNotice>
 
           <div v-if="missingModelSlots.length" class="bulk-toolbar">
             <p class="bulk-toolbar__hint">{{ t("onboarding.models.bulkHint") }}</p>
@@ -710,7 +859,15 @@ onBeforeUnmount(() => {
                   <p v-else class="hint">{{ modelHint(meta.key) }}</p>
                 </div>
                 <div class="model__actions">
-                  <template v-if="slotInstalling(meta.key)">
+                  <template v-if="downloadQueue.has(meta.key) && !slotInstalling(meta.key)">
+                    <YmButton size="sm" disabled>
+                      {{ t("onboarding.models.queued") }}
+                    </YmButton>
+                    <YmButton size="sm" @click="removeQueued(meta.key)">
+                      {{ t("onboarding.models.cancelQueued") }}
+                    </YmButton>
+                  </template>
+                  <template v-else-if="slotInstalling(meta.key)">
                     <YmButton size="sm" disabled>
                       {{ t("state.installing") }}
                     </YmButton>
@@ -883,6 +1040,15 @@ onBeforeUnmount(() => {
       :loading="planTarget !== null && busy === planTarget.slot"
       @update:model-value="planTarget = null"
       @confirm="confirmInstall"
+    />
+
+    <EnvironmentQueueDialog
+      v-model="queueOpen"
+      :reason="environmentBlockedReason"
+      :count="queueTargets.length || 1"
+      :refreshing="environmentLoading"
+      @queue="confirmQueue"
+      @refresh="loadEnvironment(true)"
     />
   </div>
 </template>
@@ -1155,6 +1321,13 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.env-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
 .bulk-toolbar {
   display: flex;
   align-items: center;
@@ -1173,7 +1346,14 @@ onBeforeUnmount(() => {
   line-height: var(--line-height-normal);
 }
 @media (max-width: 720px) {
-  .bulk-toolbar {
+  .env-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.bulk-toolbar {
     align-items: stretch;
     flex-direction: column;
   }

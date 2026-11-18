@@ -154,6 +154,7 @@ interface YaomuBridgeApi {
   getDevices(): Promise<YaomuBridgeResult<unknown>>;
   getEnvironment(refresh?: boolean): Promise<YaomuBridgeResult<unknown>>;
   getStorageUsage(): Promise<YaomuBridgeResult<unknown>>;
+  cleanupStorage(input: unknown): Promise<YaomuBridgeResult<unknown>>;
   getLocalApiStats(): Promise<YaomuBridgeResult<unknown>>;
   getLocalApiSettings(): Promise<YaomuBridgeResult<unknown>>;
   updateLocalApiSettings(input: unknown): Promise<YaomuBridgeResult<unknown>>;
@@ -249,6 +250,13 @@ interface YaomuBridgeApi {
     title?: string;
     filters?: { name: string; extensions: string[] }[];
   }): Promise<{ path: string } | null>;
+  /** 清理应用自有 WSL 运行环境；仅在 Windows 提供。 */
+  removeWslRuntime?(): Promise<{
+    ok: boolean;
+    removed?: boolean;
+    reason?: "not_installed";
+    error?: { code: string; messageKey: string; retryable: boolean };
+  }>;
   notify(title: string, body: string, category?: string): Promise<void>;
   /** 将关闭行为同步给主进程（主进程据此决定拦截 close 与托盘生命周期）。 */
   setCloseBehavior(value: "quit" | "minimize"): Promise<void>;

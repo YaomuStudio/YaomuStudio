@@ -23,6 +23,7 @@ const unavailableMethods = {
   getDevices: rejectNotReady,
   getEnvironment: rejectNotReady,
   getStorageUsage: rejectNotReady,
+  cleanupStorage: rejectNotReady,
   getLocalApiStats: rejectNotReady,
   getLocalApiSettings: rejectNotReady,
   updateLocalApiSettings: rejectNotReady,

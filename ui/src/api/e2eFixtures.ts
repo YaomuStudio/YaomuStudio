@@ -1754,6 +1754,9 @@ export const fixtureApi: YaoMuApi = {
       checks: source.checks.map((c) => ({ ...c, actionIds: [...c.actionIds] })),
     };
   },
+  async cleanupStorage(category: "models" | "cache") {
+    return { category, freedBytes: 0 };
+  },
   async getStorageUsage() {
     return { ...storageUsage };
   },
