@@ -1220,12 +1220,14 @@ async function downloadAsset(asset: Asset, filename?: string): Promise<void> {
 }
 .recent-card__title-row {
   display: flex;
-  align-items: center;
+  /* ID 胶囊对齐标题第一行，而不是在两行标题中垂直居中。 */
+  align-items: flex-start;
   gap: var(--space-2);
   min-width: 0;
 }
 .recent-card__id-pill {
   flex: none;
+  margin-top: 1px;
   padding: 1px 6px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
