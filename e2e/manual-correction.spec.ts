@@ -701,7 +701,7 @@ test("opens the export panel with the default outputs folder and Core naming tok
   await expect(panel.getByTestId("mcs-export-dir")).toBeDisabled();
   await expect(panel.getByRole("button", { name: "Browse" })).toHaveCount(0);
   await expect(panel.getByTestId("mcs-export-preview")).toHaveText(
-    /^星际译制 · 试播集_en_\d{8}-\d{6}\.srt$/,
+    /^星际译制 · 试播集_en\.srt$/,
   );
 
   const subtitle = panel.getByRole("checkbox", { name: "Subtitles", exact: true });
@@ -711,7 +711,7 @@ test("opens the export panel with the default outputs folder and Core naming tok
   await expect(video).not.toBeChecked();
   await expect(audio).not.toBeChecked();
 
-  for (const token of ["{project}", "{language}", "{timestamp}"]) {
+  for (const token of ["{project}", "{language}"]) {
     await expect(panel.getByRole("button", { name: token, exact: true })).toBeVisible();
   }
   await expect(panel.getByRole("button", { name: "{lang}", exact: true })).toHaveCount(0);
@@ -720,13 +720,13 @@ test("opens the export panel with the default outputs folder and Core naming tok
   const naming = panel.getByTestId("mcs-export-naming");
   await naming.fill("{project}_{lang}");
   await expect(
-    panel.getByText("The naming rule may only use {project}, {language} and {timestamp}.", {
+    panel.getByText("The naming rule may only use {project} and {language}.", {
       exact: true,
     }),
   ).toBeVisible();
-  await naming.fill("{project}_{language}_{timestamp}");
+  await naming.fill("{project}_{language}");
   await expect(panel.getByTestId("mcs-export-preview")).toHaveText(
-    /^星际译制 · 试播集_en_\d{8}-\d{6}\.srt$/,
+    /^星际译制 · 试播集_en\.srt$/,
   );
 
   // demo 的交付门槛仍待放行：默认字幕被阻断；已选项仍可取消，未准入项不可勾选。
@@ -766,7 +766,7 @@ test("exports multiple kinds with per-item status after delivery approval", asyn
     kind: "video",
     format: "mp4_h264",
     outputDir: "outputs",
-    namingTemplate: "{project}_{language}_{timestamp}",
+    namingTemplate: "{project}_{language}",
     bilingual: false,
   });
   expect(byKind.video?.inputRevisionId).toBeUndefined();

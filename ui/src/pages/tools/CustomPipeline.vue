@@ -212,7 +212,7 @@ const saveMessageText = computed(() => renderNotice(saveMessage.value));
 const saveErrorText = computed(() => renderNotice(saveError.value));
 
 const { outputDir: exportDir, resolve: resolveOutputDir } = useDefaultOutputDir();
-const namingTemplate = ref("{project}_{language}_{timestamp}");
+const namingTemplate = ref("{project}_{language}");
 const exporting = ref<Record<string, ExportState>>({});
 
 const pendingReviews = ref<ReviewGate[]>([]);

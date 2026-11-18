@@ -14,7 +14,7 @@ const messages: AreaMessages = {
     "mcs.noTranslation": "This project has no translated subtitle track yet.",
     "mcs.noMedia": "No source media is available for preview.",
     "mcs.export.namingInvalid":
-      "The naming rule may only use {project}, {language} and {timestamp}.",
+      "The naming rule may only use {project} and {language}.",
     "mcs.export.selectOne": "Select at least one export kind.",
     "mcs.export.partialFailed": "{count} export(s) failed.",
     "mcs.export.reviewLoading": "Loading delivery review status…",
@@ -135,7 +135,7 @@ const messages: AreaMessages = {
     "mcs.loadError": "无法加载校正工作台。",
     "mcs.noTranslation": "该项目还没有译文字幕轨。",
     "mcs.noMedia": "没有可用于预览的源素材。",
-    "mcs.export.namingInvalid": "命名规则只能使用 {project}、{language} 和 {timestamp}。",
+    "mcs.export.namingInvalid": "命名规则只能使用 {project}、{language}。",
     "mcs.export.selectOne": "至少选择一种导出内容。",
     "mcs.export.partialFailed": "{count} 项导出失败。",
     "mcs.export.reviewLoading": "正在读取交付审核状态…",

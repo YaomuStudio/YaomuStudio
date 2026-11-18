@@ -2,7 +2,7 @@
 // 人工校正 · 导出面板（UI 分支多选交互 + main 的逐类型交付门禁）。
 //
 // 输出目录固定为桌面主进程授权的 <程序目录>/outputs；命名模板只认 Core 的
-// {project}/{language}/{timestamp}；字幕冻结当前已保存 revision（双语仅 SRT），
+// {project}/{language}；字幕冻结当前已保存 revision（双语仅 SRT），
 // 视频/音频绑定当前 revision 的成功 08 交付门槛。多选后逐项导出、逐项轮询；
 // 一项失败不回滚已成功项，也不宣称原子。
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
@@ -56,8 +56,8 @@ const TERMINAL_EXPORT_STATUS = new Set<ExportRecord["status"]>([
   "CANCELED",
   "INTERRUPTED",
 ]);
-const DEFAULT_NAMING = "{project}_{language}_{timestamp}";
-const TEMPLATE_TOKENS = ["{project}", "{language}", "{timestamp}"] as const;
+const DEFAULT_NAMING = "{project}_{language}";
+const TEMPLATE_TOKENS = ["{project}", "{language}"] as const;
 
 const { outputDir, resolve: resolveOutputDir } = useDefaultOutputDir();
 const selectedKinds = ref<ExportKind[]>([]);
@@ -163,22 +163,16 @@ const namingError = computed(() => {
     return t("mcs.export.namingInvalid");
   }
   // 未闭合/多余的括号同样不能用 Core 未定义的规则提交。
-  const rest = value.replace(/\{(?:project|language|timestamp)\}/g, "");
+  const rest = value.replace(/\{(?:project|language)\}/g, "");
   if (/[{}]/.test(rest)) return t("mcs.export.namingInvalid");
   return "";
 });
-
-function formatStamp(date: Date): string {
-  const pad = (value: number): string => String(value).padStart(2, "0");
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-}
 
 const namingPreview = computed(() => {
   const extension = selectedKinds.value[0] ? extensionFor(selectedKinds.value[0]) : "srt";
   const base = naming.value
     .replaceAll("{project}", props.projectName || "YaomuStudio")
     .replaceAll("{language}", props.language || "lang")
-    .replaceAll("{timestamp}", formatStamp(new Date()))
     .replace(/[\\/:*?"<>|]/g, "_");
   return `${base}.${extension}`;
 });

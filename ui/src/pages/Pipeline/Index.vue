@@ -165,7 +165,7 @@ const bilingualSubtitleExport = ref(false);
 const exportLanguage = ref("");
 const { outputDir, resolve: resolveOutputDir } = useDefaultOutputDir();
 const exportRecordDirectory = ref("");
-const namingTemplate = ref("{project}_{language}_{timestamp}");
+const namingTemplate = ref("{project}_{language}");
 const exportRecord = ref<ExportRecord | null>(null);
 const exporting = ref(false);
 let exportRefreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1184,10 +1184,7 @@ watch([() => currentRun.value?.id ?? "", deliveryLanguage, step, resultTab], () 
 // ---------------------------------------------------------------------------
 // 导出
 // ---------------------------------------------------------------------------
-function formatStamp(date: Date): string {
-  const pad = (value: number): string => String(value).padStart(2, "0");
-  return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}-${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`;
-}
+
 
 const exportFormat = computed<ExportFormat>(() => {
   if (exportKind.value === "audio") return "wav";
@@ -1210,8 +1207,7 @@ const namingPreview = computed(() => {
   const language = exportLanguage.value || candidateLanguage.value;
   const base = namingTemplate.value
     .replaceAll("{project}", project.value?.name ?? "")
-    .replaceAll("{language}", language)
-    .replaceAll("{timestamp}", formatStamp(new Date()));
+    .replaceAll("{language}", language);
   return `${base}${extension}`;
 });
 

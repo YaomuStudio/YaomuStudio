@@ -107,7 +107,7 @@ const resultError = ref("");
 const resultProject = ref<Project | null>(null);
 const exporting = ref<Record<string, ExportState>>({});
 const { outputDir: exportDir, resolve: resolveOutputDir } = useDefaultOutputDir();
-const namingTemplate = ref("{project}_{language}_{timestamp}");
+const namingTemplate = ref("{project}_{language}");
 
 const relatedSlotKeys: CapabilitySlotKey[] = ["translate"];
 const relatedCapabilities = computed<Capability[]>(() =>

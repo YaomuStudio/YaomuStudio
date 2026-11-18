@@ -52,7 +52,7 @@ func (s *Service) prepareExportResult(
 		return nil, err
 	}
 	language, _ := task.Params["language"].(string)
-	base := s.exportBaseName(project.Name, language, record.NamingTemplate, s.Now())
+	base := s.exportBaseName(project.Name, language, record.NamingTemplate)
 	prepared := &preparedExportResult{
 		svc: s, record: record,
 		assets: []domain.Asset{}, locations: []domain.AssetLocation{}, intents: []*fileIntent{},

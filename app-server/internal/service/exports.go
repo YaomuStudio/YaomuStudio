@@ -240,7 +240,7 @@ func (s *Service) createExportTx(
 		var intent *fileIntent
 		finalPath, size, digest, err := s.writeTextExportTracked(
 			req.OutputDirGrant,
-			s.exportBaseName(project.Name, language, req.NamingTemplate, now),
+			s.exportBaseName(project.Name, language, req.NamingTemplate),
 			exportExtension(req.Format),
 			[]byte(text),
 			func(destination string) error {
@@ -1260,11 +1260,10 @@ func exportExtension(format domain.ExportFormat) string {
 	}
 }
 
-func (s *Service) exportBaseName(projectName, language, template string, now time.Time) string {
+func (s *Service) exportBaseName(projectName, language, template string) string {
 	base := template
 	base = strings.ReplaceAll(base, "{project}", projectName)
 	base = strings.ReplaceAll(base, "{language}", language)
-	base = strings.ReplaceAll(base, "{timestamp}", now.UTC().Format("20060102-150405"))
 	base = _invalidFileChars.ReplaceAllString(base, "_")
 	base = strings.Trim(strings.TrimSpace(base), ".")
 	if base == "" {
