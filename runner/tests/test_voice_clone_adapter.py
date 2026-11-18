@@ -425,5 +425,90 @@ class VoiceCloneMainLoopTests(unittest.TestCase):
         self.assertTrue(cancel.payload["data"]["exited"])
 
 
+class VoiceCloneScriptTests(unittest.TestCase):
+    def test_script_invocation_writes_product_without_serve(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            voice = root / "ref.wav"
+            original = root / "ref.srt"
+            subtitle = root / "zh.srt"
+            script = root / "voice-clone.py"
+            voice.write_bytes(b"RIFFvoice")
+            original.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
+            subtitle.write_text("1\n00:00:00,000 --> 00:00:01,000\n你好\n", encoding="utf-8")
+            script.write_text(
+                "import json, sys\n"
+                "from pathlib import Path\n"
+                "payload = json.loads(sys.argv[1][len('--input='):])\n"
+                "assert payload['language'] == 'chinese'\n"
+                "assert payload['voice_url'].endswith('ref.wav')\n"
+                "Path(payload['output_path']).write_bytes(b'ID3-finished')\n",
+                encoding="utf-8",
+            )
+            output = root / "out"
+            output.mkdir()
+            previous = os.environ.get("YAOMU_VOICE_CLONE_SCRIPT")
+            os.environ["YAOMU_VOICE_CLONE_SCRIPT"] = str(script)
+            self.addCleanup(
+                lambda: os.environ.pop("YAOMU_VOICE_CLONE_SCRIPT", None)
+                if previous is None
+                else os.environ.__setitem__("YAOMU_VOICE_CLONE_SCRIPT", previous)
+            )
+            with mock.patch.object(OmniVoiceCloneSession, "run", autospec=True) as run:
+                result = VoiceCloneAdapter().execute(
+                    _execution_request(
+                        str(output),
+                        {
+                            "executor": "flashcli",
+                            "op": "script",
+                            "voice_path": str(voice),
+                            "original_subtitle_path": str(original),
+                            "subtitle_path": str(subtitle),
+                            "language": "zh-CN",
+                            "out": "out.mp3",
+                        },
+                    )
+                )
+            run.assert_not_called()
+            self.assertEqual(result["outputs"][0]["rel_path"], "out.mp3")
+            self.assertEqual((output / "out.mp3").read_bytes(), b"ID3-finished")
+
+    def test_explicit_missing_script_does_not_fall_through(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            voice = root / "ref.wav"
+            original = root / "ref.srt"
+            subtitle = root / "zh.srt"
+            for path, text in (
+                (voice, "RIFFvoice"),
+                (original, "1\n00:00:00,000 --> 00:00:01,000\nHello\n"),
+                (subtitle, "1\n00:00:00,000 --> 00:00:01,000\n你好\n"),
+            ):
+                path.write_bytes(text.encode("utf-8"))
+            previous = os.environ.get("YAOMU_VOICE_CLONE_SCRIPT")
+            os.environ["YAOMU_VOICE_CLONE_SCRIPT"] = str(root / "missing.py")
+            self.addCleanup(
+                lambda: os.environ.pop("YAOMU_VOICE_CLONE_SCRIPT", None)
+                if previous is None
+                else os.environ.__setitem__("YAOMU_VOICE_CLONE_SCRIPT", previous)
+            )
+            with self.assertRaises(Exception) as caught:
+                VoiceCloneAdapter().execute(
+                    _execution_request(
+                        str(root),
+                        {
+                            "executor": "flashcli",
+                            "op": "script",
+                            "voice_path": str(voice),
+                            "original_subtitle_path": str(original),
+                            "subtitle_path": str(subtitle),
+                            "language": "zh-CN",
+                            "out": "out.mp3",
+                        },
+                    )
+                )
+            self.assertIn("未找到 voice-clone.py", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

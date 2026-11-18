@@ -41,7 +41,7 @@ func TestAdvancePipelineOnlyCreatesChangedSentence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(before) != 2 {
+	if len(before) != 1 || !isCloneScriptTask(before[0]) {
 		t.Fatalf("initial tasks = %d", len(before))
 	}
 	response, err := env.svc.SaveSubtitleRevision(ctx, Idem{}, track.ID, SaveSubtitleRevisionRequest{
@@ -71,15 +71,15 @@ func TestAdvancePipelineOnlyCreatesChangedSentence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	counts := map[string]int{}
+	keys := map[string]int{}
 	for _, task := range after {
-		counts[task.SegmentID]++
-		if task.ModelLock == nil || task.Params["language"] != "zh" || taskSegmentCacheKey(task) == "" {
+		if !isCloneScriptTask(task) || task.ModelLock == nil || task.Params["language"] != "zh" || taskScriptCacheKey(task) == "" {
 			t.Fatalf("unfrozen task = %+v", task)
 		}
+		keys[taskScriptCacheKey(task)]++
 	}
-	if len(after) != 3 || counts["sentence-1"] != 2 || counts["sentence-2"] != 1 {
-		t.Fatalf("sentence edit rebuilt unrelated work: tasks=%d counts=%v", len(after), counts)
+	if len(after) != 2 || len(keys) != 2 {
+		t.Fatalf("sentence edit did not replace the script task: tasks=%d keys=%v", len(after), keys)
 	}
 }
 
@@ -182,9 +182,12 @@ func TestGenerateCandidatesMatchesAutomaticFrozenWorkAndRetryDigest(t *testing.T
 	}
 	var automatic domain.Task
 	for _, task := range before {
-		if task.SegmentID == "sentence-1" {
+		if isCloneScriptTask(task) {
 			automatic = task
 		}
+	}
+	if automatic.ID == "" || automatic.Params["op"] != "script" {
+		t.Fatalf("automatic task = %+v, want script", automatic)
 	}
 	response, err := env.svc.GenerateCandidates(ctx, Idem{}, "sentence-1", CreateCandidatesRequest{Language: "zh"})
 	if err != nil {
@@ -195,11 +198,11 @@ func TestGenerateCandidatesMatchesAutomaticFrozenWorkAndRetryDigest(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if generated.ID == automatic.ID || generated.Params["language"] != "zh" || generated.ModelLock == nil {
+	if generated.ID == automatic.ID || generated.Kind != domain.TaskKindSegment || generated.SegmentID != "sentence-1" || generated.ModelLock == nil {
 		t.Fatalf("generated task = %+v", generated)
 	}
-	if taskSegmentCacheKey(generated) != taskSegmentCacheKey(automatic) || generated.InputDigest != automatic.InputDigest {
-		t.Fatalf("manual and automatic work diverged: %s/%s vs %s/%s", generated.InputDigest, taskSegmentCacheKey(generated), automatic.InputDigest, taskSegmentCacheKey(automatic))
+	if taskSegmentCacheKey(generated) == "" {
+		t.Fatal("manual redraw lost its sentence cache key")
 	}
 	if err := verifyTaskInputDigest(generated); err != nil {
 		t.Fatal(err)

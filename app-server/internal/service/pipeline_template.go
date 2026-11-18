@@ -165,8 +165,8 @@ func toolTranslateTemplate() pipelineTemplate {
 	}
 }
 
-// voiceCloneTemplate 是声音克隆工具的最小 Run：导入声源 → 逐句克隆。
-// 原文字幕/译文字幕由导入端点预先建轨；不跑 06 翻译或 08 混音。
+// voiceCloneTemplate 是声音克隆工具的最小 Run：导入声源 → 一次脚本克隆出成品。
+// 原文字幕/译文字幕由导入端点预先建轨；不跑 06 翻译或 08 混音，也不再另做音轨合并。
 func voiceCloneTemplate() pipelineTemplate {
 	return pipelineTemplate{
 		ID:    templateVoiceClone,

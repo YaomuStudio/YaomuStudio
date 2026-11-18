@@ -1,7 +1,8 @@
 """音色克隆 Adapter（节点 07）。
 
-默认 ``executor=flashcli``：受管 ``flashcli serve tts/omnivoice_flashrt:1.0.3``
-+ 回环 ``/predictions``（字段对齐 README JSON，不拷贝 demo 脚本）。
+整段成品（``op=script``）一次调用外部 ``voice-clone.py``，脚本自己启动
+``flashcli serve`` 并写出成品 mp3。不把脚本源码拷进仓库。
+单句重抽仍走受管 ``flashcli serve tts/omnivoice_flashrt:1.0.3``。
 ``executor=mock`` 写假产物供联调。
 """
 
@@ -10,7 +11,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
+import sys
 import threading
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -36,9 +40,35 @@ from .protocol import ExecutionRequest
 
 LOGGER = logging.getLogger("yaomustudio_runner.voice_clone")
 
+# 已准入的克隆权重。脚本默认模型不是这个 ref，调用前必须用环境变量覆盖。
+_SCRIPT_MODEL = "tts/omnivoice_flashrt:1.0.3"
+_SCRIPT_TIMEOUT_S = 3600.0
+_DEFAULT_VOICE_CLONE_SCRIPT = "/mnt/d/demo/voice-clone/voice-clone.py"
+_SCRIPT_LANGUAGE = {
+    "en": "english",
+    "zh": "chinese",
+    "zh-CN": "chinese",
+    "zh-TW": "chinese",
+    "ja": "japanese",
+    "ko": "korean",
+    "ru": "russian",
+    "fr": "french",
+    "de": "german",
+    "es": "spanish",
+    "pt": "portuguese",
+    "ar": "arabic",
+    "it": "italian",
+    "hi": "hindi",
+    "id": "indonesian",
+    "th": "thai",
+    "tr": "turkish",
+    "vi": "vietnamese",
+}
+
 _PARAM_KEYS = frozenset(
     {
         "executor",
+        "op",
         "voice_path",
         "voice_url",
         "subtitle_path",
@@ -81,6 +111,7 @@ class VoiceCloneAdapter:
         self._cancel_event = threading.Event()
         self._last_environ: Mapping[str, str] | None = None
         self._session: OmniVoiceCloneSession | None = None
+        self._script_proc: subprocess.Popen[bytes] | None = None
 
     @property
     def ready(self) -> bool:
@@ -216,6 +247,21 @@ class VoiceCloneAdapter:
                 end_ms=end_ms,
                 text=text,
                 original_text=original_text,
+                language=language,
+                out_rel=out_rel,
+                env=env,
+                cancel_event=active_cancel,
+                log=log,
+            )
+
+        if optional_str(params, "op") == "script":
+            if original_path is None or subtitle_path is None:
+                raise CapabilityInvalidParams("voice-clone.py 要求 original_subtitle_path")
+            return self._execute_script(
+                request,
+                voice_path=voice_path,
+                subtitle_path=subtitle_path,
+                original_path=original_path,
                 language=language,
                 out_rel=out_rel,
                 env=env,
@@ -479,11 +525,114 @@ class VoiceCloneAdapter:
             },
         }
 
+    def _execute_script(
+        self,
+        request: ExecutionRequest,
+        *,
+        voice_path: str,
+        subtitle_path: str,
+        original_path: str,
+        language: str,
+        out_rel: str,
+        env: Mapping[str, str],
+        cancel_event: threading.Event,
+        log: Callable[[str, str], None] | None = None,
+    ) -> dict[str, Any]:
+        script = resolve_voice_clone_script()
+        out_abs = resolve_output_path(request.output_dir, out_rel)
+        payload = {
+            "voice_url": voice_path,
+            "original_subtitle_url": original_path,
+            "subtitle_url": subtitle_path,
+            "output_path": out_abs,
+            "language": script_language(language),
+        }
+        child_env = os.environ.copy()
+        child_env.update(env)
+        child_env["FLASHCLI_MODEL"] = _SCRIPT_MODEL
+        child_env.setdefault("TTS_TYPE", "omnivoice")
+        flashcli = child_env.get("FLASHCLI_BIN", "")
+        if flashcli:
+            child_env["PATH"] = os.path.dirname(flashcli) + os.pathsep + child_env.get("PATH", "")
+        argv = [
+            sys.executable,
+            script,
+            "--input=" + json.dumps(payload, ensure_ascii=False),
+        ]
+        if log is not None:
+            log("runner", "开始执行 voice-clone.py")
+        proc = subprocess.Popen(
+            argv,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=child_env,
+            cwd=os.path.dirname(script) or None,
+        )
+        with self._lock:
+            self._script_proc = proc
+        try:
+            deadline = time.monotonic() + _SCRIPT_TIMEOUT_S
+            while proc.poll() is None:
+                if cancel_event.is_set():
+                    proc.terminate()
+                    raise CapabilityFailed("已取消")
+                if time.monotonic() > deadline:
+                    proc.kill()
+                    raise CapabilityFailed("voice-clone.py 超时")
+                time.sleep(0.2)
+            if proc.returncode != 0:
+                raise CapabilityFailed("voice-clone.py 失败")
+        finally:
+            with self._lock:
+                if self._script_proc is proc:
+                    self._script_proc = None
+            if proc.poll() is None:
+                proc.kill()
+        if not os.path.isfile(out_abs) or os.path.getsize(out_abs) <= 0:
+            raise CapabilityFailed("未生成成品音频")
+        if log is not None:
+            log("runner", "voice-clone.py 已完成")
+        return {
+            "outputs": [artifact_entry(out_rel, out_abs)],
+            "executor": "flashcli",
+            "model_ref": _SCRIPT_MODEL,
+            "device": {"cuda_visible_devices": env.get("CUDA_VISIBLE_DEVICES")},
+        }
+
     def cancel(self, *, term_grace_s: float = 1.0, kill_grace_s: float = 5.0) -> bool:
         del term_grace_s, kill_grace_s
         with self._lock:
             self._cancel_event.set()
             session = self._session
+            proc = self._script_proc
         if session is not None:
             session.close()
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
         return True
+
+
+def script_language(language: str) -> str:
+    return _SCRIPT_LANGUAGE.get(language, language)
+
+
+def resolve_voice_clone_script() -> str:
+    raw = os.environ.get("YAOMU_VOICE_CLONE_SCRIPT", "").strip()
+    if raw:
+        mapped = _windows_script_path(raw)
+        for path in (raw, mapped):
+            if path and os.path.isfile(path):
+                return path
+        raise CapabilityFailed("未找到 voice-clone.py")
+    if os.path.isfile(_DEFAULT_VOICE_CLONE_SCRIPT):
+        return _DEFAULT_VOICE_CLONE_SCRIPT
+    raise CapabilityFailed("未找到 voice-clone.py")
+
+
+def _windows_script_path(path: str) -> str:
+    normalized = path.replace("\\", "/")
+    if len(normalized) >= 3 and normalized[1] == ":":
+        drive = normalized[0].lower()
+        rest = normalized[2:].lstrip("/")
+        return f"/mnt/{drive}/{rest}"
+    return path

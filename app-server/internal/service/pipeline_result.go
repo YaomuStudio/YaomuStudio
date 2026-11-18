@@ -167,7 +167,7 @@ func (p *preparedNodeResult) AfterCommit() error {
 
 // assetRoleForTask 按任务/节点与媒体职责给出产物角色；未知组合留空。
 func assetRoleForTask(task domain.Task, meta *domain.MediaMeta) domain.AssetRole {
-	if isCloneAudioAssemblyTask(task) {
+	if isCloneAudioAssemblyTask(task) || isCloneScriptTask(task) {
 		return domain.AssetRoleFullDubAudio
 	}
 	if task.Kind == domain.TaskKindSegment {
@@ -267,6 +267,15 @@ func (p *preparedNodeResult) materializeOutputs() error {
 			}
 		}
 		return fmt.Errorf("node 08 produced no media output")
+	case domain.NodeKeyClone:
+		if op, _ := task.Params["op"].(string); op == "script" {
+			for _, output := range p.outputs {
+				if isAudioPath(output.RelPath) {
+					return nil
+				}
+			}
+			return fmt.Errorf("clone script produced no audio output")
+		}
 	}
 	return nil
 }

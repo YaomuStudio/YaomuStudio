@@ -190,6 +190,19 @@ func (s *Service) advancePipeline(ctx context.Context, tx *store.Tx, runID domai
 			if tpl.Has(domain.NodeKeySeparate) && !nodeCompleted(snap.run, domain.NodeKeySeparate) {
 				continue
 			}
+			if tpl.ID == templateVoiceClone {
+				// 克隆工具一次调用 voice-clone.py 直接得到成品，不再逐句建任务、也不再另做合并。
+				if err := s.ensureCloneScriptTask(ctx, tx, snap, language, revision, events); err != nil {
+					if isCloneTimelineFailure(err) {
+						if failErr := s.ensureCloneTimelineFailure(ctx, tx, snap, language, revision, err, events); failErr != nil {
+							return failErr
+						}
+						continue
+					}
+					return err
+				}
+				continue
+			}
 			work, err := s.segmentWorkForRevision(ctx, tx, snap, *revision, language)
 			if err != nil {
 				if isCloneTimelineFailure(err) {
@@ -794,6 +807,14 @@ func (s *Service) computeCloneStatus(
 		}
 		if tpl.Has(domain.NodeKeySeparate) && !nodeCompleted(snap.run, domain.NodeKeySeparate) {
 			outcomes = append(outcomes, domain.NodeStatusPending)
+			continue
+		}
+		if tpl.ID == templateVoiceClone {
+			scriptOutcomes, err := s.cloneScriptOutcomes(ctx, tx, snap, language, revision)
+			if err != nil {
+				return domain.NodeStatusPending, err
+			}
+			outcomes = append(outcomes, scriptOutcomes...)
 			continue
 		}
 		segmentOutcomes, err := s.cloneTaskOutcomes(ctx, tx, snap, language, revision)

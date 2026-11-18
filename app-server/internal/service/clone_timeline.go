@@ -131,6 +131,13 @@ func (s *Service) validateFrozenCloneTimeline(
 	if track.Type != domain.TrackTypeTranslation || track.Language != task.Language {
 		return invalidRequestf("frozen clone revision is not the task's translation track")
 	}
+	if op, _ := params["op"].(string); op == "script" {
+		windows := make([]domain.TimelineWindow, 0, len(revision.Segments))
+		for _, segment := range revision.Segments {
+			windows = append(windows, domain.TimelineWindow{StartMs: segment.StartMs, EndMs: segment.EndMs})
+		}
+		return domain.ValidateMediaTimeline(duration, windows)
+	}
 	var segment *domain.Segment
 	for i := range revision.Segments {
 		if revision.Segments[i].ID == task.SegmentID {

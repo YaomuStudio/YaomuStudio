@@ -71,14 +71,17 @@ func (s *Service) PrepareTaskExecution(ctx context.Context, task domain.Task) (m
 	core := readCoreTaskParams(params)
 	materialized := map[string]struct{}{}
 	if revisionID, _ := core["subtitle_revision_id"].(string); revisionID != "" {
-		path, err := s.materializeFrozenSubtitle(ctx, task, revisionID, core)
+		path, err := s.materializeFrozenSubtitle(ctx, task, revisionID, core, "subtitle_digest")
 		if err != nil {
 			return nil, err
 		}
-		if task.NodeKey == domain.NodeKeyTranslate {
+		switch {
+		case task.NodeKey == domain.NodeKeyTranslate:
 			// 06 翻译适配器只接受物化后的源 SRT 绝对路径；不带 08 的执行计划。
 			params["subtitle_url"] = path
-		} else {
+		case params["op"] == "script":
+			params["subtitle_path"] = path
+		default:
 			plan, ok := params["plan"].(map[string]any)
 			if !ok {
 				return nil, invalidRequestf("subtitle input requires an execution plan")
@@ -86,6 +89,18 @@ func (s *Service) PrepareTaskExecution(ctx context.Context, task domain.Task) (m
 			plan["subtitle"] = path
 		}
 		materialized[filepath.Clean(path)] = struct{}{}
+	}
+	if params["op"] == "script" {
+		originalID, _ := core["original_subtitle_revision_id"].(string)
+		if originalID == "" {
+			return nil, invalidRequestf("clone original subtitle is missing")
+		}
+		originalPath, err := s.materializeFrozenSubtitle(ctx, task, originalID, core, "original_subtitle_digest")
+		if err != nil {
+			return nil, err
+		}
+		params["original_subtitle_path"] = originalPath
+		materialized[filepath.Clean(originalPath)] = struct{}{}
 	}
 	var rewrite func(map[string]any) error
 	rewrite = func(object map[string]any) error {
@@ -151,6 +166,7 @@ func (s *Service) materializeFrozenSubtitle(
 	task domain.Task,
 	revisionID string,
 	core map[string]any,
+	digestKey string,
 ) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -167,7 +183,7 @@ func (s *Service) materializeFrozenSubtitle(
 		return "", invalidRequestf("subtitle revision belongs to another project")
 	}
 	text := renderSRT(revision.Segments)
-	expected, _ := core["subtitle_digest"].(string)
+	expected, _ := core[digestKey].(string)
 	digest := sha256.Sum256([]byte(text))
 	if expected == "" || expected != hex.EncodeToString(digest[:]) {
 		return "", changedAssetError()

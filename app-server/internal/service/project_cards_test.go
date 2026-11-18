@@ -80,6 +80,15 @@ func TestAssetRoleForTask(t *testing.T) {
 			},
 			role: domain.AssetRoleFullDubAudio,
 		},
+		{
+			name: "clone script",
+			task: domain.Task{
+				Kind:    domain.TaskKindNode,
+				NodeKey: domain.NodeKeyClone,
+				Params:  map[string]any{"op": "script", "out": "out.mp3"},
+			},
+			role: domain.AssetRoleFullDubAudio,
+		},
 		{name: "erase", task: domain.Task{Kind: domain.TaskKindNode, NodeKey: domain.NodeKeyErase}, role: domain.AssetRoleCleanVideo},
 		{name: "extract", task: domain.Task{Kind: domain.TaskKindNode, NodeKey: domain.NodeKeyExtract}, role: domain.AssetRoleSourceSubtitle},
 		{name: "translate", task: domain.Task{Kind: domain.TaskKindNode, NodeKey: domain.NodeKeyTranslate}, role: domain.AssetRoleTranslatedSubtitle},

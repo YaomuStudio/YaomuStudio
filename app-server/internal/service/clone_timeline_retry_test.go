@@ -39,7 +39,12 @@ func seedCloneTimelineFailureRun(t *testing.T) (*exportTestEnv, domain.WorkflowR
 	}); err != nil {
 		t.Fatalf("SaveSubtitleRevision: %v", err)
 	}
-	commitCloneTask(t, env, cloneSegmentTask(t, env, run.ID, "zh", "tr-1").ID)
+	if err := env.store.DoTx(ctx, func(tx *store.Tx) error {
+		var events []domain.DomainEvent
+		return env.svc.advancePipeline(ctx, tx, run.ID, &events)
+	}); err != nil {
+		t.Fatalf("advancePipeline: %v", err)
+	}
 	final, err := env.store.GetWorkflowRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("GetWorkflowRun: %v", err)
@@ -155,7 +160,7 @@ func TestRetryFrozenSegmentTimelineFailureRequiresNewRun(t *testing.T) {
 				t.Fatalf("CreateWorkflowRun: %v", err)
 			}
 			run := response.Body.(domain.WorkflowRun)
-			task := cloneSegmentTask(t, env, run.ID, "zh", "tr-1")
+			task := cloneScriptTask(t, env, run.ID, "zh")
 			now := env.svc.Now()
 			task, err = env.store.UpdateTaskStatus(ctx, task.ID, domain.TaskStatusRunning, task.StateVersion, now)
 			if err != nil {

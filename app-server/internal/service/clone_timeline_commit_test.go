@@ -92,6 +92,24 @@ func cloneAssemblyTask(t *testing.T, env *exportTestEnv, runID domain.ID, langua
 	return domain.Task{}
 }
 
+func cloneScriptTask(t *testing.T, env *exportTestEnv, runID domain.ID, language string) domain.Task {
+	t.Helper()
+	tasks, err := env.store.ListRunTasks(context.Background(), runID)
+	if err != nil {
+		t.Fatalf("ListRunTasks: %v", err)
+	}
+	var found domain.Task
+	for _, task := range tasks {
+		if isCloneScriptTask(task) && task.Language == language {
+			found = task
+		}
+	}
+	if found.ID == "" {
+		t.Fatalf("clone script task %s not found", language)
+	}
+	return found
+}
+
 func cloneSegmentTask(t *testing.T, env *exportTestEnv, runID domain.ID, language, segmentID string) domain.Task {
 	t.Helper()
 	tasks, err := env.store.ListRunTasks(context.Background(), runID)
@@ -129,13 +147,13 @@ func TestCompletedCloneCommitSurvivesInvalidCurrentRevision(t *testing.T) {
 	}
 	var frozen domain.Task
 	for _, task := range tasks {
-		if task.Kind == domain.TaskKindSegment && task.NodeKey == domain.NodeKeyClone {
+		if isCloneScriptTask(task) && task.Language == "zh" {
 			frozen = task
 			break
 		}
 	}
 	if frozen.ID == "" {
-		t.Fatal("run created no frozen 07 segment task")
+		t.Fatal("run created no clone script task")
 	}
 	if _, err := env.svc.SaveSubtitleRevision(ctx, Idem{}, translation.ID, SaveSubtitleRevisionRequest{
 		BaseRevisionID: translation.CurrentRevisionID,
@@ -182,10 +200,6 @@ func TestCompletedCloneCommitSurvivesInvalidCurrentRevision(t *testing.T) {
 	if stored.Status != domain.TaskStatusSucceeded || len(stored.ArtifactIDs) == 0 {
 		t.Fatalf("completed task lost: status=%s artifacts=%v", stored.Status, stored.ArtifactIDs)
 	}
-	candidates, err := env.svc.ListCandidates(ctx, "tr-1", "zh")
-	if err != nil || len(candidates) == 0 {
-		t.Fatalf("candidate lost: %v/%d", err, len(candidates))
-	}
 
 	final, err := env.store.GetWorkflowRun(ctx, run.ID)
 	if err != nil {
@@ -199,11 +213,11 @@ func TestCompletedCloneCommitSurvivesInvalidCurrentRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListRunTasks after commit: %v", err)
 	}
-	segmentTasks := 0
+	scriptTasks := 0
 	failureKey := ""
 	for _, task := range after {
-		if task.Kind == domain.TaskKindSegment && task.NodeKey == domain.NodeKeyClone {
-			segmentTasks++
+		if isCloneScriptTask(task) {
+			scriptTasks++
 		}
 		if task.Kind == domain.TaskKindNode && task.NodeKey == domain.NodeKeyClone &&
 			task.Status == domain.TaskStatusFailed && task.Error != nil {
@@ -213,13 +227,13 @@ func TestCompletedCloneCommitSurvivesInvalidCurrentRevision(t *testing.T) {
 			failureKey = task.Error.MessageKey
 		}
 	}
-	if segmentTasks != 1 {
-		t.Fatalf("invalid revision created executable 07 tasks: count=%d", segmentTasks)
+	if scriptTasks != 1 {
+		t.Fatalf("invalid revision created executable script tasks: count=%d", scriptTasks)
 	}
 	if failureKey != "task.clone_timeline_out_of_range" {
 		t.Fatalf("readable clone failure key = %q; tasks=%+v", failureKey, after)
 	}
-	if !hasEvent(events, "segment.candidate_selected") || !hasEvent(events, "task.failed") {
+	if !hasEvent(events, "task.failed") {
 		t.Fatalf("required events missing: %+v", eventTypes(events))
 	}
 
@@ -275,10 +289,13 @@ func TestCompletedCloneCommitWithSwitchOffKeepsExistingBehavior(t *testing.T) {
 	}
 	var frozen domain.Task
 	for _, task := range tasks {
-		if task.Kind == domain.TaskKindSegment && task.NodeKey == domain.NodeKeyClone {
+		if isCloneScriptTask(task) && task.Language == "zh" {
 			frozen = task
 			break
 		}
+	}
+	if frozen.ID == "" {
+		t.Fatal("run created no clone script task")
 	}
 	now := env.svc.Now()
 	frozen, err = env.store.UpdateTaskStatus(ctx, frozen.ID, domain.TaskStatusRunning, frozen.StateVersion, now)
@@ -351,59 +368,43 @@ func TestCloneTimelineFailureWaitsForInFlightFrozenTasks(t *testing.T) {
 	}
 	invalidRevision := saved.Body.(domain.SubtitleRevision)
 
-	zhFirst := cloneSegmentTask(t, env, run.ID, "zh", "tr-1")
-	zhSecond := cloneSegmentTask(t, env, run.ID, "zh", "tr-2")
-	events := commitCloneTask(t, env, zhFirst.ID)
-	if !hasEvent(events, "segment.candidate_selected") || !hasEvent(events, "task.failed") {
-		t.Fatalf("commit events missing: %+v", eventTypes(events))
-	}
-	candidates, err := env.svc.ListCandidates(ctx, "tr-1", "zh")
-	if err != nil || len(candidates) == 0 {
-		t.Fatalf("first frozen candidate lost: %v/%d", err, len(candidates))
-	}
-
+	script := cloneScriptTask(t, env, run.ID, "zh")
 	final, err := env.store.GetWorkflowRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("GetWorkflowRun: %v", err)
 	}
 	if final.Status.Terminal() {
-		t.Fatalf("run converged before frozen units drained: %s", final.Status)
+		t.Fatalf("run converged before the frozen script task drained: %s", final.Status)
 	}
 	if nodeStatusOf(final, domain.NodeKeyClone) == domain.NodeStatusFailed {
-		t.Fatal("clone node failed while same-language frozen units are still pending")
+		t.Fatal("clone node failed while the frozen script task is still pending")
 	}
-	if got := cloneSegmentTask(t, env, run.ID, "zh", "tr-2"); got.Status != domain.TaskStatusQueued {
-		t.Fatalf("frozen zh task = %s, want queued", got.Status)
+	if script.Status != domain.TaskStatusQueued {
+		t.Fatalf("frozen script task = %s, want queued", script.Status)
 	}
 	assertNoExecutableTaskForRevision(t, env, run.ID, invalidRevision.ID)
 
-	commitCloneTask(t, env, zhSecond.ID)
+	events := commitCloneTask(t, env, script.ID)
+	if !hasEvent(events, "task.failed") {
+		t.Fatalf("commit events missing: %+v", eventTypes(events))
+	}
 	final, err = env.store.GetWorkflowRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("GetWorkflowRun: %v", err)
 	}
 	if final.Status != domain.RunStatusPartial {
-		t.Fatalf("run status = %s, want partial after all units drained", final.Status)
+		t.Fatalf("run status = %s, want partial after the script task drained", final.Status)
 	}
 	if nodeStatusOf(final, domain.NodeKeyClone) != domain.NodeStatusFailed {
 		t.Fatalf("clone node = %s, want failed", nodeStatusOf(final, domain.NodeKeyClone))
 	}
 	assertNoExecutableTaskForRevision(t, env, run.ID, invalidRevision.ID)
-	tasks, err := env.store.ListRunTasks(ctx, run.ID)
+	drained, err := env.store.GetTask(ctx, script.ID)
 	if err != nil {
-		t.Fatalf("ListRunTasks: %v", err)
+		t.Fatalf("GetTask: %v", err)
 	}
-	segments := 0
-	for _, task := range tasks {
-		if task.Kind == domain.TaskKindSegment && task.NodeKey == domain.NodeKeyClone {
-			segments++
-			if task.Status != domain.TaskStatusSucceeded {
-				t.Fatalf("frozen task %s did not drain: %s", task.ID, task.Status)
-			}
-		}
-	}
-	if segments != 2 {
-		t.Fatalf("frozen segment tasks = %d, want 2", segments)
+	if drained.Status != domain.TaskStatusSucceeded || len(drained.ArtifactIDs) == 0 {
+		t.Fatalf("frozen script task did not drain: %s artifacts=%v", drained.Status, drained.ArtifactIDs)
 	}
 }
 
@@ -442,8 +443,7 @@ func TestCloneTimelineFailureDoesNotBlockOtherLanguages(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveSubtitleRevision: %v", err)
 	}
-	commitCloneTask(t, env, cloneSegmentTask(t, env, run.ID, "zh", "tr-1").ID)
-	commitCloneTask(t, env, cloneSegmentTask(t, env, run.ID, "zh", "tr-2").ID)
+	commitCloneTask(t, env, cloneScriptTask(t, env, run.ID, "zh").ID)
 
 	final, err := env.store.GetWorkflowRun(ctx, run.ID)
 	if err != nil {
@@ -455,13 +455,12 @@ func TestCloneTimelineFailureDoesNotBlockOtherLanguages(t *testing.T) {
 	if nodeStatusOf(final, domain.NodeKeyClone) == domain.NodeStatusFailed {
 		t.Fatal("clone node failed while other language is still pending")
 	}
-	jaTask := cloneSegmentTask(t, env, run.ID, "ja", "ja-1")
+	jaTask := cloneScriptTask(t, env, run.ID, "ja")
 	if jaTask.Status != domain.TaskStatusQueued {
 		t.Fatalf("other language task = %s, want queued", jaTask.Status)
 	}
 
 	commitCloneTask(t, env, jaTask.ID)
-	commitCloneTask(t, env, cloneAssemblyTask(t, env, run.ID, "ja").ID)
 	final, err = env.store.GetWorkflowRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("GetWorkflowRun: %v", err)
@@ -490,7 +489,8 @@ func assertNoExecutableTaskForRevision(t *testing.T, env *exportTestEnv, runID, 
 		t.Fatalf("ListRunTasks: %v", err)
 	}
 	for _, task := range tasks {
-		if task.Kind == domain.TaskKindSegment && task.NodeKey == domain.NodeKeyClone &&
+		executable := task.Kind == domain.TaskKindSegment || isCloneScriptTask(task)
+		if executable && task.NodeKey == domain.NodeKeyClone &&
 			len(task.InputRevisionIDs) > 0 && task.InputRevisionIDs[0] == revisionID {
 			t.Fatalf("invalid revision created executable 07 task %s (%s)", task.ID, task.Status)
 		}

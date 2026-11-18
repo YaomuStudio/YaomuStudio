@@ -18,8 +18,8 @@ import (
 	"github.com/YaomuStudio/YaomuStudio/app-server/internal/service"
 )
 
-// TestCloneWSLRunnerRealGPU 是手动 GPU E2E：Core 逐句克隆 Task -> WSL Runner ->
-// 真实 flashcli serve/预测 -> Core 候选提交。默认跳过；设置 YAOMU_WSL_E2E=1 运行。
+// TestCloneWSLRunnerRealGPU 是手动 GPU E2E：Core 一次脚本任务 -> WSL Runner ->
+// voice-clone.py 写出成品。默认跳过；设置 YAOMU_WSL_E2E=1 运行。
 func TestCloneWSLRunnerRealGPU(t *testing.T) {
 	if os.Getenv("YAOMU_WSL_E2E") != "1" {
 		t.Skip("set YAOMU_WSL_E2E=1 to run the WSL GPU clone E2E")
@@ -100,7 +100,7 @@ func TestCloneWSLRunnerRealGPU(t *testing.T) {
 
 	resp, err := e.svc.CreateWorkflowRun(ctx, service.Idem{}, service.CreateWorkflowRunInput{
 		ProjectID:          string(project),
-		Name:               "WSL 逐句克隆 E2E",
+		Name:               "WSL 脚本克隆 E2E",
 		Template:           "tool_voice_clone",
 		SourceLanguage:     "en",
 		TargetLanguages:    []string{"zh"},
@@ -127,39 +127,32 @@ func TestCloneWSLRunnerRealGPU(t *testing.T) {
 			clone = &tasks[i]
 		}
 	}
-	if clone == nil || len(clone.ArtifactIDs) == 0 {
-		t.Fatalf("no successful clone task with artifacts: %+v", tasks)
+	if clone == nil || clone.Params["op"] != "script" || len(clone.ArtifactIDs) == 0 {
+		t.Fatalf("no successful clone script task with artifacts: %+v", tasks)
 	}
-	candidates, err := e.svc.ListCandidates(ctx, clone.SegmentID, "zh")
-	if err != nil {
-		t.Fatalf("ListCandidates: %v", err)
-	}
-	if len(candidates) != 1 || candidates[0].AudioAssetID == "" {
-		t.Fatalf("candidates = %+v", candidates)
-	}
-	candidateAsset, err := e.st.GetAsset(ctx, candidates[0].AudioAssetID)
+	product, err := e.st.GetAsset(ctx, clone.ArtifactIDs[0])
 	if err != nil {
 		t.Fatalf("GetAsset: %v", err)
 	}
-	data, err := os.ReadFile(candidateAsset.Path)
+	data, err := os.ReadFile(product.Path)
 	if err != nil {
-		t.Fatalf("read candidate: %v", err)
+		t.Fatalf("read product: %v", err)
 	}
-	if len(data) < 44 || string(data[:4]) != "RIFF" {
-		t.Fatalf("candidate is not a WAV: %s (%d bytes)", candidateAsset.Path, len(data))
+	if len(data) == 0 {
+		t.Fatalf("product is empty: %s", product.Path)
 	}
 	logPath := filepath.Join(e.data, "cache", "execution-logs", string(clone.ID), "attempt-1.log")
 	logData, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("read execution log: %v", err)
 	}
-	if !strings.Contains(string(logData), "单句克隆") {
-		t.Fatalf("execution log missing clone lines:\n%s", logData)
+	if !strings.Contains(string(logData), "voice-clone.py") {
+		t.Fatalf("execution log missing script lines:\n%s", logData)
 	}
 	if strings.Contains(string(logData), "/mnt/") || strings.Contains(string(logData), "C:\\") {
 		t.Fatalf("execution log leaked an absolute path:\n%s", logData)
 	}
-	t.Logf("clone candidate: %s %d bytes type=%s", candidateAsset.Path, len(data), candidateAsset.Type)
+	t.Logf("clone product: %s %d bytes type=%s", product.Path, len(data), product.Type)
 	t.Logf("execution log lines: %d", strings.Count(string(logData), "\n"))
 }
 

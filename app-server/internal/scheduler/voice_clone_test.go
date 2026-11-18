@@ -40,45 +40,39 @@ func TestVoiceCloneRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListRunTasks: %v", err)
 	}
-	segmentTasks := 0
-	assemblyTasks := 0
+	scriptTasks := 0
 	for _, task := range tasks {
-		if task.Kind == domain.TaskKindNode && task.NodeKey == domain.NodeKeyClone && task.Params["op"] == "assemble" {
-			assemblyTasks++
-			if task.Status != domain.TaskStatusSucceeded {
-				t.Fatalf("assembly %s status = %s", task.ID, task.Status)
-			}
+		if task.NodeKey != domain.NodeKeyClone {
 			continue
 		}
-		if task.Kind != domain.TaskKindSegment || task.NodeKey != domain.NodeKeyClone {
-			t.Fatalf("task = %s/%s, want segment/07 or full-audio assembly", task.Kind, task.NodeKey)
+		if task.Kind != domain.TaskKindNode {
+			t.Fatalf("task = %s/%s, want one clone script task", task.Kind, task.NodeKey)
 		}
-		segmentTasks++
+		if task.Params["op"] != "script" {
+			t.Fatalf("clone op = %v, want script", task.Params["op"])
+		}
+		scriptTasks++
 		if task.Status != domain.TaskStatusSucceeded {
 			t.Fatalf("task %s status = %s", task.ID, task.Status)
+		}
+		if task.SegmentID != "" {
+			t.Fatalf("script task segment = %s, want empty", task.SegmentID)
 		}
 		if task.Params["voice_source_asset_id"] != string(asset.ID) {
 			t.Fatalf("voice source param = %v", task.Params["voice_source_asset_id"])
 		}
-		if task.Params["adjust_duration"] != true || task.Params["validate_timestamps"] != true {
-			t.Fatalf("clone option params = %+v", task.Params)
+		if task.Params["out"] != "out.mp3" {
+			t.Fatalf("clone out = %v, want out.mp3", task.Params["out"])
 		}
-		if task.Params["text"] == "" || task.Params["original_text"] == "" {
-			t.Fatalf("clone segment text projection = %+v", task.Params)
+		if task.Params["language"] != "zh" {
+			t.Fatalf("clone language = %v", task.Params["language"])
 		}
-		if task.Params["out"] != "candidate.wav" {
-			t.Fatalf("clone segment out = %v", task.Params["out"])
-		}
-		candidates, err := e.svc.ListCandidates(context.Background(), task.SegmentID, "zh")
-		if err != nil {
-			t.Fatalf("ListCandidates: %v", err)
-		}
-		if len(candidates) != 1 || !candidates[0].IsRecommended || candidates[0].AudioAssetID == "" {
-			t.Fatalf("candidates for %s = %+v", task.SegmentID, candidates)
+		if len(task.ArtifactIDs) == 0 {
+			t.Fatalf("script task produced no artifact")
 		}
 	}
-	if segmentTasks != 2 || assemblyTasks != 1 {
-		t.Fatalf("segment tasks = %d, assembly tasks = %d, want 2 and 1", segmentTasks, assemblyTasks)
+	if scriptTasks != 1 {
+		t.Fatalf("script tasks = %d, want 1", scriptTasks)
 	}
 
 	gates, err := e.st.ListProjectReviews(context.Background(), project, string(run.ID))

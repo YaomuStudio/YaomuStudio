@@ -452,6 +452,12 @@ async function loadResult(project: Project): Promise<void> {
   }
 }
 
+function fullDubFileName(row: FullDubRow): string {
+  const match = /\.([a-z0-9]+)$/i.exec(row.asset.name);
+  const ext = match ? `.${match[1].toLowerCase()}` : ".mp3";
+  return row.language ? `clone-${row.language}${ext}` : `clone-full${ext}`;
+}
+
 async function saveFullDub(row: FullDubRow): Promise<void> {
   saveBusy.value = row.asset.id;
   saveMessage.value = null;
@@ -459,7 +465,7 @@ async function saveFullDub(row: FullDubRow): Promise<void> {
   try {
     const saved = await api.saveAsset({
       assetId: row.asset.id,
-      suggestedName: row.language ? `clone-${row.language}.wav` : "clone-full.wav",
+      suggestedName: fullDubFileName(row),
       title: t("voiceClone.result.save"),
     });
     if (!saved) return;
