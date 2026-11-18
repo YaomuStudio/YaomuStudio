@@ -58,6 +58,7 @@ function brandDevElectron() {
   console.log("[relaunch] branding dev Electron bundle…");
   spawnSync("plutil", ["-replace", "CFBundleName", "-string", "YaomuStudio", info], { stdio: "ignore" });
   spawnSync("plutil", ["-replace", "CFBundleDisplayName", "-string", "YaomuStudio", info], { stdio: "ignore" });
+  spawnSync("plutil", ["-replace", "CFBundleIdentifier", "-string", "com.aodianyun.yaomustudio.dev", info], { stdio: "ignore" });
   // Info.plist 修改会使 Electron 自带签名失效，开发态用 ad-hoc 签名恢复可启动性。
   spawnSync("codesign", ["--force", "--deep", "--sign", "-", appDir], { stdio: "ignore" });
 }
