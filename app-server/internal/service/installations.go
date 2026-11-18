@@ -44,6 +44,8 @@ type ReleasePlan struct {
 	Permissions      []string
 	License          domain.LicenseSummary
 	RequiresRestart  bool
+	// FlashCLIRef 是安装完成后要预拉的已准入模型引用。空值表示该发布不走 FlashCLI。
+	FlashCLIRef string
 }
 
 // ReleaseCatalog 解析槽位的准入发布；发布流水线未接入时返回未就绪。
@@ -67,6 +69,15 @@ func (UnconfiguredReleases) Resolve(_ context.Context, slot domain.CapabilitySlo
 // StaticReleases 是测试/离线开发用的发布目录。
 type StaticReleases struct {
 	Releases map[domain.CapabilitySlotKey]ReleasePlan
+}
+
+// FlashCLIRefFor 返回与已安装发布匹配的已准入引用。测试目录用它，不额外消耗 Resolve。
+func (s StaticReleases) FlashCLIRefFor(slot domain.CapabilitySlotKey, release domain.ReleaseRef) string {
+	plan, ok := s.Releases[slot]
+	if !ok || plan.Release.ReleaseID != release.ReleaseID || plan.Release.Version != release.Version {
+		return ""
+	}
+	return plan.FlashCLIRef
 }
 
 // Resolve 实现 ReleaseCatalog。
@@ -152,6 +163,8 @@ type storedPlan struct {
 	CreatedAt time.Time                `json:"created_at"`
 	Plan      domain.InstallationPlan  `json:"plan"`
 	Files     []downloader.File        `json:"files"`
+	// FlashCLIRef 只留在安装计划元数据里，不进入对外 InstallationPlan。
+	FlashCLIRef string `json:"flashcli_ref,omitempty"`
 }
 
 // PlanInstallation 解析安装计划（200）；不持久化执行意图。
@@ -231,9 +244,15 @@ func (s *Service) PlanInstallation(ctx context.Context, slot domain.CapabilitySl
 	}
 	plan.PlanHash = hash
 	plan.PlanID = "plan_" + hash[:16]
+	flashRef := admittedStoredRef(resolved.FlashCLIRef)
+	if flashRef != "" && s.flashCLIPrepareRunning(flashRef) {
+		return domain.InstallationPlan{}, errResourceBusy("flashcli model prepare is already running")
+	}
+	s.rememberFlashCLIRef(plan.PlanHash, flashRef)
 
 	stored, err := json.Marshal(storedPlan{
 		Slot: slot, PlanHash: hash, CreatedAt: s.Now(), Plan: plan, Files: resolved.Files,
+		FlashCLIRef: flashRef,
 	})
 	if err != nil {
 		return domain.InstallationPlan{}, fmt.Errorf("encode plan: %w", err)
@@ -446,6 +465,9 @@ func (s *Service) createInstallationWrite(ctx context.Context, idem Idem, req Cr
 	var createdRoot string
 	var createdPlan domain.InstallationPlan
 	var createdFiles []downloader.File
+	var createdRef string
+	var reused domain.Installation
+	var reusedRef string
 	resp, err := s.write(ctx, "installations.create", idem, 202, func(ctx context.Context, tx *store.Tx) (any, error) {
 		if prepared == nil {
 			// 预检说已有回执；事务内若真的执行则状态已变化，安全失败而不是无验证激活。
@@ -481,6 +503,8 @@ func (s *Service) createInstallationWrite(ctx context.Context, idem Idem, req Cr
 				return nil, err
 			}
 			events = append(events, staged...)
+			reused = target.inst
+			reusedRef = admittedStoredRef(stored.FlashCLIRef)
 			return body, nil
 		}
 
@@ -532,6 +556,7 @@ func (s *Service) createInstallationWrite(ctx context.Context, idem Idem, req Cr
 		createdRoot = s.releaseRoot(key)
 		createdPlan = stored.Plan
 		createdFiles = stored.Files
+		createdRef = admittedStoredRef(stored.FlashCLIRef)
 		return tx.GetInstallation(ctx, inst.ID)
 	})
 	if err != nil {
@@ -541,7 +566,11 @@ func (s *Service) createInstallationWrite(ctx context.Context, idem Idem, req Cr
 	// 传输在事务提交后异步执行；真实下载由 Downloader 适配器提供。
 	// 幂等重放不会执行事务，created 为空时不重复启动安装。
 	if created.ID != "" {
-		s.startInstallation(created, createdRoot, createdPlan, createdFiles)
+		s.startInstallation(created, createdRoot, createdPlan, createdFiles, createdRef)
+	} else if reused.ID != "" && reusedRef != "" && s.flashCLIPrepareNeeded(ctx, reused, reusedRef) {
+		// 已完成的目录复用不会再进入下载 worker。本地标记只说明某次 pull 退出过 0，
+		// 权重是否还在以 models list 为准；标记还在但权重缺失时仍要重新预拉。
+		s.startFlashCLIPrepare(reused, reusedRef)
 	}
 	return resp, nil
 }
@@ -552,6 +581,9 @@ func (s *Service) prepareCreateInstallation(ctx context.Context, req CreateInsta
 	stored, err := s.installationPlanFrom(ctx, s.store.GetMeta, req.PlanID, req.PlanHash)
 	if err != nil {
 		return nil, err
+	}
+	if ref := admittedStoredRef(stored.FlashCLIRef); ref != "" && s.flashCLIPrepareRunning(ref) {
+		return nil, errResourceBusy("flashcli model prepare is already running")
 	}
 	covered, key, manifest, err := installationPlanSubject(stored)
 	if err != nil {
@@ -654,6 +686,9 @@ func (s *Service) installationPlanFrom(
 	}
 	if stored.PlanHash != planHash {
 		return storedPlan{}, fmt.Errorf("%w: plan hash mismatch", domain.ErrPreflightStale)
+	}
+	if stored.FlashCLIRef != "" && !domain.AdmittedFlashCLIRef(stored.FlashCLIRef) {
+		return storedPlan{}, fmt.Errorf("%w: installation plan flashcli ref is not admitted", domain.ErrPreflightStale)
 	}
 	if s.Now().Sub(stored.CreatedAt) > planTTL {
 		return storedPlan{}, fmt.Errorf("%w: installation plan expired", domain.ErrPreflightStale)
@@ -787,7 +822,7 @@ func capabilitySlotsOverlap(a, b []domain.CapabilitySlotKey) bool {
 	return false
 }
 
-func (s *Service) startInstallation(inst domain.Installation, root string, plan domain.InstallationPlan, files []downloader.File) {
+func (s *Service) startInstallation(inst domain.Installation, root string, plan domain.InstallationPlan, files []downloader.File, ref string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.installMu.Lock()
 	if s.installs == nil {
@@ -807,7 +842,7 @@ func (s *Service) startInstallation(inst domain.Installation, root string, plan 
 			s.installMu.Unlock()
 			cancel()
 		}()
-		s.runInstallation(ctx, inst, root, plan, files)
+		s.runInstallation(ctx, inst, root, plan, files, ref)
 	}()
 }
 
@@ -983,6 +1018,13 @@ func (s *Service) RecoverInstallations(ctx context.Context) error {
 			continue
 		}
 		if s.recoverInstallingFiles(inst) {
+			if ref := s.flashCLIRefForRelease(inst.Slot, inst.Release); ref != "" &&
+				!flashCLIPrepareMarkerMatches(s.installationRoot(inst), ref) {
+				// 文件已落位但 FlashCLI 预拉未完成。启动阶段不在这里重新下载，
+				// 交给用户重试，避免 Core 在对外服务前阻塞一小时。
+				s.failInstallation(inst, inst.Progress, inst.VerifiedFiles, "installation.interrupted_on_restart", true)
+				continue
+			}
 			if err := s.completeInstallation(inst, *inst.Release, len(inst.Manifest)); err != nil {
 				s.logWarn("installation", "installation.recovery_complete_failed", map[string]any{
 					"installation_id": string(inst.ID),
@@ -1009,7 +1051,21 @@ func (s *Service) RecoverInstallations(ctx context.Context) error {
 }
 
 // runInstallation 驱动 planning→downloading→verifying→installing→done 的阶段推进。
-func (s *Service) runInstallation(ctx context.Context, inst domain.Installation, dir string, plan domain.InstallationPlan, files []downloader.File) {
+func (s *Service) runInstallation(ctx context.Context, inst domain.Installation, dir string, plan domain.InstallationPlan, files []downloader.File, ref string) {
+	if !domain.AdmittedFlashCLIRef(ref) {
+		ref = s.rememberedFlashCLIRef(plan.PlanHash)
+	}
+	// 与目录文件下载并行启动预拉，避免下载过程中看不到 FlashCLI。
+	prepareDone := make(chan error, 1)
+	if ref != "" {
+		go func() {
+			s.logInfo("installation", "installation.model_prepare_started", map[string]any{
+				"installation_id": string(inst.ID),
+				"slot":            string(inst.Slot),
+			})
+			prepareDone <- s.prepareAdmittedModel(ctx, ref)
+		}()
+	}
 	// 未成功落 done 的所有退出路径（失败、取消、阶段竞争）都清理 `.part`；
 	// 旧版本目录不在 dir 内，不受影响。
 	completed := false
@@ -1032,6 +1088,8 @@ func (s *Service) runInstallation(ctx context.Context, inst domain.Installation,
 		total += file.Size
 	}
 	progress := newInstallProgress(s, inst.ID, total)
+	// 有 FlashCLI 权重时，进度条用权重清单的实际大小和已落盘字节，不用目录小包。
+	trackWeights := ref != "" && s.opts.WeightProgress != nil
 
 	var base int64
 	var fetchErr error
@@ -1039,6 +1097,9 @@ func (s *Service) runInstallation(ctx context.Context, inst domain.Installation,
 		current := file
 		baseAt := base
 		fetchErr = s.opts.Downloader.Fetch(ctx, dir, current, func(written, _ int64) {
+			if trackWeights {
+				return
+			}
 			progress.report(baseAt + written)
 		})
 		if fetchErr != nil {
@@ -1099,6 +1160,37 @@ func (s *Service) runInstallation(ctx context.Context, inst domain.Installation,
 			return
 		}
 	}
+	// 文件落位后等待并行预拉结束。未完成标记前不写 done，避免任务执行时才开始下载。
+	if ref != "" {
+		var prepareErr error
+		pollCtx, stopPoll := context.WithCancel(ctx)
+		if trackWeights {
+			go s.pollFlashCLIWeightProgress(pollCtx, inst.ID, ref)
+		}
+		select {
+		case prepareErr = <-prepareDone:
+			stopPoll()
+		case <-ctx.Done():
+			stopPoll()
+			return
+		}
+		if prepareErr != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			s.logWarn("installation", "installation.model_prepare_failed", map[string]any{
+				"installation_id": string(inst.ID),
+				"error":           prepareErr.Error(),
+			})
+			s.failInstallation(inst, progress.percent(), verified, "installation.install_failed", true)
+			return
+		}
+		if err := writeFlashCLIPrepareMarker(dir, ref); err != nil {
+			s.failInstallation(inst, progress.percent(), verified, "installation.install_failed", true)
+			return
+		}
+		invalidateFlashCLIListCache()
+	}
 	// 状态写入失败不得宣称完成：记录落 failed（可重试），已校验文件保留待重试复用。
 	if err := s.completeInstallation(inst, plan.Release, verified); err != nil {
 		s.failInstallation(inst, progress.percent(), verified, "installation.install_failed", true)
@@ -1116,6 +1208,83 @@ func (s *Service) transitionInstallation(ctx context.Context, id domain.ID, to d
 // progressInstallation 在当前阶段内推进真实进度（可丢弃的进度消息）。
 func (s *Service) progressInstallation(ctx context.Context, id domain.ID, phase domain.InstallationPhase, progress, verified int) (domain.Installation, error) {
 	return s.updateInstallationPhase(ctx, id, phase, progress, verified, "installation.progress", nil)
+}
+
+// reportInstallingProgress 只在记录仍处于 installing 时写入权重进度。
+func (s *Service) reportInstallingProgress(ctx context.Context, id domain.ID, progress, verified int) error {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 99 {
+		progress = 99
+	}
+	var events []domain.DomainEvent
+	updated := false
+	err := s.store.DoTx(ctx, func(tx *store.Tx) error {
+		inst, ok, err := tx.SetInstallationProgress(ctx, id, domain.InstallationPhaseInstalling, progress, verified, s.Now())
+		if err != nil || !ok {
+			return err
+		}
+		updated = true
+		return s.stageEvent(ctx, tx, &events, domain.DomainEvent{
+			Type: "installation.progress",
+			Data: map[string]any{
+				"installation_id": inst.ID,
+				"slot":            inst.Slot,
+				"slots":           inst.CoveredSlots,
+				"phase":           inst.Phase,
+				"progress":        inst.Progress,
+			},
+		})
+	})
+	if err != nil || !updated {
+		return err
+	}
+	s.publish(events...)
+	return nil
+}
+
+func (s *Service) pollFlashCLIWeightProgress(ctx context.Context, id domain.ID, ref string) {
+	measure := s.opts.WeightProgress
+	if measure == nil {
+		return
+	}
+	interval := s.opts.WeightProgressInterval
+	if interval <= 0 {
+		interval = 2 * time.Second
+	}
+	measureOnce := func() {
+		if ctx.Err() != nil {
+			return
+		}
+		done, total, err := measure(ctx, ref)
+		if err != nil || total <= 0 || done < 0 {
+			return
+		}
+		if done > total {
+			done = total
+		}
+		pct := int(done * 100 / total)
+		if pct > 99 {
+			pct = 99
+		}
+		current, err := s.GetInstallation(ctx, string(id))
+		if err != nil || current.Phase != domain.InstallationPhaseInstalling || current.Progress == pct {
+			return
+		}
+		_ = s.reportInstallingProgress(ctx, id, pct, current.VerifiedFiles)
+	}
+	measureOnce()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			measureOnce()
+		}
+	}
 }
 
 func (s *Service) updateInstallationPhase(ctx context.Context, id domain.ID, to domain.InstallationPhase, progress, verified int, eventType string, extra map[string]any) (domain.Installation, error) {
@@ -1398,6 +1567,31 @@ func (s *Service) DeleteInstalledPackage(ctx context.Context, idem Idem, slotVal
 	}
 	s.installationLifecycleMu.Lock()
 	defer s.installationLifecycleMu.Unlock()
+
+	replay, err := s.idempotentReplay(ctx, "installations.delete", idem)
+	if err != nil {
+		return Response{}, err
+	}
+	if !replay {
+		refs, err := s.flashCLIRefsReleasedByDelete(ctx, slot)
+		if err != nil {
+			return Response{}, err
+		}
+		for _, ref := range refs {
+			if err := s.removeAdmittedModel(ctx, ref); err != nil {
+				s.logWarn("installation", "installation.model_remove_failed", map[string]any{
+					"slot":  string(slot),
+					"error": err.Error(),
+				})
+				return Response{}, &domain.Error{
+					Code:       domain.ErrorCodeWorkerExited,
+					MessageKey: "installation.install_failed",
+					Retryable:  true,
+				}
+			}
+			invalidateFlashCLIListCache()
+		}
+	}
 
 	var events []domain.DomainEvent
 	var removeRoots []string
@@ -1869,6 +2063,12 @@ func releaseID(ref *domain.ReleaseRef) string {
 		return ""
 	}
 	return ref.ReleaseID
+}
+
+func (s *Service) logInfo(component, event string, fields map[string]any) {
+	if s.log != nil {
+		s.log.Info(component, event, fields)
+	}
 }
 
 func (s *Service) logWarn(component, event string, fields map[string]any) {

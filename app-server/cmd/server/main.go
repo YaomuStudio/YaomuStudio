@@ -158,9 +158,12 @@ func run() error {
 			// 由 Main 注入 MLSTOOLS_BIN，二者都只读环境，不要求模型安装记录。
 			MLSToolsPath: func() string { return resolveMLSToolsPath(os.Getenv) },
 		},
-		Devices:     environmentDevices,
-		Environment: environmentDevices,
-		Releases:    releases,
+		Devices: environmentDevices,
+		// 模型列表的“已下载”以 flashcli models list 的 WEIGHTS=cached 为准。
+		ListCachedModels: service.ListFlashCLICachedModels,
+		WeightProgress:   service.MeasureFlashCLIWeightProgress,
+		Environment:      environmentDevices,
+		Releases:         releases,
 		// 导入/重定位用同一固定 ffprobe 读取媒体元数据；未配置或缺失时
 		// 导入仍成功但 Meta 为空（记录警告，不伪造）。
 		MediaProber: newMediaProber(os.Getenv),

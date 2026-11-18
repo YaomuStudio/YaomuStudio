@@ -397,7 +397,16 @@ async function refresh(): Promise<void> {
 
 async function startInstall(slot: CapabilitySlotKey): Promise<void> {
   // 未支持/未准入的槽位没有可解析的发布，禁用入口且不发无效计划请求。
-  if (activeInstallation(slot) || !hasDownloadableRelease(caps.slotState(slot))) return;
+  // 权重预拉进行中槽位已是 INSTALLING，不能再打开下载确认。
+  const state = caps.slotState(slot)?.state;
+  if (
+    activeInstallation(slot) ||
+    state === "INSTALLING" ||
+    state === "VERIFYING" ||
+    !hasDownloadableRelease(caps.slotState(slot))
+  ) {
+    return;
+  }
   busySlot.value = slot;
   clearSlotFeedback(slot);
   try {
@@ -654,6 +663,16 @@ onMounted(() => {
               {{ activeSharedLabel(row.cap.slot) }}
             </p>
           </div>
+          <div
+            v-else-if="row.cap.state === 'INSTALLING' || row.cap.state === 'VERIFYING'"
+            class="progress"
+          >
+            <div class="progress__head">
+              <span>{{ t("models.progress") }}</span>
+            </div>
+            <YmProgress indeterminate tone="info" />
+            <p class="progress__phase">{{ t(STATE_HINTS[row.cap.state]) }}</p>
+          </div>
 
           <div v-if="visibleParams(row.cap).length > 0" class="params">
             <p class="params__title">{{ t("models.params") }}</p>
@@ -856,6 +875,16 @@ onMounted(() => {
             <p v-if="activeSharedLabel(row.cap.slot)" class="progress__shared">
               {{ activeSharedLabel(row.cap.slot) }}
             </p>
+          </div>
+          <div
+            v-else-if="row.cap.state === 'INSTALLING' || row.cap.state === 'VERIFYING'"
+            class="progress"
+          >
+            <div class="progress__head">
+              <span>{{ t("models.progress") }}</span>
+            </div>
+            <YmProgress indeterminate tone="info" />
+            <p class="progress__phase">{{ t(STATE_HINTS[row.cap.state]) }}</p>
           </div>
           <footer class="slot__actions">
             <template v-if="activeInstallation(row.cap.slot)">

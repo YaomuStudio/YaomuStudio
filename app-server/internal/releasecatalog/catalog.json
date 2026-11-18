@@ -33,6 +33,7 @@
         ]
       },
       "requires_restart": false,
+      "flashcli_ref": "tts/omnivoice_flashrt:1.0.3",
       "source": {
         "flashhub_repo": "tts/omnivoice_flashrt",
         "flashhub_repo_id": 8,
@@ -116,6 +117,7 @@
         ]
       },
       "requires_restart": false,
+      "flashcli_ref": "xym/melband-roformer:1.0.10",
       "source": {
         "flashhub_repo": "xym/melband-roformer",
         "flashhub_repo_id": 9,
@@ -265,6 +267,7 @@
         ]
       },
       "requires_restart": false,
+      "flashcli_ref": "asr/qwen3_asr:1.0.1",
       "source": {
         "flashhub_repo": "asr/qwen3_asr",
         "flashhub_repo_id": 36,

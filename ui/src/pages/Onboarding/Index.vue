@@ -7,9 +7,7 @@ import { api } from "@/api";
 import {
   errorNotice,
   messageNotice,
-  noticeKey,
   renderNotice,
-  type NoticeMessageParam,
   type SafeNotice,
 } from "@/i18n/notice";
 import {
@@ -196,21 +194,6 @@ function slotNameKey(slot: CapabilitySlotKey): string {
   return CAPABILITY_SLOTS.find((meta) => meta.key === slot)?.nameKey ?? slot;
 }
 
-/**
- * 槽位是提示事件期的不可变身份；展示名在渲染时按当前 locale 解析。
- * 字面量键由 i18n guard 校验注册；新增槽位需要同步此映射。
- */
-const SLOT_NOTICE_NAME: Record<CapabilitySlotKey, NoticeMessageParam> = {
-  asr: noticeKey("slot.asr"),
-  translate: noticeKey("slot.translate"),
-  tts: noticeKey("slot.tts"),
-  "voice-clone": noticeKey("slot.voiceClone"),
-  "subtitle-erase": noticeKey("slot.subtitleErase"),
-  separation: noticeKey("slot.separation"),
-  ocr: noticeKey("slot.ocr"),
-  ffmpeg: noticeKey("slot.ffmpeg"),
-};
-
 function capOf(slot: CapabilitySlotKey) {
   return caps.slotState(slot);
 }
@@ -246,6 +229,13 @@ function activeSharedLabel(slot: CapabilitySlotKey): string {
 
 function activeProgress(slot: CapabilitySlotKey): number {
   return activeInstallation(slot)?.progress ?? 0;
+}
+
+/** 安装进行中：有活动记录，或能力目录已经是安装/校验。 */
+function slotInstalling(slot: CapabilitySlotKey): boolean {
+  if (activeInstallation(slot)) return true;
+  const state = capOf(slot)?.state;
+  return state === "INSTALLING" || state === "VERIFYING";
 }
 
 function activePhaseLabel(slot: CapabilitySlotKey): string {
@@ -395,13 +385,6 @@ async function confirmInstall(): Promise<void> {
     // 写后重读：列表与能力目录都由 Core 投影，不用旧回执假装已 READY。
     await refreshInstallations();
     await loadCapabilities();
-    // 共享安装不再拼接多个已翻译槽位名；单槽用 noticeKey 冻结槽位身份。
-    notice.value =
-      coverage.slots.length > 1
-        ? messageNotice("onboarding.models.installStartedShared")
-        : messageNotice("onboarding.models.installStarted", {
-            name: SLOT_NOTICE_NAME[coverage.slots[0] ?? plan.slot],
-          });
   } catch (err) {
     planTarget.value = null;
     error.value = errorNotice(err, "onboarding.error");
@@ -689,9 +672,13 @@ onBeforeUnmount(() => {
           <div v-if="activeModelSlots.length" class="bulk-progress">
             <div class="bulk-progress__head">
               <span>{{ t("onboarding.models.bulkRunning", { count: activeModelSlots.length }) }}</span>
-              <span class="mono">{{ Math.round(activeModelProgress) }}%</span>
+              <span v-if="activeModelProgress > 0" class="mono">{{ Math.round(activeModelProgress) }}%</span>
             </div>
-            <YmProgress :value="activeModelProgress" tone="info" />
+            <YmProgress
+              :value="activeModelProgress"
+              :indeterminate="activeModelProgress <= 0"
+              tone="info"
+            />
           </div>
 
           <div class="model-list">
@@ -704,11 +691,17 @@ onBeforeUnmount(() => {
                       {{ slotLabel(meta.key) }}
                     </YmBadge>
                   </div>
-                  <div v-if="activeInstallation(meta.key)" class="model__progress">
-                    <YmProgress :value="activeProgress(meta.key)" tone="info" />
+                  <div v-if="slotInstalling(meta.key)" class="model__progress">
+                    <YmProgress
+                      :value="activeProgress(meta.key)"
+                      :indeterminate="activeProgress(meta.key) <= 0"
+                      tone="info"
+                    />
                     <span class="hint">
-                      {{ Math.round(activeProgress(meta.key)) }}% ·
-                      {{ activePhaseLabel(meta.key) }}
+                      <template v-if="activeProgress(meta.key) > 0">
+                        {{ Math.round(activeProgress(meta.key)) }}% ·
+                      </template>
+                      {{ activePhaseLabel(meta.key) || t("state.installing") }}
                     </span>
                     <span v-if="activeSharedLabel(meta.key)" class="hint">
                       {{ activeSharedLabel(meta.key) }}
@@ -717,15 +710,20 @@ onBeforeUnmount(() => {
                   <p v-else class="hint">{{ modelHint(meta.key) }}</p>
                 </div>
                 <div class="model__actions">
-                  <YmButton
-                    v-if="activeInstallation(meta.key)"
-                    size="sm"
-                    :loading="busy === meta.key"
-                    :title="activeSharedLabel(meta.key) || undefined"
-                    @click="cancelModel(meta.key)"
-                  >
-                    {{ t("onboarding.models.cancel") }}
-                  </YmButton>
+                  <template v-if="slotInstalling(meta.key)">
+                    <YmButton size="sm" disabled>
+                      {{ t("state.installing") }}
+                    </YmButton>
+                    <YmButton
+                      v-if="activeInstallation(meta.key)"
+                      size="sm"
+                      :loading="busy === meta.key"
+                      :title="activeSharedLabel(meta.key) || undefined"
+                      @click="cancelModel(meta.key)"
+                    >
+                      {{ t("onboarding.models.cancel") }}
+                    </YmButton>
+                  </template>
                   <YmButton
                     v-else-if="capOf(meta.key)?.state === 'READY'"
                     size="sm"
@@ -1243,7 +1241,10 @@ onBeforeUnmount(() => {
   margin-top: var(--space-2);
 }
 .model__actions {
+  display: flex;
   flex: none;
+  align-items: center;
+  gap: var(--space-2);
 }
 .storage-total {
   display: flex;

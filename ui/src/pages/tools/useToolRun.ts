@@ -262,7 +262,7 @@ export function useToolRun() {
       const final = await pollRun(
         created.id,
         opts.pollMs ?? 500,
-        opts.timeoutMs ?? 15 * 60 * 1000,
+        opts.timeoutMs ?? 60 * 60 * 1000,
         opts.waitForReview,
       );
       if (!final) {

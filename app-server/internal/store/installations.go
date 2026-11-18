@@ -392,6 +392,34 @@ func (tx *Tx) UpdateInstallationPhase(ctx context.Context, id domain.ID, to doma
 	return tx.GetInstallation(ctx, id)
 }
 
+// SetInstallationProgress 只在阶段仍是 phase 时更新进度。
+// 阶段已经离开时返回 false，避免把完成记录改回安装中。
+func (tx *Tx) SetInstallationProgress(ctx context.Context, id domain.ID, phase domain.InstallationPhase, progress, verifiedFiles int, now time.Time) (domain.Installation, bool, error) {
+	if progress < 0 || progress > 100 {
+		return domain.Installation{}, false, fmt.Errorf("%w: installation progress %d out of range", domain.ErrInvalidRequest, progress)
+	}
+	res, err := tx.db.ExecContext(ctx, `
+		UPDATE installations
+		SET progress = ?, verified_files = ?, updated_at = ?
+		WHERE id = ? AND phase = ?`,
+		progress, verifiedFiles, formatTime(now), id, string(phase))
+	if err != nil {
+		return domain.Installation{}, false, fmt.Errorf("update installation progress: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return domain.Installation{}, false, fmt.Errorf("rows affected: %w", err)
+	}
+	if n == 0 {
+		return domain.Installation{}, false, nil
+	}
+	inst, err := tx.GetInstallation(ctx, id)
+	if err != nil {
+		return domain.Installation{}, false, err
+	}
+	return inst, true, nil
+}
+
 // SetCurrentBindings 在同一事务内把槽位当前引用切到指定安装实体。
 //
 // 先清空同槽其他当前引用（部分唯一索引要求），再 upsert 本实体引用；

@@ -59,6 +59,24 @@ type Options struct {
 	Releases     ReleaseCatalog
 	Downloader   Downloader
 
+	// PrepareModel 在已准入模型文件落位后预拉 FlashCLI 权重。
+	// nil 时使用 WSL 上已准入的 `flashcli pull <ref>`。测试可注入。
+	PrepareModel func(ctx context.Context, ref string) error
+
+	// ListCachedModels 用 `flashcli models list` 判断已准入 ref 的权重是否已缓存。
+	// nil 时不改能力目录（测试不启动 WSL）。生产入口注入 ListFlashCLICachedModels。
+	ListCachedModels func(ctx context.Context) (map[string]bool, error)
+
+	// RemoveModel 删除已准入 ref 的 FlashCLI 缓存。
+	// nil 时使用 `flashcli bundle clean <ref> --all --yes`。测试可注入。
+	RemoveModel func(ctx context.Context, ref string) error
+
+	// WeightProgress 返回该 ref 已下载的权重字节和清单声明的总字节。
+	// nil 时安装进度仍按目录小包计算（测试）。生产入口注入 MeasureFlashCLIWeightProgress。
+	WeightProgress func(ctx context.Context, ref string) (done, total int64, err error)
+	// WeightProgressInterval 是权重进度的采样间隔。0 表示 2 秒。
+	WeightProgressInterval time.Duration
+
 	// HeavySlots 是重型推理资源槽上限（默认 1，可配置）。
 	HeavySlots int
 
@@ -117,6 +135,15 @@ type Service struct {
 	usageCached bool
 	usageValue  domain.StorageUsage
 	usageAt     time.Time
+
+	// flashRefs 记住本次进程里计划对应的已准入预拉引用。
+	// 安装执行以持久化的计划引用为准；这里只作同一进程的后备。
+	flashRefMu sync.Mutex
+	flashRefs  map[string]string
+
+	// preparing 避免同一 ref 的补拉重叠。
+	prepareMu sync.Mutex
+	preparing map[string]struct{}
 }
 
 // New 构造 Service；缺失的可选依赖使用安全默认实现。

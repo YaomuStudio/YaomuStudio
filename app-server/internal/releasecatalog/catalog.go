@@ -45,6 +45,7 @@ type releaseDoc struct {
 	Permissions      []string              `json:"permissions"`
 	License          domain.LicenseSummary `json:"license"`
 	RequiresRestart  bool                  `json:"requires_restart"`
+	FlashCLIRef      string                `json:"flashcli_ref,omitempty"`
 	Files            []downloader.File     `json:"files"`
 }
 
@@ -75,6 +76,15 @@ func (c Catalog) Resolve(_ context.Context, slot domain.CapabilitySlotKey) (serv
 		}
 	}
 	return plan, nil
+}
+
+// FlashCLIRefFor 返回与已安装发布匹配的已准入引用。
+func (c Catalog) FlashCLIRefFor(slot domain.CapabilitySlotKey, release domain.ReleaseRef) string {
+	plan, ok := c.bySlot[slot]
+	if !ok || plan.Release.ReleaseID != release.ReleaseID || plan.Release.Version != release.Version {
+		return ""
+	}
+	return plan.FlashCLIRef
 }
 
 // List 返回槽位准入的引擎目录；同一槽位当前只准入一个发布。
@@ -161,6 +171,10 @@ func Parse(raw []byte) (Catalog, error) {
 		if perms == nil {
 			perms = []string{}
 		}
+		flashRef := strings.TrimSpace(rel.FlashCLIRef)
+		if flashRef != "" && !domain.AdmittedFlashCLIRef(flashRef) {
+			return Catalog{}, fmt.Errorf("release catalog: releases[%d] flashcli_ref %q is not admitted", i, flashRef)
+		}
 		plan := service.ReleasePlan{
 			Release:          rel.Release,
 			CoveredSlots:     covered,
@@ -172,13 +186,14 @@ func Parse(raw []byte) (Catalog, error) {
 			Permissions:      perms,
 			License:          rel.License,
 			RequiresRestart:  rel.RequiresRestart,
+			FlashCLIRef:      flashRef,
 		}
 		key, err := domain.ReleaseStorageKey(rel.Release)
 		if err != nil {
 			return Catalog{}, fmt.Errorf("release catalog: releases[%d]: %w", i, err)
 		}
 		if existing, seen := declarations[key]; seen {
-			if !sameCoverage(existing.CoveredSlots, plan.CoveredSlots) || !sameFiles(existing.Files, plan.Files) {
+			if !sameCoverage(existing.CoveredSlots, plan.CoveredSlots) || !sameFiles(existing.Files, plan.Files) || existing.FlashCLIRef != plan.FlashCLIRef {
 				return Catalog{}, fmt.Errorf(
 					"release catalog: releases[%d] repeats release %q with conflicting coverage or file manifest",
 					i, rel.Release.ReleaseID)

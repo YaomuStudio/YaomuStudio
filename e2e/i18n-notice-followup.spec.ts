@@ -103,27 +103,25 @@ test("onboarding install and cancel notices follow the locale without resending"
   await asrRow.getByRole("button", { name: "Download", exact: true }).click();
   await page.getByRole("button", { name: "Download and install" }).click();
 
-  const installNotice = page
-    .locator(".ym-notice[role='status']")
-    .filter({ hasText: "Download requested for Speech recognition." });
-  await expect(installNotice).toHaveCount(1);
-  await expect(installNotice).toBeVisible();
+  await expect(
+    page.locator(".ym-notice[role='status']").filter({ hasText: "Download requested" }),
+  ).toHaveCount(0);
+  await expect(asrRow.getByRole("button", { name: "Installing", exact: true })).toBeVisible();
+  await expect(asrRow.getByRole("progressbar")).toBeVisible();
   const planBefore = await readMockNumber(page, "planRequests");
   const installBefore = await readMockNumber(page, "installRequests");
 
   await switchLocale(page, "zh-CN");
+  const zhRow = page.locator(".model").filter({ hasText: "语音识别" });
+  await expect(zhRow.getByRole("button", { name: "安装中", exact: true })).toBeVisible();
   await expect(
-    page
-      .locator(".ym-notice[role='status']")
-      .filter({ hasText: "已请求下载 语音识别。" })
-      .first(),
-  ).toBeVisible();
+    page.locator(".ym-notice[role='status']").filter({ hasText: "已请求下载" }),
+  ).toHaveCount(0);
   // 仍停留在模型步骤，未因切换语言跳转或重置步骤。
   await expect(page.getByRole("heading", { name: "下载模型包" })).toBeVisible();
   expect(await readMockNumber(page, "planRequests")).toBe(planBefore);
   expect(await readMockNumber(page, "installRequests")).toBe(installBefore);
 
-  const zhRow = page.locator(".model").filter({ hasText: "语音识别" });
   await zhRow.getByRole("button", { name: "取消", exact: true }).click();
   await expect(
     page

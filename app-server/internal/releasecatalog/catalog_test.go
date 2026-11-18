@@ -32,6 +32,9 @@ func TestLoadEmbedded(t *testing.T) {
 	if len(tts.Files) == 0 {
 		t.Fatal("tts files empty")
 	}
+	if tts.FlashCLIRef != "tts/omnivoice_flashrt:1.0.3" || clone.FlashCLIRef != tts.FlashCLIRef {
+		t.Fatalf("tts flashcli ref = %q, clone = %q", tts.FlashCLIRef, clone.FlashCLIRef)
+	}
 	for _, f := range tts.Files {
 		if err := downloader.ValidateFile(f); err != nil {
 			t.Fatalf("tts file %s: %v", f.RelPath, err)
@@ -42,7 +45,7 @@ func TestLoadEmbedded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("separation resolve: %v", err)
 	}
-	if sep.Release.ReleaseID == "" || len(sep.Files) == 0 {
+	if sep.Release.ReleaseID == "" || len(sep.Files) == 0 || sep.FlashCLIRef != "xym/melband-roformer:1.0.10" {
 		t.Fatalf("separation plan incomplete: %#v", sep)
 	}
 
@@ -50,7 +53,7 @@ func TestLoadEmbedded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("asr resolve: %v", err)
 	}
-	if asr.Release.ReleaseID != "fh-asr-qwen3_asr-1.0.1" || len(asr.Files) == 0 {
+	if asr.Release.ReleaseID != "fh-asr-qwen3_asr-1.0.1" || len(asr.Files) == 0 || asr.FlashCLIRef != "asr/qwen3_asr:1.0.1" {
 		t.Fatalf("asr plan incomplete: %#v", asr)
 	}
 	for _, f := range asr.Files {

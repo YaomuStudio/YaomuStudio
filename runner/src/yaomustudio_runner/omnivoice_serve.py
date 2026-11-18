@@ -43,7 +43,8 @@ _BASE64_RE = re.compile(
     re.DOTALL,
 )
 _MAX_PREDICTION_BYTES = 32 * 1024 * 1024
-_PREDICTION_TIMEOUT_S = 180.0
+# 单句预测与 serve 健康检查使用同一档 WSL 执行等待。
+_PREDICTION_TIMEOUT_S = 3600.0
 
 
 @dataclass(frozen=True)

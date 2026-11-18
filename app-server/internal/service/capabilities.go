@@ -560,6 +560,9 @@ func (s *Service) ListCapabilities(ctx context.Context) ([]domain.Capability, er
 	if caps == nil {
 		caps = []domain.Capability{}
 	}
+	if err := s.applyFlashCLIDownloadEvidence(ctx, caps); err != nil {
+		return nil, err
+	}
 	if err := s.annotateCapabilityRuntime(ctx, caps); err != nil {
 		return nil, err
 	}
