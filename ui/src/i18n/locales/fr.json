@@ -702,7 +702,7 @@
   "preflight.reuse_track_invalid": "Le sous-titre réutilisé ne correspond plus à ce projet ou à cette langue. Sélectionnez-le à nouveau.",
   "preflight.source_track_required": "Importez les sous-titres originaux avant de créer l'exécution de clonage.",
   "preflight.translation_track_required": "Importez des sous-titres traduits pour chaque langue cible.",
-  "projectDetail.assetStatus.corrupt": "Corrompu",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Import",
   "projectDetail.assetStatus.missing": "Manquant",
   "projectDetail.assetStatus.ready": "Prêt",

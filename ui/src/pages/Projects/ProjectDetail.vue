@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, apiMode } from "@/api";
-import { formatBytes, formatDate, formatDuration, t, tCount } from "@/i18n";
+import { formatBytes, formatDate, formatDuration, getLocale, t, tCount } from "@/i18n";
 import {
   fallbackErrorNotice,
   messageNotice,
@@ -14,7 +14,7 @@ import {
   type ProjectStatusBucket,
 } from "@/domain/projects";
 import { runnerWaitingMessageKey, type Tone } from "@/domain/status";
-import { ASR_LANGUAGES, TARGET_LANGUAGES, UI_LANGUAGES } from "@/domain/languages";
+import { ASR_LANGUAGES, TARGET_LANGUAGES, UI_LANGUAGES, targetLanguageLabel } from "@/domain/languages";
 import { evaluateAccess } from "@/domain/capabilityAccess";
 import type {
   Asset,
@@ -26,7 +26,7 @@ import type {
   Task,
   WorkflowRun,
 } from "@/domain/types";
-import { buildProjectDownloadItems } from "@/components/projectCardFiles";
+import { buildProjectDownloadItems, fileSafe } from "@/components/projectCardFiles";
 import PageHeader from "@/components/layout/PageHeader.vue";
 import YmBadge from "@/components/ui/YmBadge.vue";
 import YmButton from "@/components/ui/YmButton.vue";
@@ -190,12 +190,17 @@ const projectStats = computed<StatItem[]>(() => {
 const downloadNames = computed<Map<string, string>>(() => {
   const current = project.value;
   if (!current) return new Map();
-  return new Map(
+  const names = new Map(
     buildProjectDownloadItems({
       projectName: current.name,
       assets: current.assets,
     }).map((item) => [item.asset.id, item.filename]),
   );
+  // 详情页展示全部资产：卡片下载规则未覆盖的 ready 资产也允许另存。
+  for (const asset of current.assets) {
+    if (asset.status === "ready" && !names.has(asset.id)) names.set(asset.id, asset.name);
+  }
+  return names;
 });
 
 onMounted(() => {
@@ -226,10 +231,10 @@ onBeforeUnmount(() => {
   if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
 });
 
-async function loadProject(id: string): Promise<void> {
+async function loadProject(id: string, force = false): Promise<void> {
   if (!id) return;
   error.value = null;
-  if (projects.current?.id === id) return;
+  if (!force && projects.current?.id === id) return;
   try {
     await projects.open(id);
     await loadExports(id);
@@ -331,6 +336,45 @@ async function openFolder(): Promise<void> {
   }
 }
 
+function relocateFilters(asset: Asset): { name: string; extensions: string[] }[] {
+  switch (asset.type) {
+    case "video":
+      return [{ name: "video", extensions: ["mp4", "mov", "mkv", "m4v", "webm"] }];
+    case "audio":
+    case "audio_track":
+      return [{ name: "audio", extensions: ["mp3", "wav", "aac", "flac", "m4a", "ogg"] }];
+    case "subtitle":
+      return [{ name: "subtitle", extensions: ["srt", "ass"] }];
+    case "image":
+      return [{ name: "image", extensions: ["png", "jpg", "jpeg", "webp"] }];
+    default:
+      return [];
+  }
+}
+
+/** 重新选择被移动/删除的源文件；Core 会校验内容摘要，防止误绑定其他文件。 */
+async function relocateAsset(asset: Asset): Promise<void> {
+  if (!desktopApi) {
+    error.value = messageNotice("pipeline.import.relocateDesktopOnly");
+    return;
+  }
+  error.value = null;
+  notice.value = null;
+  try {
+    const paths = await desktopApi.selectFiles({
+      title: t("pipeline.import.relocate"),
+      filters: relocateFilters(asset),
+    });
+    if (!paths.length) return;
+    await api.relocateAsset(asset.id, paths[0]);
+    notice.value = messageNotice("pipeline.import.relocateSuccess");
+    flashNotice();
+    await loadProject(projectId.value, true);
+  } catch (err) {
+    error.value = fallbackErrorNotice(err, "pipeline.import.relocateFailed");
+  }
+}
+
 async function downloadAsset(asset: Asset): Promise<void> {
   const name = downloadNames.value.get(asset.id);
   if (!name) return;
@@ -351,6 +395,44 @@ async function downloadAsset(asset: Asset): Promise<void> {
     notice.value = messageNotice("workbench.card.downloadFailed");
     flashNotice();
   }
+}
+
+function trackRevision(track: SubtitleTrack) {
+  return track.revisions.find((item) => item.id === track.currentRevisionId) ?? track.revisions.at(-1);
+}
+
+function srtTime(ms: number): string {
+  const total = Math.max(0, Math.floor(ms));
+  const hours = Math.floor(total / 3_600_000);
+  const minutes = Math.floor((total % 3_600_000) / 60_000);
+  const seconds = Math.floor((total % 60_000) / 1000);
+  const millis = total % 1000;
+  const pad = (value: number, size = 2) => String(value).padStart(size, "0");
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)},${pad(millis, 3)}`;
+}
+
+/** 字幕轨道不在资产列表里；直接按当前 revision 导出 SRT，所有项目类型一致。 */
+function downloadTrack(track: SubtitleTrack): void {
+  const current = project.value;
+  const revision = trackRevision(track);
+  if (!current || !revision || revision.segments.length === 0) return;
+  const body = revision.segments
+    .map((segment, index) => `${index + 1}\n${srtTime(segment.startMs)} --> ${srtTime(segment.endMs)}\n${segment.text}\n`)
+    .join("\n");
+  const base = fileSafe(
+    `${current.name}_${langName(track.language)}_${t(`projectDetail.trackType.${track.type}`)}`,
+  );
+  const filename = `${base || "subtitles"}.srt`;
+  const url = URL.createObjectURL(new Blob([body], { type: "application/x-subrip;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+  notice.value = messageNotice("workbench.card.downloaded", { name: filename });
+  flashNotice();
 }
 
 /** 全量 Project 不带 modeType：有 Run 用 Run 的类型，否则只使用已加载的列表摘要。 */
@@ -384,7 +466,7 @@ function runTypeKey(run?: WorkflowRun): string {
 
 function langName(code: string): string {
   const language = LANGUAGES.find((item) => item.code === code);
-  return language?.nativeName ?? language?.name ?? code;
+  return language ? targetLanguageLabel(language, getLocale()) : code;
 }
 
 function segmentCount(track: SubtitleTrack): number {
@@ -571,6 +653,17 @@ function assetStatusTone(status: AssetStatus): Tone {
             </span>
             <span class="asset-row__meta mono"><bdi dir="ltr">{{ formatBytes(asset.sizeBytes) }}</bdi></span>
             <YmButton
+              v-if="asset.status === 'missing' || asset.status === 'corrupt'"
+              size="sm"
+              variant="ghost"
+              icon="folder-open"
+              :title="t('pipeline.import.relocateHint')"
+              :data-testid="`project-detail-relocate-${asset.id}`"
+              @click="relocateAsset(asset)"
+            >
+              {{ t("pipeline.import.relocate") }}
+            </YmButton>
+            <YmButton
               v-if="downloadNames.has(asset.id)"
               size="sm"
               variant="ghost"
@@ -609,6 +702,16 @@ function assetStatusTone(status: AssetStatus): Tone {
             <YmBadge tone="neutral">
               <bdi>{{ tCount("projectDetail.tracks.revisions", track.revisions.length) }}</bdi>
             </YmBadge>
+            <YmButton
+              v-if="(trackRevision(track)?.segments.length ?? 0) > 0"
+              size="sm"
+              variant="ghost"
+              icon="download"
+              :data-testid="`project-detail-download-track-${track.id}`"
+              @click="downloadTrack(track)"
+            >
+              {{ t("workbench.card.download") }}
+            </YmButton>
           </li>
         </ul>
       </YmCard>

@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "पुनः उपयोग किया गया सबटाइटल अब इस प्रोजेक्ट या भाषा से मेल नहीं खाता। इसे दोबारा चुनें।",
   "preflight.source_track_required": "क्लोन रन बनाने से पहले मूल सबटाइटल आयात करें।",
   "preflight.translation_track_required": "हर लक्ष्य भाषा के लिए अनूदित सबटाइटल आयात करें।",
-  "projectDetail.assetStatus.corrupt": "दूषित",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "आयात हो रहा है",
   "projectDetail.assetStatus.missing": "गायब",
   "projectDetail.assetStatus.ready": "तैयार",

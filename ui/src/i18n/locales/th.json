@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "ซับไตเติลที่ใช้ซ้ำไม่ตรงกับโปรเจกต์หรือภาษานี้อีกต่อไป ให้เลือกใหม่",
   "preflight.source_track_required": "นำเข้าซับไตเติลต้นฉบับก่อนสร้างรอบโคลนเสียง",
   "preflight.translation_track_required": "นำเข้าซับไตเติลที่แปลแล้วสำหรับทุกภาษาเป้าหมาย",
-  "projectDetail.assetStatus.corrupt": "ไฟล์เสียหาย",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "กำลังนำเข้า",
   "projectDetail.assetStatus.missing": "ไฟล์หาย",
   "projectDetail.assetStatus.ready": "พร้อมใช้งาน",

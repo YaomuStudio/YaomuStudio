@@ -426,6 +426,15 @@ test("downloads an asset directly from project detail", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("downloads a subtitle track as SRT from project detail", async ({ page }) => {
+  await page.goto("/#/projects/proj-demo");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.locator('[data-testid^="project-detail-download-track-"]').first().click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.srt$/);
+});
+
 test("failed run offers recreate and shows production failed", async ({ page }) => {
   await page.addInitScript(() => {
     const scope = window as Window & { __yaomuMock?: Record<string, unknown> };

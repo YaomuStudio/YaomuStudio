@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "A legenda reutilizada já não corresponde a este projeto ou idioma. Selecione-a novamente.",
   "preflight.source_track_required": "Importe a legenda original antes de criar a execução de clonagem.",
   "preflight.translation_track_required": "Importe uma legenda traduzida para cada idioma de destino.",
-  "projectDetail.assetStatus.corrupt": "Corrompido",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "A importar",
   "projectDetail.assetStatus.missing": "Em falta",
   "projectDetail.assetStatus.ready": "Pronto",

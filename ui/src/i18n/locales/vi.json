@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Phụ đề tái sử dụng không còn khớp dự án hoặc ngôn ngữ này. Chọn lại.",
   "preflight.source_track_required": "Nhập phụ đề gốc trước khi tạo lần chạy nhân bản.",
   "preflight.translation_track_required": "Nhập phụ đề đã dịch cho mỗi ngôn ngữ đích.",
-  "projectDetail.assetStatus.corrupt": "Hỏng",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Đang nhập",
   "projectDetail.assetStatus.missing": "Thiếu",
   "projectDetail.assetStatus.ready": "Sẵn sàng",

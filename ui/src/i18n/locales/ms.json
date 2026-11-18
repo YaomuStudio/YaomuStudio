@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Sari kata yang diguna semula tidak lagi sepadan dengan projek atau bahasa ini. Pilih semula.",
   "preflight.source_track_required": "Import sari kata asal sebelum mencipta jalanan klon.",
   "preflight.translation_track_required": "Import sari kata terjemahan bagi setiap bahasa sasaran.",
-  "projectDetail.assetStatus.corrupt": "Rosak",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Mengimport",
   "projectDetail.assetStatus.missing": "Hilang",
   "projectDetail.assetStatus.ready": "Sedia",

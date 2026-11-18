@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Wykorzystywane ponownie napisy nie pasują już do tego projektu lub języka. Wybierz je ponownie.",
   "preflight.source_track_required": "Zaimportuj oryginalne napisy przed utworzeniem uruchomienia klonowania.",
   "preflight.translation_track_required": "Zaimportuj przetłumaczone napisy dla każdego języka docelowego.",
-  "projectDetail.assetStatus.corrupt": "Uszkodzony",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Importowanie",
   "projectDetail.assetStatus.missing": "Brak",
   "projectDetail.assetStatus.ready": "Gotowy",

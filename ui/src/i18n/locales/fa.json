@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "زیرنویس استفاده‌شده دیگر با این پروژه یا زبان سازگار نیست. آن را دوباره انتخاب کنید.",
   "preflight.source_track_required": "پیش از ایجاد اجرای همانندسازی، زیرنویس اصلی را درون‌ریزی کنید.",
   "preflight.translation_track_required": "برای هر زبان مقصد، یک زیرنویس ترجمه‌شده درون‌ریزی کنید.",
-  "projectDetail.assetStatus.corrupt": "خراب",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "در حال درون‌ریزی",
   "projectDetail.assetStatus.missing": "غایب",
   "projectDetail.assetStatus.ready": "آماده",

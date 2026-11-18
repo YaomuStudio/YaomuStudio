@@ -704,7 +704,7 @@
   "preflight.reuse_track_invalid": "재사용한 자막이 더 이상 이 프로젝트나 언어에 속하지 않습니다. 다시 선택하세요.",
   "preflight.source_track_required": "클론 실행을 만들기 전에 원본 자막을 가져오세요.",
   "preflight.translation_track_required": "대상 언어마다 번역 자막을 가져오세요.",
-  "projectDetail.assetStatus.corrupt": "손상",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "가져오는 중",
   "projectDetail.assetStatus.missing": "누락",
   "projectDetail.assetStatus.ready": "준비 완료",

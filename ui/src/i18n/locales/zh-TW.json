@@ -740,7 +740,7 @@
   "preflight.reuse_track_invalid": "複用的字幕已不屬於本專案或語言，請重新選擇。",
   "preflight.source_track_required": "建立克隆任務前請先匯入原文字幕。",
   "preflight.translation_track_required": "每個目標語言都需要匯入一份譯文字幕。",
-  "projectDetail.assetStatus.corrupt": "檔案損壞",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "匯入中",
   "projectDetail.assetStatus.missing": "原始檔缺失",
   "projectDetail.assetStatus.ready": "就緒",

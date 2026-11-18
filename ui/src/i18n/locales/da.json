@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Den genbrugte undertekst stemmer ikke længere overens med dette projekt eller sprog. Vælg den igen.",
   "preflight.source_track_required": "Importér den originale undertekst, før du opretter kloningskørslen.",
   "preflight.translation_track_required": "Importér en oversat undertekst til hvert målsprog.",
-  "projectDetail.assetStatus.corrupt": "Korrupt",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Importerer",
   "projectDetail.assetStatus.missing": "Mangler",
   "projectDetail.assetStatus.ready": "Klar",

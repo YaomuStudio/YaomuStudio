@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "الترجمة النصية المُعاد استخدامها لم تعد تطابق هذا المشروع أو اللغة. اخترها مرة أخرى.",
   "preflight.source_track_required": "استورد الترجمة النصية الأصلية قبل إنشاء تشغيل الاستنساخ.",
   "preflight.translation_track_required": "استورد ترجمة نصية مترجمة لكل لغة هدف.",
-  "projectDetail.assetStatus.corrupt": "تالف",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "جارٍ الاستيراد",
   "projectDetail.assetStatus.missing": "مفقود",
   "projectDetail.assetStatus.ready": "جاهز",

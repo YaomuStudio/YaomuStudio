@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Yeniden kullanılan altyazı artık bu projeyle veya dille eşleşmiyor. Yeniden seçin.",
   "preflight.source_track_required": "Klon çalışmasını oluşturmadan önce orijinal altyazıyı içe aktarın.",
   "preflight.translation_track_required": "Her hedef dil için çevrilmiş bir altyazı içe aktarın.",
-  "projectDetail.assetStatus.corrupt": "Bozuk",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "İçe aktarılıyor",
   "projectDetail.assetStatus.missing": "Eksik",
   "projectDetail.assetStatus.ready": "Hazır",

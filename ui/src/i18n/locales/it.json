@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Il sottotitolo riutilizzato non corrisponde più a questo progetto o lingua. Selezionalo di nuovo.",
   "preflight.source_track_required": "Importa il sottotitolo originale prima di creare l'esecuzione di clonazione.",
   "preflight.translation_track_required": "Importa un sottotitolo tradotto per ogni lingua di destinazione.",
-  "projectDetail.assetStatus.corrupt": "Danneggiato",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Importazione",
   "projectDetail.assetStatus.missing": "Mancante",
   "projectDetail.assetStatus.ready": "Pronto",

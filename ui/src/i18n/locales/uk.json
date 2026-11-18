@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Повторно використані субтитри більше не відповідають цьому проєкту або мові. Виберіть їх ще раз.",
   "preflight.source_track_required": "Імпортуйте оригінальні субтитри перед створенням запуску клонування.",
   "preflight.translation_track_required": "Імпортуйте перекладені субтитри для кожної цільової мови.",
-  "projectDetail.assetStatus.corrupt": "Пошкоджено",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Імпортування",
   "projectDetail.assetStatus.missing": "Відсутній",
   "projectDetail.assetStatus.ready": "Готово",

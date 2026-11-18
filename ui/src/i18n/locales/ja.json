@@ -704,7 +704,7 @@
   "preflight.reuse_track_invalid": "再利用した字幕はもうこのプロジェクトまたは言語のものではありません。選択し直してください。",
   "preflight.source_track_required": "クローン実行の作成前に元の字幕をインポートしてください。",
   "preflight.translation_track_required": "対象言語ごとに翻訳字幕をインポートしてください。",
-  "projectDetail.assetStatus.corrupt": "破損",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "インポート中",
   "projectDetail.assetStatus.missing": "見つからない",
   "projectDetail.assetStatus.ready": "準備完了",

@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Subtitle yang digunakan kembali tidak lagi cocok dengan proyek atau bahasa ini. Pilih lagi.",
   "preflight.source_track_required": "Impor subtitle asli sebelum membuat eksekusi kloning.",
   "preflight.translation_track_required": "Impor subtitle terjemahan untuk setiap bahasa target.",
-  "projectDetail.assetStatus.corrupt": "Rusak",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Mengimpor",
   "projectDetail.assetStatus.missing": "Hilang",
   "projectDetail.assetStatus.ready": "Siap",

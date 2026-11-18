@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Uudelleenkäytetty tekstitys ei vastaa enää tätä projektia tai kieltä. Valitse se uudelleen.",
   "preflight.source_track_required": "Tuo alkuperäinen tekstitys ennen klooniajon luomista.",
   "preflight.translation_track_required": "Tuo käännetty tekstitys jokaista kohdekieltä varten.",
-  "projectDetail.assetStatus.corrupt": "Vaurioitunut",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Tuodaan",
   "projectDetail.assetStatus.missing": "Puuttuu",
   "projectDetail.assetStatus.ready": "Valmis",

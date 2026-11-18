@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Повторно используемые субтитры больше не относятся к этому проекту или языку. Выберите их заново.",
   "preflight.source_track_required": "Импортируйте исходные субтитры перед созданием запуска клонирования.",
   "preflight.translation_track_required": "Импортируйте переведённые субтитры для каждого целевого языка.",
-  "projectDetail.assetStatus.corrupt": "Повреждено",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Импорт",
   "projectDetail.assetStatus.missing": "Отсутствует",
   "projectDetail.assetStatus.ready": "Готово",

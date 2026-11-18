@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "הכתובית בשימוש החוזר כבר אינה תואמת לפרויקט או לשפה. בחר אותה שוב.",
   "preflight.source_track_required": "ייבא את הכתובית המקורית לפני יצירת ריצת השיבוט.",
   "preflight.translation_track_required": "ייבא כתובית מתורגמת לכל שפת יעד.",
-  "projectDetail.assetStatus.corrupt": "פגום",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "מייבא",
   "projectDetail.assetStatus.missing": "חסר",
   "projectDetail.assetStatus.ready": "מוכן",

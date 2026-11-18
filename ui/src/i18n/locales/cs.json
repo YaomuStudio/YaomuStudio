@@ -701,7 +701,7 @@
   "preflight.reuse_track_invalid": "Znovu používané titulky již neodpovídají tomuto projektu nebo jazyku. Vyberte je znovu.",
   "preflight.source_track_required": "Před vytvořením běhu klonování importujte původní titulky.",
   "preflight.translation_track_required": "Pro každý cílový jazyk importujte přeložené titulky.",
-  "projectDetail.assetStatus.corrupt": "Poškozeno",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Importuje se",
   "projectDetail.assetStatus.missing": "Chybí",
   "projectDetail.assetStatus.ready": "Připraveno",

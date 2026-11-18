@@ -702,7 +702,7 @@
   "preflight.reuse_track_invalid": "Der wiederverwendete Untertitel gehört nicht mehr zu diesem Projekt oder dieser Sprache. Wähle ihn erneut.",
   "preflight.source_track_required": "Original-Untertitel vor dem Klonlauf importieren.",
   "preflight.translation_track_required": "Übersetzte Untertitel für jede Zielsprache importieren.",
-  "projectDetail.assetStatus.corrupt": "Beschädigt",
+  "projectDetail.assetStatus.corrupt": "Source file unavailable",
   "projectDetail.assetStatus.importing": "Importiert",
   "projectDetail.assetStatus.missing": "Fehlt",
   "projectDetail.assetStatus.ready": "Bereit",
