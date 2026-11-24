@@ -12,7 +12,7 @@
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-1677ff">
   <img alt="Preview" src="https://img.shields.io/badge/preview-Windows%20%2F%20Linux-3ccffa">
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-beta.14-6b7280">
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-beta.15-6b7280">
   <img alt="Status" src="https://img.shields.io/badge/status-control%20plane-6b7280">
 </p>
 
@@ -47,8 +47,8 @@
 
 | 平台 | 安装包 | 说明 |
 |---|---|---|
-| Windows x64 | `YaoMuStudio-0.1.0-beta.14-win-x64.exe` | NSIS；SmartScreen 可能提示。模型执行走 WSL2。 |
-| Linux x64 | `YaoMuStudio-0.1.0-beta.14-linux-x64.AppImage` | preview；需要 GPU 驱动。模型执行 best-effort。 |
+| Windows x64 | `YaoMuStudio-0.1.0-beta.15-win-x64.exe` | NSIS；SmartScreen 可能提示。模型执行走 WSL2。 |
+| Linux x64 | `YaoMuStudio-0.1.0-beta.15-linux-x64.AppImage` | preview；需要 GPU 驱动。模型执行 best-effort。 |
 | macOS | — | 发布构建暂时排除；等 macOS 打包修复且模型就绪后再提供。 |
 
 **前置条件**：Windows 的模型执行需要可用的 WSL2 环境；Linux 为 best-effort；macOS 发布构建暂时排除，等修复打包并确认模型就绪后再提供。Windows 安装包未签名，SmartScreen 可能提示。
