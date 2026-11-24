@@ -385,6 +385,86 @@ func TestStoppedWSLIsNotStarted(t *testing.T) {
 	}
 }
 
+func TestRunningWSLResolvesProductionFlashCLIRoot(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("WSL root resolution is Windows-only")
+	}
+	opts, _ := testOptions(t)
+	opts.FlashCLIRoot = ""
+	opts.WSLDistro = "yaomu"
+	units := utf16.Encode([]rune("  NAME STATE VERSION\r\n* yaomu Running 2\r\n"))
+	listData := make([]byte, len(units)*2)
+	for i, unit := range units {
+		binary.LittleEndian.PutUint16(listData[i*2:], unit)
+	}
+	var calls [][]string
+	opts.RunCommand = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		calls = append(calls, append([]string{name}, args...))
+		switch {
+		case len(args) == 2 && args[0] == "-l" && args[1] == "-v":
+			return listData, nil
+		case len(args) == 6 && args[0] == "-d" && args[1] == "yaomu" && args[2] == "-e" && args[3] == "python3" && args[4] == "-c":
+			return []byte("/home/tester\n"), nil
+		default:
+			t.Fatalf("unexpected WSL call: %#v", append([]string{name}, args...))
+			return nil, nil
+		}
+	}
+	root, err := resolveFlashCLIRoot(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if root != `\\wsl$\yaomu\home\tester\.flashcli` {
+		t.Fatalf("root = %q", root)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("unexpected WSL calls: %#v", calls)
+	}
+}
+
+func TestApplyStaysInsideInvokingUserScopes(t *testing.T) {
+	opts, _ := testOptions(t)
+	otherBase := t.TempDir()
+	otherUserData := filepath.Join(otherBase, "userData")
+	otherDocuments := filepath.Join(otherBase, "Documents")
+	for _, dir := range []string{
+		filepath.Join(otherUserData, "core-data", "media"),
+		otherDocuments,
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	otherPersonal := filepath.Join(otherUserData, "core-data", "media", "other-user.txt")
+	otherExport := filepath.Join(otherDocuments, "other-user-export.txt")
+	for path, value := range map[string]string{
+		otherPersonal: "other-personal",
+		otherExport:   "other-export",
+	} {
+		if err := os.WriteFile(path, []byte(value), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	inventory, err := Inventory(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Personal = true
+	opts.Snapshot = inventory.Snapshot
+	if _, err := Apply(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(otherPersonal); err != nil {
+		t.Fatalf("other user's personal data changed: %v", err)
+	}
+	if _, err := os.Stat(otherExport); err != nil {
+		t.Fatalf("other user's Documents changed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(opts.UserDataDir, "core-data", "media", "project.bin")); !os.IsNotExist(err) {
+		t.Fatalf("invoking user's selected data was not removed: %v", err)
+	}
+}
+
 func TestHardLinkKeepsModelsUnknown(t *testing.T) {
 	opts, _ := testOptions(t)
 	source := filepath.Join(opts.FlashCLIRoot, "models", "store", "melband", "a.bin")
