@@ -12,6 +12,7 @@ import { useTasksStore } from "@/stores/tasks";
 import { useCapabilitiesStore } from "@/stores/capabilities";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useRuntimeStore } from "@/stores/runtime";
+import { safeYaomu } from "@/api/bridge-access";
 
 const route = useRoute();
 const isOnboarding = computed(() => route.name === "onboarding");
@@ -22,7 +23,7 @@ const caps = useCapabilitiesStore();
 const notifications = useNotificationsStore();
 const isBrowserPreview =
   import.meta.env.MODE === "development" &&
-  !window.yaomu &&
+  !safeYaomu() &&
   !navigator.userAgent.includes("Electron");
 const runtime = useRuntimeStore();
 

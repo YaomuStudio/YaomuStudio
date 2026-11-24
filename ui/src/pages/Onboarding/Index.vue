@@ -535,9 +535,10 @@ function jump(value: string): void {
   if (found) step.value = found.key;
 }
 
-function finish(): void {
+async function finish(): Promise<void> {
   localStorage.removeItem(STEP_STORAGE_KEY);
-  settings.markOnboarded();
+  // 桌面端写入主进程权威状态；失败记录但不阻塞跳转，下次启动会按未完成重新引导。
+  await settings.markOnboarded();
   void router.push("/");
 }
 

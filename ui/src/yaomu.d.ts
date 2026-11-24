@@ -277,6 +277,13 @@ interface YaomuBridgeApi {
   setAutoDownloadUpdates(value: boolean): Promise<void>;
   /** 读取主进程持有的“自动下载更新”权威值；用于 localStorage 无水合值时初始化。 */
   getAutoDownloadUpdates(): Promise<boolean>;
+  /**
+   * 读取主进程持有的引导完成状态；`null` 表示未设置（安装器未写或文件损坏），
+   * Renderer 一律按未完成处理。仅桌面端存在，浏览器预览继续使用 localStorage。
+   */
+  getOnboardingCompleted(): Promise<boolean | null>;
+  /** 完成引导后写入主进程权威状态（`<userData>/onboarding.json`）。 */
+  setOnboardingCompleted(): Promise<void>;
   /** 桌面端界面缩放：由主进程对当前窗口应用 Chromium 页面缩放（0.8–1.5）。 */
   setUiScale(factor: number): Promise<void>;
 }

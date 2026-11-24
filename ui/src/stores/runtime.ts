@@ -9,6 +9,7 @@
 // 这些模式下 firstReady 直接为 true，不等待宿主桥、不落 mock。
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { safeYaomu } from "@/api/bridge-access";
 
 const PHASES: readonly YaomuRuntimePhase[] = [
   "preparing",
@@ -97,7 +98,7 @@ export function parseRuntimeSnapshot(value: unknown): YaomuRuntimeSnapshot | nul
 /** 只接受完整 runtime 三方法；缺方法视为旧桥/演示路径，不伪造状态。 */
 function detectBridge(): YaomuRuntimeBridge | null {
   if (typeof window === "undefined") return null;
-  const runtime = window.yaomu?.runtime;
+  const runtime = safeYaomu()?.runtime;
   if (!runtime) return null;
   if (
     typeof runtime.getSnapshot !== "function" ||

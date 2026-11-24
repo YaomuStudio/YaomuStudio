@@ -29,6 +29,7 @@ import {
   writePreferences,
   type CloseBehavior,
 } from "./preferences";
+import { readOnboardingFile, writeOnboardingCompleted } from "./onboarding";
 import { defaultDenyRendererPermissions } from "./permissions";
 import {
   validateBundledRunnerResources,
@@ -137,6 +138,14 @@ function preferencesPath(): string {
   return path.join(app.getPath("userData"), "desktop-preferences.json");
 }
 
+/**
+ * 引导完成状态文件。安装器在非自动更新安装时写入“未完成”，
+ * 自动更新（`--updated`）不写，避免每次更新都重新引导。
+ */
+function onboardingPath(): string {
+  return path.join(app.getPath("userData"), "onboarding.json");
+}
+
 /** Core 数据目录；冒烟打包脚本会显式指向隔离临时目录。 */
 function coreDataDir(): string {
   return process.env.YAOMU_DATA_DIR ?? path.join(app.getPath("userData"), "core-data");
@@ -210,6 +219,17 @@ function loadDesktopPreferences(): void {
   }
   log(
     `桌面偏好不可用（${result.status}），回退 closeBehavior=${DEFAULT_PREFERENCES.closeBehavior}, autoCheckUpdates=${DEFAULT_PREFERENCES.autoCheckUpdates}, autoDownloadUpdates=${DEFAULT_PREFERENCES.autoDownloadUpdates}`,
+  );
+}
+
+/**
+ * 启动时记录引导权威状态；缺失/损坏/未知值按“未完成”处理，不阻断启动。
+ * 每次 Renderer 读取都重新读文件，避免主进程缓存与安装器写入不一致。
+ */
+function loadOnboardingState(): void {
+  const result = readOnboardingFile(onboardingPath());
+  log(
+    `引导状态：${result.completed === true ? "已完成" : "未完成"}（${result.status}）`,
   );
 }
 
@@ -523,6 +543,15 @@ function registerIpc(controller: RuntimeController, installController: UpdateIns
   registerDesktopSettingsIpc(ipcMain, authorization, {
     getAutoCheckUpdates: () => autoCheckUpdates,
     getAutoDownloadUpdates: () => autoDownloadUpdates,
+    getOnboardingCompleted: () => readOnboardingFile(onboardingPath()).completed,
+    applyOnboardingCompleted: () => {
+      try {
+        writeOnboardingCompleted(onboardingPath());
+      } catch (error) {
+        log(`引导状态保存失败：${describe(error)}`);
+        throw new Error("引导状态保存失败");
+      }
+    },
     applyCloseBehavior: (value) => applyCloseBehavior(value, true),
     applyAutoCheckUpdates: (value) => applyAutoCheckUpdates(value, true),
     applyAutoDownloadUpdates: (value) => applyAutoDownloadUpdates(value, true),
@@ -937,6 +966,7 @@ void app.whenReady().then(async () => {
   // ready 前已进入退出：不再注册初始化、探测或创建窗口。
   if (quitting || startup.cancelled) return;
   loadDesktopPreferences();
+  loadOnboardingState();
   // 名称/任务栏身份已在启动早期对齐；Dock 图标需在 ready 后应用。
   applyDevBrandIcon();
   // Renderer Web 权限默认拒绝；仅受信顶层 fullscreen 例外，窗口创建/加载前安装到实际 session。

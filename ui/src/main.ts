@@ -11,9 +11,10 @@ import { useCapabilitiesStore } from "./stores/capabilities";
 import { useRuntimeStore } from "./stores/runtime";
 import { useSettingsStore } from "./stores/settings";
 import { scrollFade } from "./directives/scrollFade";
+import { safeYaomu } from "./api/bridge-access";
 
 // 桌面端无边框窗口标记：所有页面（含首次引导）都需要，不能只挂 AppShell。
-const desktopPlatform = window.yaomu?.platform;
+const desktopPlatform = safeYaomu()?.platform;
 if (desktopPlatform === "darwin" || desktopPlatform === "win32" || desktopPlatform === "linux") {
   const osClass =
     desktopPlatform === "darwin" ? "os-mac" : desktopPlatform === "win32" ? "os-win" : "os-linux";
@@ -28,35 +29,46 @@ app.use(pinia);
 const runtime = useRuntimeStore(pinia);
 void runtime.init();
 
-app.use(router);
-app.directive("scroll-fade", scrollFade);
-
-// 首次引导门控：未完成 → /onboarding；已完成则跳过 onboarding。
-router.beforeEach(async (to) => {
+/**
+ * 引导状态水合必须在路由初始导航前完成：桌面端权威状态在主进程文件，
+ * 读取后路由守卫才能同步判断，避免先渲染引导/工作台再跳转的闪烁。
+ * 浏览器预览/E2E 无桌面桥时 hydrateOnboarding 保持既有 localStorage 行为。
+ */
+async function bootstrap(): Promise<void> {
   const settings = useSettingsStore(pinia);
-  if (!settings.onboarded && to.name !== "onboarding") return { name: "onboarding" };
-  if (settings.onboarded && to.name === "onboarding") return { name: "workbench" };
+  await settings.hydrateOnboarding();
 
-  // 宿主首次 ready 前不读取能力目录：初始化面板不挂载业务页，
-  // 旧完整桥/演示/不可用模式（gated=false）保持原守卫行为。
-  if (runtime.gated && !runtime.firstReady) return true;
+  app.use(router);
+  app.directive("scroll-fade", scrollFade);
 
-  // 发布准入：受控入口在首次进入前等待能力目录；Core 不可用时保留入口，
-  // 由页面展示现有错误态，不能因为加载失败把全部功能隐藏。
-  const accessKey = to.meta.accessKey as AccessKey | undefined;
-  if (!accessKey) return true;
-  const caps = useCapabilitiesStore(pinia);
-  if (caps.slots.length === 0) {
-    try {
-      await caps.load();
-    } catch {
-      return true;
+  // 首次引导门控：未完成 → /onboarding；已完成则跳过 onboarding。
+  router.beforeEach(async (to) => {
+    if (!settings.onboarded && to.name !== "onboarding") return { name: "onboarding" };
+    if (settings.onboarded && to.name === "onboarding") return { name: "workbench" };
+
+    // 宿主首次 ready 前不读取能力目录：初始化面板不挂载业务页，
+    // 旧完整桥/演示/不可用模式（gated=false）保持原守卫行为。
+    if (runtime.gated && !runtime.firstReady) return true;
+
+    // 发布准入：受控入口在首次进入前等待能力目录；Core 不可用时保留入口，
+    // 由页面展示现有错误态，不能因为加载失败把全部功能隐藏。
+    const accessKey = to.meta.accessKey as AccessKey | undefined;
+    if (!accessKey) return true;
+    const caps = useCapabilitiesStore(pinia);
+    if (caps.slots.length === 0) {
+      try {
+        await caps.load();
+      } catch {
+        return true;
+      }
     }
-  }
-  if (evaluateAccess(caps.slots, accessKey).level === "hidden") {
-    return { name: "workbench" };
-  }
-  return true;
-});
+    if (evaluateAccess(caps.slots, accessKey).level === "hidden") {
+      return { name: "workbench" };
+    }
+    return true;
+  });
 
-app.mount("#app");
+  app.mount("#app");
+}
+
+void bootstrap();

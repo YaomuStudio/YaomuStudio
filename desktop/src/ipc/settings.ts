@@ -9,6 +9,10 @@ import type { DesktopAuthorization } from "./authorization";
 export interface DesktopSettingsHandlers {
   getAutoCheckUpdates(): boolean;
   getAutoDownloadUpdates(): boolean;
+  /** 读出主进程持有的引导完成状态；`null` 表示未设置（按未完成处理）。 */
+  getOnboardingCompleted(): boolean | null;
+  /** 写入“引导已完成”；失败时由 Main 记录并抛给 Renderer。 */
+  applyOnboardingCompleted(): void;
   applyCloseBehavior(value: CloseBehavior): void;
   applyAutoCheckUpdates(value: boolean): void;
   applyAutoDownloadUpdates(value: boolean): void;
@@ -46,6 +50,16 @@ export function registerDesktopSettingsIpc(
   ipcMain.handle("yaomu:settings:get-auto-download-updates", (event) => {
     authorization.requireSender(event);
     return handlers.getAutoDownloadUpdates();
+  });
+  // 引导完成状态以主进程文件为权威；安装器在非更新安装时重置，
+  // Renderer 的 localStorage 只作为旧版本一次性迁移来源。
+  ipcMain.handle("yaomu:settings:get-onboarding-completed", (event) => {
+    authorization.requireSender(event);
+    return handlers.getOnboardingCompleted();
+  });
+  ipcMain.handle("yaomu:settings:set-onboarding-completed", (event) => {
+    authorization.requireSender(event);
+    handlers.applyOnboardingCompleted();
   });
   // 界面缩放：只接受 FR-SET-43 的 80%–150%，由 Main 应用到发起窗口。
   // 使用 Chromium 页面缩放而不是 CSS zoom，媒体查询、fixed 定位和 100% 高度

@@ -66,7 +66,10 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  # 交互卸载默认保留项目/模型/WSL；用户二次确认删除时才清理 userData 与 outputs。
+  # 统一 include 入口：安装期重置引导状态；卸载时提供两个默认关闭的
+  # “个人数据/模型”选项，由随包 helper 执行受限清理。模板不得自行删除
+  # AppData；卸载器还会拒绝 --delete-app-data 旁路。
+  deleteAppDataOnUninstall: false
   include: nsis/uninstall-lease.nsh
 
 # 首发矩阵：Windows x64、macOS arm64/x64、Linux x64；签名仍按各平台注释处理。

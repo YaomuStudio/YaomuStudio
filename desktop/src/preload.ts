@@ -242,6 +242,12 @@ const api = {
     ipcRenderer.invoke("yaomu:settings:set-auto-download-updates", value),
   getAutoDownloadUpdates: () =>
     ipcRenderer.invoke("yaomu:settings:get-auto-download-updates") as Promise<boolean>,
+  // 引导完成状态以主进程文件为权威；null 表示未设置（Renderer 按未完成处理）。
+  getOnboardingCompleted: () =>
+    ipcRenderer.invoke("yaomu:settings:get-onboarding-completed") as Promise<boolean | null>,
+  // 完成引导后写入主进程权威状态；失败由 Renderer 记录，不回滚界面。
+  setOnboardingCompleted: () =>
+    ipcRenderer.invoke("yaomu:settings:set-onboarding-completed") as Promise<void>,
   // 界面缩放：Main 使用 Chromium 页面缩放应用到当前窗口，Renderer 不直接改页面 zoom。
   setUiScale: (factor: number) => ipcRenderer.invoke("yaomu:settings:set-ui-scale", factor),
 };

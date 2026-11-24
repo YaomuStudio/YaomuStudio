@@ -225,13 +225,28 @@ const settingsChannels = [
   ["yaomu:settings:get-auto-check-updates", undefined],
   ["yaomu:settings:set-auto-download-updates", true],
   ["yaomu:settings:get-auto-download-updates", undefined],
+  ["yaomu:settings:get-onboarding-completed", undefined],
+  ["yaomu:settings:set-onboarding-completed", undefined],
   ["yaomu:settings:set-ui-scale", 1.25],
 ];
 
 function settingsHarness() {
   const handlers = new Map();
-  const calls = { get: 0, close: [], auto: [], download: [], downloadGet: 0, uiScale: [] };
-  const state = { autoCheckUpdates: false, autoDownloadUpdates: false };
+  const calls = {
+    get: 0,
+    close: [],
+    auto: [],
+    download: [],
+    downloadGet: 0,
+    onboardGet: 0,
+    onboardSet: 0,
+    uiScale: [],
+  };
+  const state = {
+    autoCheckUpdates: false,
+    autoDownloadUpdates: false,
+    onboardingCompleted: null,
+  };
   const authorization = new DesktopAuthorization();
   const target = sender();
   authorization.registerWindow(target.contents, appURL);
@@ -241,6 +256,11 @@ function settingsHarness() {
     {
       getAutoCheckUpdates() { calls.get += 1; return state.autoCheckUpdates; },
       getAutoDownloadUpdates() { calls.downloadGet += 1; return state.autoDownloadUpdates; },
+      getOnboardingCompleted() { calls.onboardGet += 1; return state.onboardingCompleted; },
+      applyOnboardingCompleted() {
+        calls.onboardSet += 1;
+        state.onboardingCompleted = true;
+      },
       applyCloseBehavior(value) { calls.close.push(value); },
       applyAutoCheckUpdates(value) { calls.auto.push(value); state.autoCheckUpdates = value; },
       applyAutoDownloadUpdates(value) {
@@ -275,9 +295,19 @@ test("settings IPC rejects untrusted sources before any read or write", () => {
   denied(event, "navigated document");
   contents.mainFrame.url = appURL;
 
-  assert.deepEqual(calls, { get: 0, close: [], auto: [], download: [], downloadGet: 0, uiScale: [] });
+  assert.deepEqual(calls, {
+    get: 0,
+    close: [],
+    auto: [],
+    download: [],
+    downloadGet: 0,
+    onboardGet: 0,
+    onboardSet: 0,
+    uiScale: [],
+  });
   assert.equal(state.autoCheckUpdates, false);
   assert.equal(state.autoDownloadUpdates, false);
+  assert.equal(state.onboardingCompleted, null);
 });
 
 test("settings IPC allows the registered top-level window and keeps value semantics", () => {
@@ -312,6 +342,15 @@ test("settings IPC allows the registered top-level window and keeps value semant
   );
   assert.deepEqual(calls.download, [true]);
   assert.equal(state.autoDownloadUpdates, true);
+
+  // 引导状态：null 表示未设置；set 触发写入回调后 get 返回已完成。
+  assert.equal(invoke("yaomu:settings:get-onboarding-completed", target.event), null);
+  assert.equal(calls.onboardGet, 1);
+  invoke("yaomu:settings:set-onboarding-completed", target.event);
+  assert.equal(calls.onboardSet, 1);
+  assert.equal(state.onboardingCompleted, true);
+  assert.equal(invoke("yaomu:settings:get-onboarding-completed", target.event), true);
+  assert.equal(calls.onboardGet, 2);
 
   invoke("yaomu:settings:set-ui-scale", target.event, 1.25);
   assert.deepEqual(calls.uiScale, [[contents.id, 1.25]]);

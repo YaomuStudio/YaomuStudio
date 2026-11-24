@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # 构建打包所需的本机资源：Core 二进制 + Runner 源码/启动器 + 随包运行时。
-# 用法：bash scripts/build-core.sh [--out <dir>] [--arch arm64|x64]
+# 用法：bash scripts/build-core.sh [--out <dir>] [--arch arm64|x64] [--os darwin|linux|win32]
 #
 # - Windows 宿主：生成 yaomu-core.exe、yaomu-runner.cmd，默认随包 Windows
 #   embeddable Python 3.12.10 与 Gyan FFmpeg 9.0.2。
 # - macOS/Linux 宿主：生成 yaomu-core、POSIX yaomu-runner，默认随包
 #   python-build-standalone 3.12.16 与 ffmpeg-static 6.1.1。
-# - --arch 允许在 Apple Silicon 上交叉暂存 x64 资源；目标 OS 仍为宿主 OS。
+# - --arch 允许在 Apple Silicon 上交叉暂存 x64 资源；--os 允许交叉构建
+#   Windows 安装包（例如在 macOS 上生成 win32/x64 资源）。
 # - 显式 FFMPEG_BIN/FFPROBE_BIN 优先；BUNDLE_PYTHON=0/BUNDLE_FFMPEG=0 可关闭随包。
 set -euo pipefail
 
@@ -14,13 +15,15 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 app_server="$root/app-server"
 out="$root/desktop/build/core"
 arch=""
+target_os_arg=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) out="${2:-}"; shift 2 ;;
     --arch) arch="${2:-}"; shift 2 ;;
+    --os) target_os_arg="${2:-}"; shift 2 ;;
     -h|--help)
-      echo "usage: $0 [--out <dir>] [--arch arm64|x64]"
+      echo "usage: $0 [--out <dir>] [--arch arm64|x64] [--os darwin|linux|win32]"
       exit 0
       ;;
     *) echo "[build-core] unknown argument: $1" >&2; exit 2 ;;
@@ -36,6 +39,12 @@ case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) target_os="win32" ;;
   *) echo "[build-core] unsupported host OS: $(uname -s)" >&2; exit 2 ;;
 esac
+if [ -n "$target_os_arg" ]; then
+  case "$target_os_arg" in
+    darwin | linux | win32) target_os="$target_os_arg" ;;
+    *) echo "[build-core] unsupported --os: $target_os_arg" >&2; exit 2 ;;
+  esac
+fi
 
 host_arch=""
 case "$(uname -m)" in
@@ -68,6 +77,13 @@ echo "[build-core] target=$target_os/$arch out=$out"
 echo "[build-core] go build -> $out/$core_name"
 mkdir -p "$out"
 (cd "$app_server" && GOOS="$goos" GOARCH="$goarch" go build -trimpath -o "$out/$core_name" ./cmd/server)
+
+helper_name="yaomu-uninstall-helper"
+if [ "$target_os" = "win32" ]; then
+  helper_name="yaomu-uninstall-helper.exe"
+fi
+echo "[build-core] go build -> $out/$helper_name"
+(cd "$app_server" && GOOS="$goos" GOARCH="$goarch" go build -trimpath -o "$out/$helper_name" ./cmd/uninstall-helper)
 
 echo "[build-core] copy runner source -> $out/runner_src"
 rm -rf "$out/runner_src"

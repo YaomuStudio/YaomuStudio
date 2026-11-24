@@ -9,6 +9,7 @@ import { createBridgeApi } from "./bridge";
 import { fixtureApi } from "yaomu-e2e-source";
 import { createUnavailableApi } from "./unavailable";
 import type { YaoMuApi } from "./types";
+import { safeDesktopApi } from "./bridge-access";
 
 export type ApiMode = "bridge" | "fixtures" | "unavailable";
 
@@ -70,7 +71,7 @@ const BRIDGE_METHODS = {
 
 const BRIDGE_METHOD_NAMES = Object.keys(BRIDGE_METHODS) as (keyof YaoMuApi)[];
 
-const bridge = typeof window !== "undefined" ? window.yaomu?.api : undefined;
+const bridge = typeof window !== "undefined" ? safeDesktopApi() : undefined;
 
 /** preload 桥必须完整：部分/损坏对象不能因为 truthy 就展示假成功。 */
 function isBridgeUsable(candidate: unknown): candidate is YaomuBridgeApi {

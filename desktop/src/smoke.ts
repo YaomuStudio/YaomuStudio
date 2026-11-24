@@ -13,6 +13,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { DesktopAuthorization } from "./ipc/authorization";
+import { writeOnboardingCompleted } from "./onboarding";
 import { observeCoreRunnerEvidence } from "./smoke-evidence";
 
 interface CheckResult {
@@ -134,8 +135,18 @@ interface ShellState {
 }
 
 /**
+ * 冒烟专用：直接写隔离 userData 的引导权威状态，替代旧版 localStorage 标记。
+ * 隔离目录由 desktop/scripts/smoke*.mjs 创建，不触碰真实用户数据。
+ */
+function setOnboardingCompleted(completed: boolean): void {
+  writeOnboardingCompleted(path.join(app.getPath("userData"), "onboarding.json"), completed);
+}
+
+/**
  * 首次启动会进 onboarding：ready 模式先实际验证环境步骤，再回到工作台；
  * no-core 模式直接写入已引导标记，避免依赖不可用的 Core。
+ * 引导状态由主进程文件（隔离 userData）持有；localStorage 故意写入相反值，
+ * 用来证明桌面端不再以 localStorage 决定是否引导。
  */
 async function ensureShell(win: BrowserWindow, mode: string): Promise<ShellState> {
   const ready = await waitFor(
@@ -149,10 +160,11 @@ async function ensureShell(win: BrowserWindow, mode: string): Promise<ShellState
   let onboardingDeviceVisible: boolean | undefined;
 
   if (mode === "ready") {
+    setOnboardingCompleted(false);
     await evaluate(
       win,
       `(() => {
-        localStorage.setItem("yaomu.settings", JSON.stringify({ onboarded: false }));
+        localStorage.setItem("yaomu.settings", JSON.stringify({ onboarded: true }));
         localStorage.setItem("yaomu.onboarding.step", "environment");
         location.hash = "#/onboarding";
         location.reload();
@@ -181,10 +193,11 @@ async function ensureShell(win: BrowserWindow, mode: string): Promise<ShellState
     }
   }
 
+  setOnboardingCompleted(true);
   await evaluate(
     win,
     `(() => {
-      localStorage.setItem("yaomu.settings", JSON.stringify({ onboarded: true }));
+      localStorage.setItem("yaomu.settings", JSON.stringify({ onboarded: false }));
       localStorage.removeItem("yaomu.onboarding.step");
       location.hash = "#/";
       location.reload();
