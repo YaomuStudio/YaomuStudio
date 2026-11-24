@@ -104,6 +104,10 @@ _ADMITTED_FLASHCLI_FLAGS = frozenset(
 # mlstools 字幕翻译已确认入口（2026-11-05）；仅允许出现在 translate.py。
 _ADMITTED_MLSTOOLS_FLAGS = frozenset({"--tool", "--input"})
 
+# voice_clone.py 的既有 Python 脚本入口使用一个 JSON --input 参数；
+# 它不是 FlashCLI 模型参数，不能将 FlashCLI 整套白名单扩展到这个文件。
+_ADMITTED_CLONE_SCRIPT_FLAGS = frozenset({"--input"})
+
 
 class NoGuessedFlagsAcrossRunnerTests(unittest.TestCase):
     def test_src_contains_no_guessed_cli_flag_strings(self):
@@ -121,6 +125,11 @@ class NoGuessedFlagsAcrossRunnerTests(unittest.TestCase):
                 continue
             if path.name == "translate.py":
                 unknown = sorted(set(matches) - _ADMITTED_MLSTOOLS_FLAGS)
+                if unknown:
+                    offenders[path.name] = unknown
+                continue
+            if path.name == "voice_clone.py":
+                unknown = sorted(set(matches) - _ADMITTED_CLONE_SCRIPT_FLAGS)
                 if unknown:
                     offenders[path.name] = unknown
                 continue

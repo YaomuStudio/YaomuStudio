@@ -55,6 +55,9 @@ test("packaged Windows injects bundled ffmpeg and ffprobe without a host runner"
   try {
     await writeFile(path.join(coreDir, "ffmpeg.exe"), "ffmpeg");
     await writeFile(path.join(coreDir, "ffprobe.exe"), "ffprobe");
+    // Linux/macOS CI 也验证 Windows 投影；夹具必须满足宿主的 X_OK 检查。
+    await chmod(path.join(coreDir, "ffmpeg.exe"), 0o755);
+    await chmod(path.join(coreDir, "ffprobe.exe"), 0o755);
     const result = resolveHostRuntimeEnv({
       platform: "win32",
       packaged: true,

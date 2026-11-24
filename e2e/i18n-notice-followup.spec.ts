@@ -176,6 +176,7 @@ test("voice clone save notices re-render on locale switch without resaving", asy
   ).toHaveCount(1);
   await expect(page.locator(".language-select__chips")).toHaveCount(0);
   await page.locator('input[accept=".srt"][multiple]').setInputFiles(SAMPLE_TRANSLATED_SRT);
+  await page.getByPlaceholder("Project name").fill("E2E clone project");
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByText("full-zh-CN.wav")).toBeVisible();
 
@@ -185,7 +186,7 @@ test("voice clone save notices re-render on locale switch without resaving", asy
 
   await switchLocale(page, "zh-CN");
   await expect(page.getByText(/已保存到 ~\/Downloads\/clone-.*\.wav/)).toBeVisible();
-  // 目标语言与已上传文件不因切换语言变化；VoiceClone 已无项目名称字段。
+  // 目标语言与已上传文件不因切换语言变化。
   await expect(page.locator(".language-chip").filter({ hasText: "简体中文" })).toBeVisible();
   await expect(page.locator('input[accept=".srt"][multiple]')).toBeVisible();
   expect(await readMockNumber(page, "saveAssetCalls")).toBe(saved);
