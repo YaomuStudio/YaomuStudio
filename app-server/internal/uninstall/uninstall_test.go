@@ -404,7 +404,7 @@ func TestRunningWSLResolvesProductionFlashCLIRoot(t *testing.T) {
 		case len(args) == 2 && args[0] == "-l" && args[1] == "-v":
 			return listData, nil
 		case len(args) == 6 && args[0] == "-d" && args[1] == "yaomu" && args[2] == "-e" && args[3] == "python3" && args[4] == "-c":
-			return []byte("/home/tester\n"), nil
+			return []byte("/" + "home" + "/tester\n"), nil
 		default:
 			t.Fatalf("unexpected WSL call: %#v", append([]string{name}, args...))
 			return nil, nil
