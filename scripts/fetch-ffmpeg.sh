@@ -9,7 +9,7 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 version="9.0.2"
-url="${FFMPEG_ARCHIVE_URL:-https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z}"
+url="${FFMPEG_ARCHIVE_URL:-https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-${version}-full_build.7z}"
 sha256="${FFMPEG_ARCHIVE_SHA256:-f0e46253c70dfe902bac915dfb4224f0cf1b7c6eeab9da2ccc9a5581f9a71b13}"
 out="${1:-${FFMPEG_RUNTIME_OUT:-$root/desktop/build/core}}"
 cache_dir="$root/desktop/build/.cache/ffmpeg"
