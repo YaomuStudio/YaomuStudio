@@ -88,7 +88,8 @@ test("page calls the read-only helper and skips automatic updates", () => {
     "Function un.yaomuDataPageLeave",
   );
   assert.match(page, /\$\{If\} \$\{isUpdated\}[\s\S]*?Abort/);
-  assert.match(page, /yaomu-uninstall-helper\.exe" inventory/);
+  assert.match(page, /Call un\.yaomuPrepareHelper/);
+  assert.match(page, /"\$yaomuHelperExe" inventory/);
   assert.match(page, /--user-data/);
   assert.match(page, /--install-dir/);
   assert.match(page, /--documents/);
@@ -98,7 +99,8 @@ test("uninstall confirms once with Enter/No default and calls the helper", () =>
   const macro = between(uninstaller, "!macro customUnInstall", "!macroend");
   assert.match(macro, /MessageBox MB_YESNO\|MB_ICONEXCLAMATION\|MB_DEFBUTTON2/);
   assert.match(macro, /\/SD IDNO/);
-  assert.match(macro, /yaomu-uninstall-helper\.exe" apply/);
+  assert.match(macro, /Call un\.yaomuPrepareHelper/);
+  assert.match(macro, /"\$yaomuHelperExe" apply/);
   assert.match(macro, /--personal/);
   assert.match(macro, /--models/);
   assert.match(
@@ -118,6 +120,20 @@ test("helper failure stops before the template removes the program directory", (
   assert.match(macro, /uninstall-error-snapshot-stale/);
   assert.match(macro, /uninstall-error-app-running/);
   assert.match(macro, /uninstall-error-models-unknown/);
+  assert.match(macro, /\$\{If\} \$\{Silent\}\s*SetErrorLevel 3/);
+});
+
+test("helper runs from the uninstaller plugin directory, not the install tree", () => {
+  const prepare = between(
+    installer,
+    "Function un.yaomuPrepareHelper",
+    "Function un.yaomuRunInventory",
+  );
+  assert.match(prepare, /InitPluginsDir/);
+  assert.match(prepare, /\$yaomuHelperExe "\$PLUGINSDIR\\yaomu-uninstall-helper\.exe"/);
+  assert.match(prepare, /CopyFiles \/SILENT/);
+  assert.match(prepare, /\$\{If\} \$\{Silent\}\s*SetErrorLevel 3/);
+  assert.doesNotMatch(prepare, /nsExec::Exec/);
 });
 
 test("helper failure messages stay localized and do not expose paths", () => {

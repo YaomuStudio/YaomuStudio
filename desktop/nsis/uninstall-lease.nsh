@@ -15,6 +15,7 @@
   ; process check do not prove that a WSL/Runner execution resource has exited.
   ; A retained stale lease is the safe direction; it must never be used as a
   ; substitute for a real Core/Runner stop proof.
+  Call un.yaomuPrepareHelper
   StrCpy $yaomuApplyIni "$TEMP\yaomu-uninstall-apply.ini"
   Delete "$yaomuApplyIni"
   ${IfNot} ${isUpdated}
@@ -52,7 +53,7 @@
   ; Backup-only on updates/manual install-over; destructive flags only after
   ; the non-update confirmation above. The helper still verifies the backup.
   SetDetailsPrint none
-  StrCpy $R0 '"$INSTDIR\resources\core\yaomu-uninstall-helper.exe" apply --user-data "$APPDATA\@yaomustudio\desktop" --install-dir "$INSTDIR" --documents "$DOCUMENTS" --result "$yaomuApplyIni"'
+  StrCpy $R0 '"$yaomuHelperExe" apply --user-data "$APPDATA\@yaomustudio\desktop" --install-dir "$INSTDIR" --documents "$DOCUMENTS" --result "$yaomuApplyIni"'
   ${If} $yaomuPersonalRequested == "1"
     StrCpy $R0 "$R0 --personal"
   ${EndIf}
@@ -98,7 +99,11 @@
         StrCpy $R2 "Cleanup did not complete; uninstall was stopped. Retry, or keep the data and uninstall later."
       ${EndIf}
     ${EndIf}
-    MessageBox MB_OK|MB_ICONSTOP "$R2"
+    ${If} ${Silent}
+      SetErrorLevel 3
+    ${Else}
+      MessageBox MB_OK|MB_ICONSTOP "$R2"
+    ${EndIf}
     ${If} $installMode == "all"
       SetShellVarContext all
     ${EndIf}

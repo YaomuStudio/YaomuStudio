@@ -28,6 +28,7 @@
   Var yaomuModelsSize
   Var yaomuInventoryIni
   Var yaomuApplyIni
+  Var yaomuHelperExe
 
   ; Reject the stock template's whole-AppData bypass before any page or
   ; deletion. This also catches --delete-app-data=1.
@@ -52,21 +53,36 @@
   !macro customUnWelcomePage
     !insertmacro MUI_UNPAGE_WELCOME
 
+    Function un.yaomuPrepareHelper
+      InitPluginsDir
+      StrCpy $yaomuHelperExe "$PLUGINSDIR\yaomu-uninstall-helper.exe"
+      ${If} ${FileExists} "$yaomuHelperExe"
+        Return
+      ${EndIf}
+      ClearErrors
+      CopyFiles /SILENT "$INSTDIR\resources\core\yaomu-uninstall-helper.exe" "$yaomuHelperExe"
+      ${IfNot} ${FileExists} "$yaomuHelperExe"
+        ${If} ${Silent}
+          SetErrorLevel 3
+          Quit
+        ${EndIf}
+        ${If} $LANGUAGE == 2052
+          MessageBox MB_OK|MB_ICONSTOP "无法准备卸载辅助工具，已停止卸载。"
+        ${Else}
+          MessageBox MB_OK|MB_ICONSTOP "The uninstall helper could not be prepared; uninstall was stopped."
+        ${EndIf}
+        Quit
+      ${EndIf}
+    FunctionEnd
+
     Function un.yaomuRunInventory
       StrCpy $yaomuModelsAvailable "0"
       StrCpy $yaomuModelsSize ""
       StrCpy $yaomuModelsSnapshot ""
       StrCpy $yaomuInventoryIni "$TEMP\yaomu-uninstall-inventory.ini"
       Delete "$yaomuInventoryIni"
-      ${IfNot} ${FileExists} "$INSTDIR\resources\core\yaomu-uninstall-helper.exe"
-        ${If} $LANGUAGE == 2052
-          MessageBox MB_OK|MB_ICONSTOP "卸载辅助工具缺失，已停止卸载。"
-        ${Else}
-          MessageBox MB_OK|MB_ICONSTOP "The uninstall helper is missing; uninstall was stopped."
-        ${EndIf}
-        Quit
-      ${EndIf}
-      nsExec::ExecToStack '"$INSTDIR\resources\core\yaomu-uninstall-helper.exe" inventory --user-data "$APPDATA\@yaomustudio\desktop" --install-dir "$INSTDIR" --documents "$DOCUMENTS" --result "$yaomuInventoryIni"'
+      Call un.yaomuPrepareHelper
+      nsExec::ExecToStack '"$yaomuHelperExe" inventory --user-data "$APPDATA\@yaomustudio\desktop" --install-dir "$INSTDIR" --documents "$DOCUMENTS" --result "$yaomuInventoryIni"'
       Pop $0
       Pop $1
       ${If} ${FileExists} "$yaomuInventoryIni"
