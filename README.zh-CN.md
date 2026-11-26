@@ -12,7 +12,7 @@
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-1677ff">
   <img alt="Preview" src="https://img.shields.io/badge/preview-Windows%20%2F%20Linux-3ccffa">
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-beta.15-6b7280">
+  <img alt="Release" src="https://img.shields.io/static/v1?label=release&amp;message=v0.1.0-beta.15&amp;color=6b7280">
   <img alt="Status" src="https://img.shields.io/badge/status-control%20plane-6b7280">
 </p>
 

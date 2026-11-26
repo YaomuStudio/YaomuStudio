@@ -39,7 +39,7 @@ function makeFixture({ readmeVersion = FROM } = {}) {
     writeFileSync(
       path.join(root, rel),
       [
-        `  <img alt="Release" src="https://img.shields.io/badge/release-v${readmeVersion}-6b7280">`,
+        `  <img alt="Release" src="https://img.shields.io/static/v1?label=release&amp;message=v${readmeVersion}&amp;color=6b7280">`,
         `| Windows x64 | \`YaoMuStudio-${readmeVersion}-win-x64.exe\` | NSIS |`,
         `| Linux x64 | \`YaoMuStudio-${readmeVersion}-linux-x64.AppImage\` | preview |`,
         "",
@@ -72,7 +72,7 @@ test("同步三处 package.json、锁文件与两份 README", (t) => {
 
   for (const rel of ["README.md", "README.zh-CN.md"]) {
     const text = read(root, rel);
-    assert.ok(text.includes(`release-v${TO}`), `${rel}: 版本徽标未更新`);
+    assert.ok(text.includes(`message=v${TO}`), `${rel}: 版本徽标未更新`);
     assert.ok(text.includes(`YaoMuStudio-${TO}-win-x64.exe`), `${rel}: Windows 资产名未更新`);
     assert.ok(text.includes(`YaoMuStudio-${TO}-linux-x64.AppImage`), `${rel}: Linux 资产名未更新`);
     assert.ok(!text.includes(FROM), `${rel}: 仍残留旧版本号`);
